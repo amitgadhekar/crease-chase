@@ -25,7 +25,7 @@ function resize(){
   cvs.width=Math.round(W*dpr);cvs.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
   F=baseF=Math.min(W*2.4,H*1.15);CX=W/2;HZ=baseHZ=H*0.31;
   const hud=$('#hud');hudBottom=hud.hidden?70:hud.getBoundingClientRect().bottom-r.top;
-  skc.width=Math.round(W*dpr);skc.height=Math.round(H*dpr);if(glOK)T3.r.setSize(skc.width,skc.height,false);
+  skc.width=Math.round(W*dpr);skc.height=Math.round(H*dpr);glSize();
   sk.setTransform(dpr,0,0,dpr,0,0);
   if(S.cel)celCam(clock-S.cel.t0);
 }

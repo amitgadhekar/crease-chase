@@ -4,31 +4,31 @@
    Game coordinates are left-handed (+x is screen right looking down +z) and three's are right-handed, so every object
    lives in T3.world, a group mirrored in x. */
 const glc=$('#gl'),skc=$('#sky'),sk=skc.getContext('2d');
-// Phase 1 keeps the old engine's colour maths: colours are used as given (no sRGB decode or encode) and fog is linear.
-// A move to sRGB output and tone mapping only changes this function.
+// sRGB output with ACES tone mapping. three mixes fog after tone mapping, in the output colour space, so fog colours match
+// the 2D sky canvas exactly.
 function colourSetup(r){
-  THREE.ColorManagement.enabled=false;r.outputColorSpace=THREE.LinearSRGBColorSpace;
-  THREE.ShaderChunk.fog_fragment=THREE.ShaderChunk.fog_fragment.replace('smoothstep( fogNear, fogFar, vFogDepth )','saturate( ( vFogDepth - fogNear ) / ( fogFar - fogNear ) )');
+  THREE.ColorManagement.enabled=true;r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;
 }
 const T3=(()=>{let r;try{r=new THREE.WebGLRenderer({canvas:glc,alpha:true,antialias:true,premultipliedAlpha:true});}catch(e){return null;}
-  colourSetup(r);r.setClearColor(0,0);
-  const scene=new THREE.Scene(),world=new THREE.Group(),hemi=new THREE.HemisphereLight(0xffffff,0xffffff,Math.PI),sun=new THREE.DirectionalLight(0xffffff,Math.PI);
-  world.scale.x=-1;world.add(hemi,sun);scene.add(world);
-  return {r,scene,world,hemi,sun,cam:new THREE.PerspectiveCamera(50,1,0.15,2000),fog:new THREE.Fog(0,1,2)};})();
+  colourSetup(r);r.setClearColor(0,0);r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFShadowMap;
+  const scene=new THREE.Scene(),world=new THREE.Group(),sun=new THREE.DirectionalLight(0xffffff,3);
+  world.scale.x=-1;world.add(sun,sun.target);scene.add(world);
+  Object.assign(sun.shadow,{bias:-.00004,normalBias:.025});sun.castShadow=true;sun.shadow.camera.near=1;sun.shadow.camera.far=320;
+  return {r,scene,world,sun,cam:new THREE.PerspectiveCamera(50,1,0.15,2000),fog:new THREE.Fog(0,1,2),pmrem:new THREE.PMREMGenerator(r),env:null};})();
 const glOK=!!T3;
 let curPlanet='earth',yawShift=0;
+// per planet: sun [colour, intensity, azimuth from +z toward +x, elevation], sky-dome environment intensity, exposure, shadow
+// strength and softness, rim light on players, floodlight glow, fog [colour, near, far]; envSky overrides VIS.sky for the dome
 const LOOK3D={
-  earth:{sky:'#d6e8f7',gr:'#55804a',k:1,fog:['#cfe5f2',150,700]},
-  moon:{sky:'#3b4252',gr:'#262626',k:1.1,fog:null},
-  mercury:{sky:'#4d3c30',gr:'#2a211b',k:1.1,fog:null},
-  venus:{sky:'#f3d18a',gr:'#7a5a22',k:.75,fog:['#e9c47c',22,150]},
-  mars:{sky:'#ebbd92',gr:'#7c3b1f',k:1,fog:['#dba67c',60,300]},
-  jupiter:{sky:'#efc79a',gr:'#3e3a3a',k:1,fog:['#d99f70',35,210]},
-  saturn:{sky:'#efe0bb',gr:'#47544c',k:1,fog:['#e6d9b4',70,330]},
-  neptune:{sky:'#86b4ea',gr:'#1d3a52',k:1,fog:['#5f92d2',45,260]}
+  earth:{sun:['#fff0d8',3.1,140,50],env:1,exp:1,sh:.85,shr:2.5,rim:.22,glow:.35,fog:['#cfe5f2',140,700]},
+  moon:{sun:['#ffffff',3.6,115,28],env:.55,exp:1.08,sh:.97,shr:1.2,rim:.3,glow:1,fog:null},
+  mercury:{sun:['#fff0cf',4.2,110,22],env:.6,exp:1,sh:.95,shr:1.5,rim:.3,glow:.6,fog:null},
+  venus:{sun:['#ffe2a0',1.5,150,64],env:1.45,exp:1.02,sh:.45,shr:7,rim:.2,glow:.7,fog:['#e9c47c',8,120]},
+  mars:{sun:['#ffe0c0',2.7,115,36],env:1.05,exp:1.02,sh:.78,shr:3,rim:.22,glow:.5,fog:['#dba67c',60,320]},
+  jupiter:{sun:['#fff2e0',2.2,150,62],env:.75,exp:1.12,sh:.8,shr:3,rim:.28,glow:.95,fog:['#d99f70',35,220]},
+  saturn:{sun:['#fff1d2',2.7,130,42],env:.95,exp:1.02,sh:.8,shr:3,rim:.22,glow:.6,fog:['#e6d9b4',70,340]},
+  neptune:{sun:['#e4eeff',2.6,160,64],env:.7,exp:1.1,sh:.85,shr:2.5,rim:.3,glow:1,fog:['#5f92d2',45,270]}
 };
-const hex=h=>{const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];};
-function colA(str){if(str[0]==='#')return [hex(str),1];const m=str.match(/[\d.]+/g).map(Number);return [[m[0]/255,m[1]/255,m[2]/255],m[3]==null?1:m[3]];}
 const V3={sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sc:(a,s)=>[a[0]*s,a[1]*s,a[2]*s],
   cross:(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],norm:a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l];},
   dist:(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]),lerp:(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t],dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2]};
@@ -42,45 +42,45 @@ function mL(m,a,b,L0,side,sx=1,sz=1){const d=V3.sub(b,a),Ln=Math.hypot(d[0],d[1]
   mB(m,V3.lerp(a,b,0.5),V3.sc(X,sx),V3.sc(Y,Ln/L0),V3.sc(V3.cross(X,Y),sz));}
 function mSeg(m,a,b,r){mL(m,a,b,1,null,r,r);}
 
-const GCV=document.createElement('canvas'),SCV=document.createElement('canvas');
-function buildStands(c){
-  const v=VIS,w=1024,h=256;c.width=w;c.height=h;const g=c.getContext('2d');
-  g.fillStyle=v.stands;g.fillRect(0,0,w,h);
-  g.fillStyle=v.roof;g.fillRect(0,0,w,h*0.1);g.fillStyle='rgba(0,0,0,.3)';g.fillRect(0,h*0.1,w,3);
-  for(let y=h*0.14;y<h*0.83;y+=4)for(let x=0;x<w;x+=4){
-    if(Math.random()<0.2)continue;g.globalAlpha=0.45+Math.random()*0.55;g.fillStyle=v.crowd[(Math.random()*v.crowd.length)|0];
-    g.fillRect(x+Math.random(),y+Math.random(),2.6,3);}
-  g.globalAlpha=1;
-  const bh=h*0.15;g.fillStyle=v.boards[0];g.fillRect(0,h-bh,w,bh);
-  g.font=`900 ${bh*0.72}px "Big Shoulders Display","Arial Narrow",Impact,sans-serif`;g.textBaseline='middle';
-  const gap=bh*1.4,tw=v.ads.map(t=>g.measureText(t).width),cyc=tw[0]+tw[1]+2*gap,reps=Math.max(1,Math.floor(w/cyc)),sp=(w-reps*(tw[0]+tw[1]))/(2*reps);
-  for(let x=sp/2,i=0;i<reps*2;i++){const t=v.ads[i%2];g.fillStyle=v.boards[1+i%2];g.fillText(t,x,h-bh/2+2);x+=tw[i%2]+sp;}
+const GCV=document.createElement('canvas'),PCV=document.createElement('canvas'),ADV=document.createElement('canvas'),SEV=document.createElement('canvas'),WDV=document.createElement('canvas');
+const RIM={value:new THREE.Color()},DET={tDet:{value:null},uDetRep:{value:60}};
+const sunDir=lk=>{const a=lk.sun[2]*D2R,e=lk.sun[3]*D2R;return [Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e)];};
+// image-based light: a sky dome (zenith, horizon, a band of stands, grass below, brighter toward the sun) prefiltered by PMREM
+let envDome=null;
+function envBuild(v,lk,d){
+  if(!envDome){const c=()=>({value:new THREE.Color()});envDome=new THREE.Scene();envDome.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,
+    uniforms:{top:c(),hor:c(),std:c(),gnd:c(),sc:c(),sd:{value:new THREE.Vector3()}},
+    vertexShader:'varying vec3 vD;void main(){vD=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:'uniform vec3 top,hor,std,gnd,sc,sd;varying vec3 vD;void main(){float y=vD.y;vec3 c=mix(hor,top,sqrt(clamp(y,0.,1.)));c=mix(std,c,smoothstep(.05,.2,y));'+
+      'if(y<0.)c=mix(std,gnd,smoothstep(0.,.12,-y));c+=sc*pow(max(dot(vD,sd),0.),6.)*step(0.,y);gl_FragColor=vec4(c,1.);}'})));}
+  const u=envDome.children[0].material.uniforms,sky=lk.envSky||v.sky;
+  const ds=x=>{const l=x.r*.3+x.g*.59+x.b*.11;x.lerp(TCOL.setRGB(l,l,l),.45);};u.top.value.set(sky[0]);u.hor.value.set(sky[1]);ds(u.top.value);ds(u.hor.value);u.std.value.set(v.stands).multiplyScalar(.6);u.gnd.value.set(v.ground[0]).multiplyScalar(.55);
+  u.sc.value.set(lk.sun[0]).multiplyScalar(.12*lk.sun[1]);u.sd.value.set(-d[0],d[1],d[2]);
+  if(T3.env)T3.env.dispose();T3.env=T3.pmrem.fromScene(envDome,0,.1,100,{size:128});T3.scene.environment=T3.env.texture;
 }
-function groundCanvas(c,v,R){
-  const n=512;c.width=n;c.height=n;const g=c.getContext('2d');
-  g.fillStyle=v.ground[0];g.fillRect(0,0,n,n);
-  const per=5/(2*R)*n;g.fillStyle='rgba(255,255,255,'+(v.stripe*1.4)+')';
-  for(let y=0,i=0;y<n;y+=per,i++)if(i%2)g.fillRect(0,y,n,per);
-  const rg=g.createRadialGradient(n/2,n/2,n*0.2,n/2,n/2,n*0.5);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(1,v.ground[1]+'99');
-  g.fillStyle=rg;g.fillRect(0,0,n,n);
-  for(let i=0;i<2500;i++){g.fillStyle=Math.random()<0.5?'rgba(0,0,0,.05)':'rgba(255,255,255,.04)';g.fillRect(Math.random()*n,Math.random()*n,2,2);}
+// land around the stadium for the wide celebration view: dark ground fading into the horizon colour, then transparent, so
+// it meets the 2D sky without an edge (fog is off on it)
+function surround(c,v,lk,r0){
+  const n=256,g=c.getContext('2d');c.width=c.height=n;const hz=lk.fog?lk.fog[0]:v.sky[1],gr=g.createRadialGradient(n/2,n/2,0,n/2,n/2,n/2);
+  gr.addColorStop(0,v.stands);gr.addColorStop(r0*1.05,v.stands);gr.addColorStop(Math.min(.3,r0*2),v.ground[1]);gr.addColorStop(.6,hz);gr.addColorStop(.97,hz.slice(0,7)+'00');
+  g.fillStyle=gr;g.fillRect(0,0,n,n);
 }
-function lightFor(){
-  const lk=LOOK3D[curPlanet]||LOOK3D.earth,sky=hex(lk.sky),dir=V3.norm([-0.35,0.85,-0.4]);
-  const lum=0.3*sky[0]+0.59*sky[1]+0.11*sky[2],si=clamp((1.02-0.72*lum)/dir[1],0.25,1.6)*lk.k;
-  return {dir,sun:[si,si*0.97,si*0.92],sky:V3.sc(sky,0.72),gr:V3.sc(hex(lk.gr),0.72),fog:lk.fog};
-}
-// per planet: canvas textures are redrawn and boundary geometry refilled in place, so nothing is reallocated
+// per planet: canvas textures are redrawn, the stadium and crowd rebuilt, lights, environment and fog retuned
 function build3D(){
   if(!glOK)return;
-  const v=VIS,R=BOUNDARY,r27=27*R/65,G=G3,lt=lightFor(),k=aiKit(),[cc,ca]=colA(v.crease);
-  groundCanvas(GCV,v,R+7);G.groundTex.needsUpdate=true;buildStands(SCV);G.standTex.needsUpdate=true;
-  fillGeo(G.rope.geometry,GB.ann(R-0.13,R+0.13,160,false));fillGeo(G.ring.geometry,GB.ann(r27-0.07,r27+0.07,120,true));
-  fillGeo(G.stand.geometry,GB.bowl(R+7,R+7+v.standsH*1.15,v.standsH,128,-9));mT(G.ground,[0,0,0],R+7,1,R+7);
-  col(G.wide.material,v.ground[1]);col(G.rope.material,v.rope);col(G.pitch[0].material,v.pitch[0]);col(G.pitch[1].material,v.pitch[1]);
-  col(G.crease,cc).opacity=ca;col(G.pm.shirt,k.shirt);col(G.pm.pants,k.pants);col(G.pm.skin,k.skin);
-  T3.hemi.color.setRGB(...lt.sky);T3.hemi.groundColor.setRGB(...lt.gr);T3.sun.color.setRGB(...lt.sun);T3.sun.position.set(...lt.dir);
-  T3.scene.fog=lt.fog?T3.fog:null;if(lt.fog)T3.fog.color.set(lt.fog[0]);
+  const v=VIS,R=BOUNDARY,r27=27*R/65,G=G3,lk=LOOK3D[curPlanet]||LOOK3D.earth,k=aiKit();
+  paintGround(GCV,v,R+7,R);G.groundTex.needsUpdate=true;paintPitch(PCV,v);G.pitchTex.needsUpdate=true;paintAds(ADV,v);G.adsTex.needsUpdate=true;
+  DET.uDetRep.value=2*(R+7)/1.6;
+  fillGeo(G.ring.geometry,GB.ann(r27-0.07,r27+0.07,120,true));mT(G.ground,[0,0,0],R+7,1,R+7);
+  const A=arenaGeo(v,R);fillGeo(G.arena.geometry,A.o);fillGeo(G.ads.geometry,A.ad);fillGeo(G.seats.geometry,A.st);paintSeats(SEV,v);G.seatTex.needsUpdate=true;fillGeo(G.panels.geometry,A.pn);
+  const hp=G.halo.geometry.attributes,gl=lk.glow;
+  A.halo.forEach((p,i)=>{hp.position.array.set(p,i*3);hp.color.array.set([1,.93,.8,.55*gl],i*4);});
+  G.halo.geometry.setDrawRange(0,A.halo.length);hp.position.needsUpdate=hp.color.needsUpdate=true;G.panels.material.color.setScalar(.45+.55*gl);
+  crowdBuild(A.rows,v,R,A.screen);qApply();
+  surround(WDV,v,lk,(R+7+1.15*v.standsH)/1800);G.wide.material.map.needsUpdate=true;CRWD.u.uHaze.value.set(lk.fog?lk.fog[0]:v.sky[1]);col(G.pm.shirt,k.shirt);col(G.pm.pants,k.pants);col(G.pm.skin,k.skin);
+  const d=G.dir=sunDir(lk);T3.sun.color.set(lk.sun[0]);T3.sun.intensity=lk.sun[1];Object.assign(T3.sun.shadow,{intensity:lk.sh,radius:lk.shr});
+  T3.r.toneMappingExposure=lk.exp;T3.scene.environmentIntensity=lk.env;RIM.value.set(v.sky[1]).multiplyScalar(lk.rim);envBuild(v,lk,d);
+  T3.scene.fog=lk.fog?T3.fog:null;if(lk.fog)T3.fog.color.set(lk.fog[0]);
 }
 // camera = cam position + yaw, no pitch; F and the off-centre principal point (CX, HZ) come in through setViewOffset,
 // so a world point lands on the same pixel as proj(), which the 2D overlays use
@@ -275,70 +275,78 @@ function poseTick(){
   return o;}
 
 /* --- materials and meshes --- */
-const SKIN=[0.69,0.48,0.33],PAD=[.95,.95,.93],GLOVE=[.96,.96,.96],GRIP=[.2,.15,.1],BLADE=[.89,.77,.56],GRILLE=[.34,.36,.4];
-const col=(m,c)=>{if(typeof c==='string')m.color.set(c);else m.color.setRGB(c[0],c[1],c[2]);return m;};
-const lam=(c,map)=>col(new THREE.MeshLambertMaterial({side:THREE.DoubleSide,map:map||null}),c);
+const SKIN=[0.69,0.48,0.33],PAD=[.95,.95,.93],GLOVE=[.96,.96,.96],GRIP=[.2,.15,.1],GRILLE=[.34,.36,.4];
+const col=(m,c)=>{if(typeof c==='string')m.color.set(c);else m.color.setRGB(c[0],c[1],c[2],THREE.SRGBColorSpace);return m;};
+const std=(c,o)=>col(new THREE.MeshStandardMaterial(Object.assign({side:THREE.DoubleSide,roughness:.85},o)),c);
 const bas=(c,map)=>col(new THREE.MeshBasicMaterial({side:THREE.DoubleSide,map:map||null}),c);
-// the old engine's highlight on helmet, pads, gloves and blade: a Blinn-Phong sun spot (power 24, no N.L) plus a
-// sky-coloured rim, scaled by sp. Light colours carry three's factor PI, hence RECIPROCAL_PI.
-function specMat(c,sp,map){const m=lam(c,map);
-  m.onBeforeCompile=s=>{s.uniforms.uSp={value:sp};s.fragmentShader='uniform float uSp;\n'+s.fragmentShader.replace('#include <opaque_fragment>',
-    'outgoingLight+=uSp*RECIPROCAL_PI*(directionalLights[0].color*pow(max(dot(geometryNormal,normalize(geometryViewDir+directionalLights[0].direction)),0.),24.)'+
-    '+hemisphereLights[0].skyColor*.5*pow(1.-abs(dot(geometryNormal,geometryViewDir)),3.));\n#include <opaque_fragment>');};
-  m.customProgramCacheKey=()=>'spec';return m;}
+// players: a view-dependent rim in the sky colour (RIM, per planet) so they read against the grass
+function kit(c,o){const m=std(c,o);
+  m.onBeforeCompile=s=>{s.uniforms.uRim=RIM;s.fragmentShader='uniform vec3 uRim;\n'+s.fragmentShader.replace('#include <opaque_fragment>',
+    'outgoingLight+=uRim*pow(1.-abs(dot(geometryNormal,geometryViewDir)),3.);\n#include <opaque_fragment>');};
+  m.customProgramCacheKey=()=>'kit';return m;}
 // flat ground layers are drawn first, in renderOrder, without depth and alpha-blended like the old engine.
 // CustomBlending keeps them in three's opaque list: the transparent list would be drawn after the solids.
 function flat(m,a=1,fog=true){return Object.assign(m,{depthTest:false,depthWrite:false,opacity:a,fog,blending:THREE.CustomBlending,
   blendSrc:THREE.SrcAlphaFactor,blendDst:THREE.OneMinusSrcAlphaFactor,blendSrcAlpha:THREE.OneFactor,blendDstAlpha:THREE.OneMinusSrcAlphaFactor});}
 function part(g,m,parent){const x=new THREE.Mesh(g,m);x.matrixAutoUpdate=false;(parent||T3.world).add(x);return x;}
 let flatOrder=-100;
-function layer(g,m){const x=part(g,m);x.renderOrder=flatOrder++;return x;}
-function canvasTex(c,repeat){const t=new THREE.CanvasTexture(c);t.flipY=false;if(repeat)t.wrapS=THREE.RepeatWrapping;return t;}
+function layer(g,m){const x=part(g,m);x.renderOrder=flatOrder++;x.receiveShadow=true;return x;}
+function canvasTex(c,repeat,data){const t=new THREE.CanvasTexture(c);t.flipY=false;t.colorSpace=data?THREE.NoColorSpace:THREE.SRGBColorSpace;
+  t.anisotropy=Math.min(8,T3.r.capabilities.getMaxAnisotropy());if(repeat)t.wrapS=THREE.RepeatWrapping;if(repeat>1)t.wrapT=THREE.RepeatWrapping;return t;}
 function paint(w,h,f){const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'),w,h);return canvasTex(c,true);}
+const painted=(f,repeat,data)=>{const c=document.createElement('canvas');f(c);return canvasTex(c,repeat,data);};
 function rig(){const g=new THREE.Group();g.matrixAutoUpdate=false;T3.world.add(g);return g;}
+const shade=o=>{o.traverse(m=>{m.castShadow=m.receiveShadow=true;});return o;};
 const pair=f=>[f(),f()];
 // fielder or bowler: 13 parts sharing the AI kit materials
 function personRig(G,sph){const g=rig(),P=G.pg,m=G.pm,p=(x,y)=>part(x,y,g);
-  return {g,thigh:pair(()=>p(P.thigh,m.pants)),shin:pair(()=>p(P.shin,m.pants)),shoe:pair(()=>p(P.shoe,m.shoe)),torso:p(P.torso,m.shirt),
-    arm:pair(()=>p(P.arm,m.shirt)),hand:pair(()=>p(sph,m.skin)),head:p(P.head,m.skin),cap:p(P.cap,m.shirt)};}
+  const r={g,thigh:pair(()=>p(P.thigh,m.pants)),shin:pair(()=>p(P.shin,m.pants)),shoe:pair(()=>p(P.shoe,m.shoe)),torso:p(P.torso,m.shirt),
+    arm:pair(()=>p(P.arm,m.shirt)),hand:pair(()=>p(sph,m.skin)),head:p(P.head,m.skin),cap:p(P.cap,m.shirt)};shade(g);return r;}
 function batterRig(){
-  const k=KIT.you,g=rig(),p=(x,y)=>part(geo(x),y,g),pp=(x,y)=>{const q=geo(x);return pair(()=>part(q,y,g));},skin=lam(SKIN),
+  const k=KIT.you,g=rig(),p=(x,y)=>part(geo(x),y,g),pp=(x,y)=>{const q=geo(x);return pair(()=>part(q,y,g));},skin=kit(SKIN,{roughness:.6}),
     bar=(y,R,sp)=>arcG([0,y,0],R,[1,0,0],[0,0,1],H2-sp,H2+sp,.0055,14),vb=(th)=>arcG([0,-.03,0],.162,[0,1,0],[Math.sin(th),0,Math.cos(th)],1.2,2.25,.0055,10),
     shirtTex=paint(64,128,(x,w,h)=>{x.fillStyle=k.shirt;x.fillRect(0,0,w,h);x.fillStyle=k.trim;x.fillRect(0,h*.755,w,2);
       for(const o of [0,w]){x.beginPath();x.moveTo(o-9,h);x.lineTo(o,h*.87);x.lineTo(o+9,h);x.lineTo(o+5,h);x.lineTo(o,h*.91);x.lineTo(o-5,h);x.fill();}
       x.fillRect(0,h*.958,w,h*.025);x.fillStyle=k.shirt;x.fillRect(0,h*.985,w,h*.015);}),
     padTex=paint(128,8,(x,w,h)=>{x.fillStyle='#fff';x.fillRect(0,0,w,h);x.fillStyle='#c9cbc8';for(let i=1;i<7;i++)x.fillRect(i/14*w-1,0,2,h);}),
     shoeTex=paint(4,64,(x,w,h)=>{x.fillStyle='#f2f2f2';x.fillRect(0,0,w,h);x.fillStyle='#8a8f96';x.fillRect(0,0,w,h*.46);}),
-    pants=lam(k.pants),hm=specMat(k.helmet,.35);
-  return {g,shoe:pp(shoeG(24,12),lam([1,1,1],shoeTex)),thigh:pp(capG(.088,.062,.43,20,6),pants),pad:pp(padG(70,24),specMat(PAD,.12,padTex)),
+    pants=kit(k.pants,{roughness:.9}),hm=kit(k.helmet,{roughness:.22,metalness:.1});
+  const r={g,shoe:pp(shoeG(24,12),kit([1,1,1],{map:shoeTex,roughness:.6})),thigh:pp(capG(.088,.062,.43,20,6),pants),pad:pp(padG(70,24),kit(PAD,{map:padTex,roughness:.45})),
     pelvis:p(GB.surf(lin(12,0,1),28,(v,a)=>{const y=-.15+.26*v,[,w,d]=crv([[-.15,0,0],[-.14,.08,.07],[-.11,.145,.125],[-.04,.168,.145],[.04,.16,.14],[.1,.15,.13],[.11,0,0]],y);return [d*Math.cos(a),y,w*Math.sin(a)];}),pants),
-    torso:p(torsoG(32,24),lam([1,1,1],shirtTex)),uarm:pp(capG(.054,.044,.31,18,6),skin),sleeve:pp(capG(.066,.06,.15,18,5),lam(k.shirt)),
-    farm:pp(capG(.044,.034,.3,18,6),skin),glove:pp(capG(.042,.056,.09,18,6),specMat(GLOVE,.1)),neck:p(capG(.056,.05,.17,16,5),skin),
+    torso:p(torsoG(32,24),kit([1,1,1],{map:shirtTex,roughness:.88})),uarm:pp(capG(.054,.044,.31,18,6),skin),sleeve:pp(capG(.066,.06,.15,18,5),kit(k.shirt,{roughness:.88})),
+    farm:pp(capG(.044,.034,.3,18,6),skin),glove:pp(capG(.042,.056,.09,18,6),kit(GLOVE,{roughness:.55})),neck:p(capG(.056,.05,.17,16,5),skin),
     head:p(GB.join(ellG([0,-.025,.005],[.098,.118,.108],24,14),ellG([0,-.035,.108],[.016,.026,.02],8,5)),skin),
     helmet:p(GB.join(GB.surf(lin(12,0,1),36,(v,a)=>{const s=Math.sin(a),lb=-.8+smooth(clamp((s+.35)/1.1,0,1)),l=lb+(H2-lb)*v,c=Math.cos(l);
         return [.132*c*Math.cos(a),.015+.14*Math.sin(l),-.005+(s>0?.142:.152)*c*s];}),
       ellG([0,.04,.09],[.128,.012,.1],24,6,.18),ellG([0,-.105,-.118],[.082,.032,.024],16,5,-.5),ellG([.128,-.005,.072],[.018,.028,.028],10,5),ellG([-.128,-.005,.072],[.018,.028,.028],10,5)),hm),
-    grille:p(GB.join(bar(-.005,.158,1),bar(-.055,.156,.95),bar(-.1,.142,.85),vb(0),vb(.42),vb(-.42)),specMat(GRILLE,.3)),
-    handle:p(capG(.017,.017,.36,12,3),lam(GRIP)),blade:p(bladeG(24,32),specMat(BLADE,.15))};
+    grille:p(GB.join(bar(-.005,.158,1),bar(-.055,.156,.95),bar(-.1,.142,.85),vb(0),vb(.42),vb(-.42)),kit(GRILLE,{roughness:.35,metalness:.7})),
+    handle:p(capG(.017,.017,.36,12,3),kit(GRIP,{roughness:.8})),blade:p(bladeG(24,32),kit([1,1,1],{map:painted(paintWood),roughness:.5}))};
+  shade(g);return r;
 }
 function buildScene(){
-  const sph=geo(GB.sph(10,16)),cyl=geo(GB.cyl(12)),disk=geo(GB.disk(48)),plane=geo(GB.plane()),black=[0,0,0],cw=0.05;
-  const G={groundTex:canvasTex(GCV,false),standTex:canvasTex(SCV,true)};
-  G.wide=layer(disk,flat(lam(black)));mT(G.wide,[0,0,0],1800,1,1800);
-  G.ground=layer(disk,flat(lam([1,1,1],G.groundTex)));
-  G.rope=layer(new THREE.BufferGeometry(),flat(bas(black)));G.ring=layer(new THREE.BufferGeometry(),flat(bas([1,1,1]),.45));
-  G.pitch=[layer(plane,flat(lam(black))),layer(plane,flat(lam(black),.35))];mT(G.pitch[0],[0,0,10.06],3.05,1,23.4);mT(G.pitch[1],[0,0,10.06],1.6,1,17);
-  const fm=flat(bas(black),.045);for(const zf of [2.6,17.6])mT(layer(disk,fm),[0.15,0,zf],0.6,1,1.1);
-  G.crease=flat(bas([1,1,1]));
-  for(const [zb,dz] of [[0,1],[20.12,-1]])for(const [px,pz,w,l] of [[0,zb,2.64,cw],[0,zb+1.22*dz,3.66,cw],[-1.32,zb,cw,2.44],[1.32,zb,cw,2.44]])mT(layer(plane,G.crease),[px,0,pz],w,1,l);
-  const fsh=flat(bas(black),.22,false);
-  G.fsh=Array.from({length:NFL},()=>layer(disk,fsh));G.bsh=layer(disk,fsh);G.psh=layer(disk,flat(bas(black),.25,false));G.bash=layer(disk,flat(bas(black),.35,false));
+  const sph=geo(GB.sph(10,16)),cyl=geo(GB.cyl(12)),disk=geo(GB.disk(48)),plane=geo(GB.plane()),black=[0,0,0],glow=painted(paintGlow);
+  const G={groundTex:canvasTex(GCV,false),pitchTex:canvasTex(PCV,false),adsTex:canvasTex(ADV,true),seatTex:canvasTex(SEV,true)};
+  G.wide=layer(disk,flat(bas([1,1,1],canvasTex(WDV,false)),1,false));mT(G.wide,[0,0,0],1800,1,1800);
+  // outfield: large-scale colour from the ground canvas, close-up grain from a tiled detail texture multiplied in, tiled normal map
+  const gm=std([1,1,1],{map:G.groundTex,roughness:.92,normalMap:painted(paintGrassNormal,2,true),normalScale:new THREE.Vector2(.5,.5)});
+  gm.normalMap.repeat.setScalar(90);DET.tDet.value=painted(paintGrassDetail,2,true);
+  gm.onBeforeCompile=s=>{Object.assign(s.uniforms,DET);s.fragmentShader='uniform sampler2D tDet;uniform float uDetRep;\n'+s.fragmentShader.replace('#include <map_fragment>',
+    '#include <map_fragment>\ndiffuseColor.rgb*=texture2D(tDet,vMapUv*uDetRep).rgb*2.;');};gm.customProgramCacheKey=()=>'grass';
+  G.ground=layer(disk,flat(gm));
+  G.ring=layer(new THREE.BufferGeometry(),flat(std([1,1,1],{roughness:.9}),.5));
+  G.pitch=layer(plane,flat(std([1,1,1],{map:G.pitchTex,roughness:.8})));mT(G.pitch,[0,0,10.06],4,1,24);
+  G.fsh=Array.from({length:NFL},()=>layer(disk,flat(bas(black,glow),.4,false)));
   G.mk=layer(disk,flat(bas([1,0.88,0.4]),.28,false));G.mkr=layer(geo(GB.ann(0.66,1,48,false)),flat(bas([1,0.88,0.4]),1,false));
-  G.stand=part(new THREE.BufferGeometry(),bas([1,1,1],G.standTex));
-  const cream=lam([0.95,0.92,0.82]),bail=lam([0.85,0.64,0.25]),stumps=()=>[cream,cream,cream,bail,bail].map(m=>part(cyl,m));
+  for(const m of [G.mk,G.mkr])m.material.toneMapped=false;
+  G.arena=part(new THREE.BufferGeometry(),std([1,1,1],{vertexColors:true,roughness:.88}));
+  G.seats=part(new THREE.BufferGeometry(),std([1,1,1],{map:G.seatTex,vertexColors:true,roughness:.7}));
+  G.ads=part(new THREE.BufferGeometry(),std([1,1,1],{map:G.adsTex,emissiveMap:G.adsTex,emissive:0xffffff,emissiveIntensity:.5,roughness:.45}));
+  G.panels=part(new THREE.BufferGeometry(),Object.assign(bas([1,1,1],painted(paintPanel)),{toneMapped:false}));
+  G.halo=glowPoints(8,26,glow);G.fw=glowPoints(FW_MAX*3+400,2.1,glow);crowdMeshes();
+  const cream=std([0.95,0.92,0.82],{roughness:.45}),bail=std([0.85,0.64,0.25],{roughness:.5}),stumps=()=>[cream,cream,cream,bail,bail].map(m=>shade(part(cyl,m)));
   G.stumps=[stumps(),stumps()];stumps3D(G.stumps[1],20.12,null);
-  G.ball=part(sph,lam([0.78,0.13,0.1]));
-  G.pm={shirt:lam(black),pants:lam(black),skin:lam(black),shoe:lam([0.16,0.16,0.18])};
+  G.ball=shade(part(sph,std([1,1,1],{map:painted(paintBall),roughness:.38})));G.ball.receiveShadow=false;
+  G.pm={shirt:kit(black,{roughness:.88}),pants:kit(black,{roughness:.9}),skin:kit(black,{roughness:.6}),shoe:kit([0.16,0.16,0.18],{roughness:.6})};
   G.pg={thigh:geo(capG(.078,.066,.465,12,3)),shin:geo(capG(.064,.05,.465,12,3)),arm:geo(capG(.052,.04,.6,12,3)),shoe:geo(shoeG(12,6)),
     torso:geo(torsoG(14,10,[[-.09,0,0],[-.08,.12,.09],[-.04,.165,.11],...TORSO.slice(3)])),
     head:geo(GB.join(ellG([0,.06,0],[.046,.085,.046],8,4),ellG([0,.18,0],[.098,.115,.105],14,8),ellG([0,.165,.1],[.016,.024,.02],6,3))),
@@ -413,8 +421,8 @@ function bowlerState(){
    frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
 const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay';
 const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,arm:null,brun:0,brn:false,
-  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null});
-const LV=mkView();
+  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0});
+const LV=mkView(),CH={on:false,t0:-9};
 function liveView(){
   const V=LV,ph=S.phase;
   V.pose=poseTick();V.ball=ballNow();
@@ -428,29 +436,66 @@ function liveView(){
       o.x=p.x;o.z=p.z;o.face=Math.atan2(tx-p.x,tz-p.z);o.running=mv;o.run=p.run;o.crouch=ph==='flight'||ph==='runup'?1:0;});
   }
   V.hideBat=!!(S.chase&&clock>=S.chase.t0);V.trail=V.hideBat?S.trail3:null;
+  // the crowd jumps once a boundary's ball crosses the rope (its outcome is no longer deferred) and through the win celebration
+  const on=S.cel?clock-S.cel.t0>.4:ph==='result'&&!!S.res&&!!S.res.boundary&&!S.deferred;
+  if(on!==CH.on){CH.on=on;CH.t0=clock;}
+  V.cheer=on?Math.min(1,(clock-CH.t0)/.3):Math.max(0,1-(clock-CH.t0)/.6);
   return V;
 }
+/* --- adaptive quality: frame time is measured over the first seconds of a match (after a warm-up); while it is slow the tier
+   steps down: shadow map size, then crowd count, then pixel ratio. No settings UI. --- */
+const QT=[{sm:2048,crowd:1,dpr:2.5},{sm:1024,crowd:1,dpr:2.5},{sm:1024,crowd:.5,dpr:2.5},{sm:1024,crowd:.5,dpr:1.5}];
+const Q={t:0,lock:false,last:0,warm:0,n:0,acc:0};
+function glSize(){if(glOK){const d=Math.min(window.devicePixelRatio||1,QT[Q.t].dpr);T3.r.setSize(Math.round(W*d),Math.round(H*d),false);}}
+function qApply(){
+  if(!glOK)return;const q=QT[Q.t],sh=T3.sun.shadow;
+  if(sh.mapSize.x!==q.sm){sh.mapSize.set(q.sm,q.sm);if(sh.map){sh.map.dispose();sh.map=null;}}
+  crowdCount(q.crowd);glSize();
+}
+function qTick(){
+  const now=performance.now(),dt=now-Q.last;Q.last=now;
+  if(Q.lock||!M||S.paused||S.phase==='idle'||dt>250){Q.warm=Q.n=Q.acc=0;return;}
+  if((Q.warm+=dt)<1200)return;
+  Q.acc+=dt;if(++Q.n<90)return;
+  if(Q.acc/Q.n>22&&Q.t<QT.length-1){Q.t++;qApply();Q.warm=Q.n=Q.acc=0;}else Q.lock=true;
+}
+/* --- shadows: the directional light's orthographic frustum is fitted each frame to the ground the camera sees (up to a far
+   distance), in light space, so it works for the batting view, chase, replays and the wide celebration orbit alike.
+   Casters project onto their own shadows in light space, so covering the visible ground covers them too. --- */
+const SHB={x:[1,0,0],y:[0,1,0],x0:0,x1:0,y0:0,y1:0};
+function fitShadow(d){
+  const z=[-d[0],d[1],d[2]],x=V3.norm([z[2],0,-z[0]]),y=V3.cross(z,x),far=S.cel?Math.hypot(cam.x,cam.z)+BOUNDARY+12:wideCam()?60:46;
+  const dn=Math.max(.5,H-HZ>1?cam.y*F/(H-HZ):.5);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(const dd of [dn,far])for(const sx of [-CX,W-CX]){const l=sx*dd/F,gx=-(cam.x+cam.fx*dd+cam.rx*l),gz=cam.z+cam.fz*dd+cam.rz*l,a=x[0]*gx+x[2]*gz,b=y[0]*gx+y[2]*gz;
+    x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,b);y1=Math.max(y1,b);}
+  const m=1.5,cx=(x0+x1)/2,cy=(y0+y1)/2,hw=(x1-x0)/2+m,hh=(y1-y0)/2+m,c=V3.add(V3.sc(x,cx),V3.sc(y,cy)),L=T3.sun,sc=L.shadow.camera;
+  L.target.position.set(-c[0],c[1],c[2]);L.position.set(-(c[0]+z[0]*160),c[1]+z[1]*160,c[2]+z[2]*160);
+  sc.left=-hw;sc.right=hw;sc.bottom=-hh;sc.top=hh;sc.updateProjectionMatrix();
+  Object.assign(SHB,{x,y,x0:cx-hw+1,x1:cx+hw-1,y0:cy-hh+1,y1:cy+hh-1});
+}
+const inShadow=(gx,gz)=>{const a=-gx*SHB.x[0]+gz*SHB.x[2],b=-gx*SHB.y[0]+gz*SHB.y[2];return a>SHB.x0&&a<SHB.x1&&b>SHB.y0&&b<SHB.y1;};
 const G3=glOK?buildScene():null;
 
 function render3D(V){
   if(!glOK)return;
   const G=G3,bp=V.ball,pz=V.pose,mk=V.mk,lk=LOOK3D[curPlanet]||LOOK3D.earth;
-  syncCamera();
+  qTick();syncCamera();fitShadow(G.dir);crowdTick(V);fw3D(G.fw);
   if(lk.fog){const fo=wideCam()?Math.max(0,Math.hypot(cam.x,cam.z)+CAM_Z):0;T3.fog.near=lk.fog[1]+fo;T3.fog.far=lk.fog[2]+fo;}
+  T3.scene.environmentIntensity=lk.env*(1+flash*2.5);
   G.wide.visible=wideCam();
-  for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on;G.fsh[i].visible=G.fielders[i].g.visible=on;
-    if(on){mT(G.fsh[i],[p.x,0,p.z],.38,1,.38);person3D(G.fielders[i],p.x,p.z,p.face,p);}}
-  G.bsh.visible=G.bowler.g.visible=!!M;
-  if(M){mT(G.bsh,[0.42,0,V.bz],.38,1,.38);person3D(G.bowler,0.42,V.bz,Math.PI,{running:V.brn,run:V.brun,arm:V.arm});}
-  mT(G.psh,[pz[qHX],0,pz[qHZ]+.02],.45,1,.45);
-  G.bash.visible=G.ball.visible=!!bp;
-  if(bp){const r=0.07/(1+bp.y*0.15);mT(G.bash,[bp.x,0,bp.z],r,1,r);mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);}
+  for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on;G.fielders[i].g.visible=on;G.fsh[i].visible=on&&!inShadow(p.x,p.z);
+    if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(G.fielders[i],p.x,p.z,p.face,p);}}
+  G.bowler.g.visible=!!M;
+  if(M)person3D(G.bowler,0.42,V.bz,Math.PI,{running:V.brn,run:V.brun,arm:V.arm});
+  G.ball.visible=!!bp;
+  if(bp)mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);
   G.mk.visible=G.mkr.visible=!!mk;
   if(mk){mT(G.mk,[mk.xb,0,mk.zb],0.24,1,0.24);mT(G.mkr,[mk.xb,0,mk.zb],0.26,1,0.26);}
   stumps3D(G.stumps[0],0,V.st);
   G.bat.g.visible=!V.hideBat;if(!V.hideBat)batsman3D(G.bat,pz);
   T3.r.render(T3.scene,T3.cam);
 }
+if(location.hash==='#test')window.__r={info:()=>({calls:T3.r.info.render.calls,tris:T3.r.info.render.triangles}),tier:()=>Q.t,setTier:n=>{Q.t=n;Q.lock=true;qApply();}};
 
 /* --- sky (2D canvas behind the 3D layer) --- */
 function renderSky(){
@@ -469,5 +514,5 @@ function draw(V){
   if(V.trail)V.trail.forEach((t,i)=>{const q=proj(t.x,t.y,t.z);if(!q)return;ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.03)+')';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(2,0.05*q.s),0,7);ctx.fill();});
   drawFx();
   if(S.phase==='replay')rpGlow(bp);
-  if(S.cel)fwDraw();else if(S.phase!=='replay'){drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
+  if(!S.cel&&S.phase!=='replay'){drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
 }

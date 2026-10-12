@@ -41,8 +41,11 @@ tests/smoke.mjs           Playwright smoke test over dist/
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
 03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
-2D overlays (aim arrow, radar, timing bar, info text) · 07-geometry raw shape builders (`GB`, people parts) and `geo`/`fillGeo`
-(-> BufferGeometry) · 07-render3d three scene (stadium, pitch, people, bat, stumps, ball), batter pose, view state ·
+2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
+floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
+(ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
+`geo`/`fillGeo` (-> BufferGeometry) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
+ball), batter pose, view state, adaptive quality ·
 08 camera follow + main loop · 08b replay (recording, playback, replay cameras) · 09 menu wiring + boot.
 
 ## Core model (read before touching physics or rendering)
@@ -58,15 +61,46 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Rendering layers:** `#sky` 2D canvas (gradient, stars, sun/moons with yaw shift, Jupiter bands, Venus clouds, Saturn rings)
   → `#gl` three WebGLRenderer (WebGL2, transparent clear) → `#scene` 2D overlay canvas, which also receives all pointer input.
 - **Three scene graph** (07-render3d): `buildScene` creates every mesh once at boot (12 fielder rigs + bowler, batter rig,
-  stumps, ball, ground layers); `build3D` refreshes it per planet in place (canvas textures redrawn, rope/ring/stand geometry
-  refilled, colours, lights, fog); `render3D(V)` only sets matrices (`matrixAutoUpdate` off; `mB`/`mL`/`mT` write
+  stumps, ball, ground layers, stadium meshes, crowd, glow points); `build3D` refreshes it per planet in place (canvas textures
+  redrawn, stadium geometry refilled by `arenaGeo`, crowd re-seated, colours, lights, environment, fog); `render3D(V)` only sets matrices (`matrixAutoUpdate` off; `mB`/`mL`/`mT` write
   `mesh.matrix`), visibility and fog distance. Don't create three objects per frame. Everything sits in `T3.world`, mirrored
-  in x, because game coordinates are left-handed. Flat ground layers (ground disk, rope, rings, pitch, creases, blob shadows,
-  pitch marker) use `flat()`: no depth test, CustomBlending (keeps them in three's opaque list), painter's order by negative
-  `renderOrder`; stadium, stumps, people, bat and ball are depth-tested after them. All materials are DoubleSide; `fillGeo`
-  rewinds triangles to match their normals. Lambert + HemisphereLight + DirectionalLight (intensity PI) reproduce the old
-  shader; `specMat` adds its shine/rim term. Colour management lives in `colourSetup()`: off, linear output and linear fog
-  for parity with the old engine (Phase 2 switches to sRGB/tone mapping there).
+  in x, because game coordinates are left-handed. Flat ground layers (ground disk, ring, pitch with its painted creases and
+  wear, fielder blob shadows, pitch marker) use `flat()`: no depth test, CustomBlending (keeps them in three's opaque list),
+  painter's order by negative `renderOrder`; stadium, rope, crowd, stumps, people, bat and ball are depth-tested after them.
+  All materials are DoubleSide; `fillGeo` rewinds triangles to match their normals (and loads vertex colours).
+- **Look:** `colourSetup()`: colour management on, sRGB output, ACES Filmic tone mapping (exposure per planet). Colours given
+  as arrays are sRGB (`col()`); canvas textures are sRGB except data maps (grass detail/normal). three mixes fog after tone
+  mapping in output space, so a fog colour equal to `VIS.sky[1]` meets the 2D sky seamlessly. Surfaces are
+  MeshStandardMaterial; players use `kit()` (adds a sky-coloured view rim, `RIM`, so they read against the grass). Light = one
+  DirectionalLight (the sun) + image-based light: `envBuild` renders a sky dome (zenith, horizon, a band of stands, grass,
+  brighter toward the sun) through PMREM once per planet; no hemisphere light. `LOOK3D` per planet: sun colour, intensity,
+  azimuth, elevation (azimuths are on the off side behind the batter, so the batting view and the side-on replay both see a
+  lit batter), env intensity, exposure, shadow strength/softness, rim, floodlight glow, fog. Lightning (`flash`) boosts the
+  env. The outfield multiplies a tiled detail texture into the ground canvas (`DET`) and adds a tiled normal map.
+- **Shadows:** PCFShadowMap (three r18x removed PCFSoft; PCF takes 5 hardware-filtered Vogel-disk taps, softness =
+  `shadow.radius`). `fitShadow` fits the sun's orthographic frustum every frame to the ground the camera sees (screen-bottom
+  ground point to 46 m, 60 m in replays, the whole ground in the celebration), in light space, so batting view, chase,
+  replays and celebration all work (casters project onto their own shadows, so covering the visible ground covers them).
+  Casters: people, stumps, ball. Receivers: ground layers, people, stumps. Fielders outside the frustum (`inShadow`) keep a
+  soft blob. The light and its target live in the mirrored `T3.world`, so their x is negated.
+- **Stadium** (07-arena, `arenaGeo`): a revolved step profile (front wall, lower tier, LED fascia, upper tier cantilevered
+  2.5 m over the lower one when standsH>=10.5, back wall, roof canopy over the back rows, rows under it shaded); its back edge stays at
+  (BOUNDARY+7+1.15*standsH, standsH) because fireworks launch there and `renderSky` clips the sky there. Seat-back strips
+  (seat texture), framed off-white sightscreens on legs at both ends (R+4.2), four floodlight towers (emissive panels + glow halos), LED boards at R+3 with
+  gaps at the sightscreens, a tube rope at R. Static parts share one vertex-coloured mesh.
+- **Crowd:** one 44-triangle spectator, an InstancedMesh per 30° sector (three culls sectors out of view), shirt colour via
+  instanceColor, skin via `aSkin` on the head vertices. Seats are filled most-wanted first (the end behind the bowler is
+  weighted 5x), so a lower count keeps that end full. Idle bob and cheering jumps run in the vertex shader (`CRWD.u`);
+  `V.cheer` (recorded for replays) rises when a boundary's ball crosses the rope and in the celebration, stronger near the
+  camera. Shirts are muted with team-colour clusters (`KIT.you` / AI kit), and fade toward the fog colour with distance. Decorative randomness uses `prng`, never `Math.random` (the game's RNG).
+- **Glow:** fireworks and floodlight halos are additive `THREE.Points` with a radial glow texture (`addBlend`: colour adds,
+  alpha is kept, so over the transparent sky the premultiplied canvas composites them as light), not tone mapped, no fog.
+  `fw3D` fills the points from `FW` (06) each frame: rocket head + trail, spark + two trailing points.
+- **Adaptive quality** (no UI): `qTick` measures the average frame time over 90 frames after 1.2 s of play; above 22 ms it
+  steps down one tier and measures again, otherwise it locks for the session. Tiers (`QT`): 0 shadow map 2048, full crowd
+  (15000 desktop / 9000 phone), DPR cap 2.5 · 1 shadow map 1024 · 2 crowd halved · 3 GL canvas DPR cap 1.5 (`glSize`; the
+  2D canvases keep theirs). iOS Low Power Mode (30 fps cap) also reads as slow and drops tiers, which saves battery anyway.
+  `#test` exposes `window.__r` (`info`, `tier`, `setTier`).
 - **Time:** game clock `clock` only advances when not paused. Input timestamps are converted with `gameTimeAt()` so
   pausing never desyncs timing.
 - **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, `BALL_GAP` = 2 s) → `runup`
@@ -109,7 +143,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
   without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`, fielders/bowler in `PG`
   (lower poly, 13 meshes each; `personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
-  in 07-geometry build smooth parametric shapes; `specMat` adds the shine/rim light (batter gear only).
+  in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
 - **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
   `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
   `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
@@ -158,7 +192,12 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - 3D: started on a custom ~100-line WebGL engine (CDN unreachable, single offline file). Moved to Three.js for the visual
   upgrades (shadows, PBR lighting, 3D crowd, bloom), bundled by esbuild so the file stays offline and self-contained
   (+~530 KB). Phase 1 was a parity port (same look, overlays aligned); engine.js removed. Babylon.js and PlayCanvas were
-  rejected for size.
+  rejected for size. Phase 2: sRGB/ACES, PBR + PMREM sky light, view-fitted shadow map, procedural textures, tiered stands,
+  3D crowd, 3D fireworks (+~30 KB, the build is ~1.0 MB).
+- Glow: additive glow sprites (fireworks, floodlight halos) instead of UnrealBloomPass. Bloom needs an EffectComposer: a
+  full-res HalfFloat target (~24 MB at 1170x2532, ~4x with MSAA, else the scene loses antialiasing), fog then mixes in linear
+  space before tone mapping so it no longer matches the 2D sky, and its cost is fill rate, which headless swiftshader (CPU,
+  vertex-bound here) cannot show: tried at full res, frame time was within noise there. Sprites cost one draw call each set.
 - Pause between balls: `ready` phase with a countdown, fixed at 2 s (`BALL_GAP`; the time-between-balls option was removed by owner decision), plus longer run-ups.
 - Footwork control: a bottom-left joystick (velocity, own pointer) over swipe gestures or dragging the batter, because the
   right thumb is already busy with the slingshot and swipes would collide with it. Arrows/WASD on desktop.
@@ -172,8 +211,9 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 2. Career: ladder of AI teams, coins from wins, batter upgrades (timing window, power).
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
-5. Unverified on real iPhone hardware: frame rate (~85 draw calls/frame in a normal ball after three's frustum culling, up to ~190, plus up to 600 2D firework sparks in the celebration). If slow: merge person parts into one
-   mesh per person, reduce sphere/cylinder segments, cap devicePixelRatio lower.
+5. Unverified on real iPhone hardware: frame rate (~85 draw calls/frame in a normal ball including the shadow pass, ~250 in the
+   celebration orbit; ~120k triangles, mostly crowd). The adaptive tiers react to it; if still slow: merge person parts into
+   one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
   and stumpings just knock the bails off.
 - Sun/moons/stars are screen-space with a yaw shift; Saturn's rings don't rotate with the chase camera.

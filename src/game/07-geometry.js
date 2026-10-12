@@ -44,7 +44,7 @@ function fillGeo(g,r){
     if((uy*vz-uz*vy)*(N[a]+N[b]+N[c])+(uz*vx-ux*vz)*(N[a+1]+N[b+1]+N[c+1])+(ux*vy-uy*vx)*(N[a+2]+N[b+2]+N[c+2])<0){const t=I[k+1];I[k+1]=I[k+2];I[k+2]=t;}}
   g.dispose();
   g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(r.T,2));g.setIndex(I);g.computeBoundingSphere();
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(r.T,2));if(r.C&&r.C.length)g.setAttribute('color',new THREE.Float32BufferAttribute(r.C,3));g.setIndex(I);g.computeBoundingSphere();
   return g;}
 const geo=r=>fillGeo(new THREE.BufferGeometry(),r);
 

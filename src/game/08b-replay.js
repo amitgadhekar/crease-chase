@@ -1,7 +1,7 @@
 /* ---------- replay: each delivery's view state is recorded per frame (runup to end of result) into one preallocated
    buffer and played back after fours and sixes. Frame layout: t, ball xyz (NaN = none), bowler z/arm (NaN = none)/run/running,
-   stumps age (NaN = none)/bails, pose[PN], then per fielder x, z, sin/cos face, run, flags (1 on, 2 running, 4 crouch). ---------- */
-const RF0=10+PN,RFL=RF0+NFL*6,RMAX=600,REC={buf:new Float32Array(RMAX*RFL),n:0,t0:0,nf:0},RX=new Float32Array(RFL),RV=mkView();
+   stumps age (NaN = none)/bails, pose[PN], then per fielder x, z, sin/cos face, run, flags (1 on, 2 running, 4 crouch), then crowd cheer. ---------- */
+const RF0=10+PN,RFL=RF0+NFL*6+1,RMAX=600,REC={buf:new Float32Array(RMAX*RFL),n:0,t0:0,nf:0},RX=new Float32Array(RFL),RV=mkView();
 const RDISC=new Uint8Array(RFL);RDISC[7]=RDISC[9]=1;for(let j=0;j<NFL;j++)RDISC[RF0+j*6+5]=1;
 RV.pose=RX.subarray(10,RF0);
 let RP=null;
@@ -13,7 +13,7 @@ function recFrame(V,force){
   r[o+4]=V.bz;r[o+5]=V.arm==null?NaN:V.arm;r[o+6]=V.brun;r[o+7]=V.brn?1:0;r[o+8]=V.st?V.st.a:NaN;r[o+9]=V.st&&V.st.bails?1:0;
   r.set(V.pose,o+10);
   for(let j=0;j<V.nf;j++){const f=V.f[j],k=o+RF0+j*6;r[k]=f.x;r[k+1]=f.z;r[k+2]=Math.sin(f.face);r[k+3]=Math.cos(f.face);r[k+4]=f.run;r[k+5]=(f.on?1:0)|(f.running?2:0)|(f.crouch?4:0);}
-  REC.nf=V.nf;REC.n++;
+  r[o+RFL-1]=V.cheer;REC.nf=V.nf;REC.n++;
 }
 // contact falls between two frames, so the replay gets a frame at exactly that moment: ball on the blade, impact pose
 function recContact(){
@@ -37,7 +37,7 @@ function rpView(){
   V.nf=REC.nf;
   for(let j=0;j<V.nf;j++){const k=RF0+j*6,f=V.f[j],fl=x[k+5];
     f.on=!!(fl&1);f.x=x[k];f.z=x[k+1];f.face=Math.atan2(x[k+2],x[k+3]);f.run=x[k+4];f.running=!!(fl&2);f.crouch=fl&4?1:0;}
-  V.trail=tr;
+  V.trail=tr;V.cheer=x[RFL-1];
   return V;
 }
 function rpStart(nx){

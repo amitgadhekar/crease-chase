@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f2318">
+<title>Crease Chase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* @include src/styles.css */
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <canvas id="scene" aria-label="Cricket batting game. Drag to aim, release to swing, tap to block."></canvas>
+
+  <div id="hud" hidden>
+    <div class="slab" id="scoreSlab">
+      <div class="row"><span id="sRuns" class="big">0/0</span><span id="sOvers" class="small"></span></div>
+      <div id="chips"></div>
+    </div>
+    <div class="slab" id="targetSlab">
+      <div id="sTargetLbl" class="small">Target</div>
+      <div id="sTarget" class="mid">0</div>
+      <div id="sNeed" class="small"></div>
+    </div>
+    <button id="pauseBtn" aria-label="Pause"><i></i><i></i></button>
+  </div>
+
+  <div id="banner" aria-live="polite"><span id="bMain"></span><span id="bSub"></span></div>
+  <div id="hint"></div>
+  <button id="loftBtn" aria-pressed="false" hidden>Loft</button>
+
+  <section id="menu" class="screen on" aria-label="Main menu">
+    <div class="card">
+      <div class="board"><div class="seam" aria-hidden="true"></div>
+        <h1>Crease<br>Chase</h1>
+        <p>Bat against an AI bowler that studies your weak spots and moves its fielders to block your favourite shots.</p>
+      </div>
+      <div class="opt"><span class="lbl">Mode</span>
+        <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="super">Super over</button><button data-v="nets">Nets</button></div></div>
+      <div class="opt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
+      <div class="opt"><span class="lbl">Bowler</span>
+        <div class="seg" data-key="diff"><button data-v="easy">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button></div></div>
+      <div class="opt" id="lenOpt"><span class="lbl">Match length</span>
+        <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button></div></div>
+      <div class="opt" id="netsOpt"><span class="lbl">Session ends after</span>
+        <div class="seg" data-key="netsW"><button data-v="3">3 wickets</button><button data-v="5">5 wickets</button><button data-v="10">10 wickets</button><button data-v="0">No limit</button></div></div>
+      <div class="opt"><span class="lbl">Time between balls</span>
+        <div class="seg" data-key="gap"><button data-v="1">Quick</button><button data-v="2">Normal</button><button data-v="3.5">Relaxed</button></div></div>
+      <div class="opt"><span class="lbl">Aiming</span>
+        <div class="seg" data-key="aim"><button data-v="pull">Pull back</button><button data-v="push">Point the way</button></div></div>
+      <label class="tog"><input type="checkbox" id="optAssist"> Show where the ball will pitch</label>
+      <label class="tog"><input type="checkbox" id="optSound"> Sound</label>
+      <button class="primary" id="startBtn">Play</button>
+      <details class="how" open>
+        <summary>How to bat</summary>
+        <ul>
+          <li>Pull back like a slingshot: put your finger down and drag away from where you want the ball to go. Drag down to hit it straight past the bowler, down-left for a cover drive, left for a cut, right for a pull, up for fine shots behind you.</li>
+          <li>Shots stay on the ground by default. Tap Loft before you let go to hit that ball in the air; it switches off after every ball. A longer pull hits harder, up to the dashed ring.</li>
+          <li>Let go to swing, just as the ball reaches the bat. The bar at the bottom shows how early or late you were.</li>
+          <li>Tap without dragging to block. Don't touch the screen to leave the ball.</li>
+          <li>Early swings go squarer to the leg side, late ones to the off side. Drive full balls, cut and pull short ones.</li>
+        </ul>
+      </details>
+      <p class="foot" id="recordLine"></p>
+      <button class="link" id="resetBrain">Make the bowler forget what it has learned about you</button>
+    </div>
+  </section>
+
+  <section id="intro" class="screen" aria-label="Innings break">
+    <div class="card">
+      <div class="board"><h2 id="iTitle"></h2><p id="iText"></p></div>
+      <button class="primary" id="chaseBtn">Start the chase</button>
+      <button class="secondary" id="introBack">Back to menu</button>
+    </div>
+  </section>
+
+  <section id="pause" class="screen" aria-label="Paused">
+    <div class="card">
+      <div class="board"><h2>Paused</h2><p id="pText"></p></div>
+      <button class="primary" id="resumeBtn">Resume</button>
+      <button class="secondary" id="restartBtn">Restart</button>
+      <button class="secondary" id="quitBtn">Quit to menu</button>
+    </div>
+  </section>
+
+  <section id="end" class="screen" aria-label="Result">
+    <div class="card">
+      <div class="board"><h2 id="eTitle"></h2><p id="eText"></p></div>
+      <div class="stats" id="eStats"></div>
+      <p class="foot" id="eNote"></p>
+      <button class="primary" id="againBtn">Play again</button>
+      <button class="secondary" id="menuBtn">Back to menu</button>
+    </div>
+  </section>
+</div>
+
+<!-- ================= Game logic (no DOM) ================= -->
+<script id="logic">
+// @include src/logic.js
+</script>
+
+<!-- ================= Tiny WebGL engine (no dependencies) ================= -->
+<script id="engine">
+// @include src/engine.js
+</script>
+
+<!-- ================= Rendering, input, flow ================= -->
+<script>
+// @include-game src/game
+</script>
+</body>
+</html>

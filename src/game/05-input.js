@@ -1,0 +1,31 @@
+/* ---------- input ---------- */
+const dragMax=()=>Math.min(W,H)*0.3;
+function setLoft(v){S.loft=!!v;$('#loftBtn').setAttribute('aria-pressed',String(S.loft));}
+function aimDeg(dx,dy){return settings.aim==='push'?Math.atan2(dx,-dy)/D2R:Math.atan2(-dx,dy)/D2R;}
+function perfOf(e){const n=performance.now(),t=e.timeStamp;return (t>0&&t<=n+5&&n-t<1000)?t:n;}
+function gameTimeAt(p){return clock+(p-clockPerf)/1000;}
+function canAim(){return M&&!S.paused&&!S.swing&&(S.phase==='ready'||S.phase==='runup'||S.phase==='flight'||S.phase==='break');}
+cvs.addEventListener('pointerdown',e=>{
+  if(!canAim())return;e.preventDefault();
+  const r=cvs.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+  S.aim={id:e.pointerId,x0:x,y0:y,x,y};try{cvs.setPointerCapture(e.pointerId);}catch(_){}
+  S.bat={mode:'backlift',t0:clock,from:batAngleNow(),aim:0};
+});
+cvs.addEventListener('pointermove',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const r=cvs.getBoundingClientRect();S.aim.x=e.clientX-r.left;S.aim.y=e.clientY-r.top;});
+function release(ts,a){
+  if(S.phase!=='flight'||S.swing){S.bat={mode:'stance',t0:clock,from:null,aim:0};if(S.phase==='ready'||S.phase==='runup'||S.phase==='break')hint('Too soon. Let go as the ball reaches you.');return;}
+  const dx=a.x-a.x0,dy=a.y-a.y0,L=Math.hypot(dx,dy),Lm=dragMax(),defend=L<14;
+  const aim=defend?0:aimDeg(dx,dy);
+  S.swing={tc:gameTimeAt(ts)-S.ball.start+SWING_DELAY,aim,power:clamp(L/Lm,0.3,1),lofted:!defend&&S.loft,defend,done:false};
+  S.bat={mode:defend?'block':'swing',t0:gameTimeAt(ts),from:batAngleNow(),aim};
+}
+cvs.addEventListener('pointerup',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const a=S.aim;S.aim=null;if(!M||S.paused)return;release(perfOf(e),a);});
+cvs.addEventListener('pointercancel',()=>{S.aim=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};});
+window.addEventListener('keydown',e=>{
+  if((e.key==='l'||e.key==='L')&&M&&!S.paused){setLoft(!S.loft);return;}
+  if(e.key==='p'||e.key==='Escape'){if(M&&!S.paused)pause();return;}
+  if(e.code==='Space'&&canAim()){e.preventDefault();S.bat.from=batAngleNow();release(performance.now(),{x0:0,y0:0,x:0,y:0});}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+window.addEventListener('resize',resize);
+

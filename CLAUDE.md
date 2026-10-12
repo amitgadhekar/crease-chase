@@ -20,6 +20,9 @@ npm run test:smoke               # builds, plays each planet in headless Chromiu
 npm test                         # both
 ```
 Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests.
+Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub Pages). Every push to `main` runs
+`.github/workflows/pages.yml`: balance test, build, deploy `dist/crease-chase.html` as `index.html`. A failing balance
+test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding or planet values.
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
 
@@ -48,6 +51,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Camera:** `cam` = position + yaw, looking horizontally (no pitch). `proj()` in 01-core is the single source of truth:
   screen = (CX + xc*F/zc, HZ - yc*F/zc). The WebGL view/projection matrices in 07 (`viewProj`) are built to match it
   exactly (off-centre horizon at HZ), so 2D overlays drawn with `proj()` line up with the 3D scene. If you change one, change both.
+  Field of view is changed only by setting `F` (reset to `baseF`, like `HZ`/`baseHZ`), so both stay in sync.
 - **Rendering layers:** `#sky` 2D canvas (gradient, stars, sun/moons with yaw shift, Jupiter bands, Venus clouds, Saturn rings)
   → `#gl` WebGL canvas (transparent clear) → `#scene` 2D overlay canvas, which also receives all pointer input.
   In 3D, flat ground layers (ground disk, rope, rings, pitch, creases, blob shadows, pitch marker) are drawn first with
@@ -57,6 +61,9 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, settings.gap seconds) → `runup`
   → `flight` → `result` → back to `ready`, or `break` at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
   Stump checks and swing resolution are processed in chronological order within a frame (see `flightUpdate`).
+  A chase win goes to `celebrate` (~6 s, tap/key skips): bat raise, then `celCam` flies out to a wide orbit (camera raised,
+  `HZ` moved up, `F` zoomed out; framing derived from the stand radius) with fireworks (`FW` in 06, max 600 sparks).
+  `endMatch` does the records/end-screen bookkeeping once; `showEnd` shows the end screen.
 - **Timing:** windows in `EARLY`/`LATE` (late is tighter: the ball is past you), scaled by difficulty `win`.
   Early timing pulls the shot to the leg side, late pushes it to the off side (`dir = aim + dt*300`).
 - **Shot quality:** `q = timing quality * (0.35 + 0.65 * shotFit)`. `shotFit` compares ball length/line with the chosen
@@ -64,6 +71,16 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Batting input:** pull back like a slingshot (default) or point the way (setting). Drag length = power.
   Ground shot by default; the **Loft** button lofts the next shot only and resets every ball (deliberate, so lofting
   can't stay on by accident). Tap = block, no touch = leave.
+- **Batter animation** (07, visual only): full-body procedural pose (24-number arrays: feet, hips, spine, shoulders,
+  hands, bat, head), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
+  length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
+  The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
+- **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
+  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`, fielders/bowler in `PG`
+  (lower poly, 13 draws each). `GB.surf`/`GB.join` in engine.js build smooth parametric shapes; `o.spec` adds an
+  optional shine/rim light per draw (batter gear only).
+- **Audio** (02): all synthesized, routed through a master gain + compressor. Bat sound kind (mid/edge/top/block) is
+  picked from the result label. Crowd = layered formant-band noise voices. `tests/soundboard.html` auditions every sfx.
 - **AI bowler brain:** per length/line stats of runs and wickets conceded (`mem`, persisted in localStorage `cc_mem`,
   capped at 40 samples). Weights favour what has cost it least; hard mode avoids repeating a length 3 times; pressure
   situations add yorkers/bouncers; slower balls by difficulty. `brainInsight` produces the "Bowler's plan" text.
@@ -79,7 +96,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 
 ## Constraints to keep
 - Output must stay ONE self-contained HTML file: inline CSS/JS, no build-time npm deps, works offline
-  (Google Fonts are optional with fallbacks). It is published as a claude.ai artifact, whose CSP only allows scripts from
+  (Google Fonts are optional with fallbacks). It is hosted on GitHub Pages and can also be published as a claude.ai artifact, whose CSP only allows scripts from
   cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com and styles from fonts.googleapis.com.
   The custom WebGL engine exists so the game needs no CDN and stays fully testable offline; prefer extending it over
   adding Three.js. If a library is ever needed, pin an exact version that is at least two weeks old.
@@ -102,7 +119,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 2. Career: ladder of AI teams, coins from wins, batter upgrades (timing window, power).
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
-5. Unverified on real iPhone hardware: frame rate (~200 draw calls/frame). If slow: merge person parts into one
+5. Unverified on real iPhone hardware: frame rate (~190 draw calls/frame, plus up to 600 2D firework sparks in the celebration). If slow: merge person parts into one
    mesh per person, reduce sphere/cylinder segments, cap devicePixelRatio lower.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic.
 - Sun/moons/stars are screen-space with a yaw shift; Saturn's rings don't rotate with the chase camera.

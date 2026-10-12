@@ -40,6 +40,40 @@ function drawFx(){
   if(pv){ctx.fillStyle=pv.color;for(const q of PARTS){ctx.globalAlpha=pv.alpha*(0.6+0.4*Math.sin(q.p*3));ctx.fillRect(q.x*W+Math.sin(q.p)*4,q.y*H,pv.size*q.s,pv.size*q.s);}ctx.globalAlpha=1;}
   if(flash>0){ctx.fillStyle='rgba(255,245,230,'+(flash*flash*0.45)+')';ctx.fillRect(0,0,W,H);}
 }
+/* ---------- fireworks (3D points projected onto the overlay) ---------- */
+const FW={r:[],p:[],next:0,sl:-9,sb:-9},FW_MAX=600,FW_PAL=[['#ffd36b','#fff1c2','#ffa94d'],['#ff5d73','#ffd0d8','#ff9a5c'],['#6fd6ff','#e0f8ff','#a38cff'],['#8dff8a','#f4ffc2','#5df2c8']];
+function fwReset(){FW.r.length=FW.p.length=0;}
+function fwUpdate(dt,t){
+  const sH=VIS.standsH,RT=BOUNDARY+7+sH*1.15;
+  if(t<4.6&&clock>=FW.next){FW.next=clock+rnd(0.18,0.42);
+    for(let k=Math.random()<0.3?2+(Math.random()*2|0):1;k>0;k--){const a=Math.random()*7,roof=Math.random()<0.65,r=roof?RT:rnd(0,0.6)*BOUNDARY,x=Math.sin(a)*r,z=Math.cos(a)*r;
+      FW.r.push({x0:x,y0:roof?sH:0,z0:z,x1:x+rnd(-5,5),y1:sH+rnd(0.6,1.2)*RT,z1:z+rnd(-5,5),t0:clock,T:rnd(0.9,1.3)});}
+    if(clock-FW.sl>0.25){FW.sl=clock;sfx.fwLaunch();}}
+  FW.r=FW.r.filter(q=>clock-q.t0<q.T||(fwBurst(q.x1,q.y1,q.z1,RT),false));
+  const dk=Math.exp(-1.5*dt),g=G*0.5*dt;
+  FW.p=FW.p.filter(p=>{p.age+=dt;p.vx*=dk;p.vy=p.vy*dk-g;p.vz*=dk;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;return p.age<p.life;});
+}
+function fwBurst(x,y,z,RT){
+  const n=Math.min(40+(Math.random()*41|0),FW_MAX-FW.p.length),pal=FW_PAL[Math.random()*FW_PAL.length|0],ring=Math.random()<0.3,sp=RT*rnd(0.33,0.46),life=rnd(1.5,2.3);
+  const b=Math.random()*7,c=rnd(-0.6,0.6),e1=[Math.cos(b),0,Math.sin(b)],e2=[-Math.sin(b)*Math.sin(c),Math.cos(c),Math.cos(b)*Math.sin(c)];
+  for(let i=0;i<n;i++){let d;
+    if(ring){const a=i/n*2*Math.PI,ca=Math.cos(a),sa=Math.sin(a);d=[e1[0]*ca+e2[0]*sa,e2[1]*sa,e1[2]*ca+e2[2]*sa];}
+    else{const u=Math.random()*2-1,a=Math.random()*2*Math.PI,s=Math.sqrt(1-u*u);d=[s*Math.cos(a),u,s*Math.sin(a)];}
+    const v=sp*(ring?1:rnd(0.7,1));FW.p.push({x,y,z,vx:d[0]*v,vy:d[1]*v,vz:d[2]*v,age:0,life:life*rnd(0.8,1.1),c:pal[i%pal.length]});}
+  if(clock-FW.sb>0.15){FW.sb=clock;sfx.fwBoom(clamp(Math.hypot(x-cam.x,y-cam.y,z-cam.z)/(3*RT),0,1));}
+}
+function fwDraw(){
+  if(!FW.r.length&&!FW.p.length)return;
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+  const at=(q,e)=>proj(lerp(q.x0,q.x1,e),lerp(q.y0,q.y1,e),lerp(q.z0,q.z1,e));
+  for(const q of FW.r){const u=(clock-q.t0)/q.T,e=1-(1-u)*(1-u),a=at(q,e),b=at(q,Math.max(0,e-0.15));if(!a||!b)continue;
+    ctx.strokeStyle='rgba(255,214,160,.5)';ctx.lineWidth=Math.max(1,0.2*a.s);line(b.x,b.y,a.x,a.y);
+    ctx.fillStyle='#fff3d6';ctx.beginPath();ctx.arc(a.x,a.y,Math.max(1.3,0.25*a.s),0,7);ctx.fill();}
+  for(const p of FW.p){const a=proj(p.x,p.y,p.z),b=a&&proj(p.x-p.vx*0.12,p.y-p.vy*0.12,p.z-p.vz*0.12);if(!b)continue;
+    const f=1-p.age/p.life;ctx.globalAlpha=f<0.3&&Math.random()<0.4?f:Math.min(1,f*1.6);
+    ctx.strokeStyle=p.c;ctx.lineWidth=Math.max(1.6,0.4*a.s);line(b.x,b.y,a.x,a.y);}
+  ctx.restore();
+}
 function ballNow(){
   if(S.phase==='flight'){const p=ballPos(S.ball,clock-S.ball.start);return p.z>-2.2?p:null;}
   if(S.phase==='result'){

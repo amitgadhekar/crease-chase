@@ -16,13 +16,13 @@ function refreshMenu(){
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const k=seg.dataset.key;settings[k]=(k==='len'||k==='netsW'||k==='gap')?+b.dataset.v:b.dataset.v;store.set('settings',settings);refreshMenu();}));
 $('#optAssist').addEventListener('change',e=>{settings.assist=e.target.checked;store.set('settings',settings);});
-$('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);});
+$('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);if(settings.sound)audio();});
 $('#startBtn').addEventListener('click',startMatch);
 $('#chaseBtn').addEventListener('click',beginPlay);
 $('#introBack').addEventListener('click',quitToMenu);
 $('#pauseBtn').addEventListener('click',pause);
 $('#loftBtn').addEventListener('click',()=>{if(M&&!S.paused)setLoft(!S.loft);});
-$('#resumeBtn').addEventListener('click',()=>{showScreen(null);S.paused=false;});
+$('#resumeBtn').addEventListener('click',()=>{showScreen(null);S.paused=false;sfx.duck(0);});
 $('#restartBtn').addEventListener('click',startMatch);
 $('#quitBtn').addEventListener('click',()=>{if(M&&M.mode==='nets'&&M.balls>0)endMatch('nets');else quitToMenu();});
 $('#againBtn').addEventListener('click',startMatch);

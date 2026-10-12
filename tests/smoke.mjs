@@ -36,6 +36,22 @@ for (const pk of planets) {
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
 }
+if (planets.includes('earth')) {
+  await page.click('.seg[data-key=mode] button[data-v=chase]');
+  await page.click('#planetGrid button[data-v=earth]');
+  await page.click('#startBtn');
+  await page.click('#chaseBtn');
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 15000, polling: 30});
+  // Reach the target before the next ball; the real result flow then ends the chase with a win.
+  await page.evaluate(() => { const M = __t.getM(); M.runs = M.target; });
+  for (const [t, n] of [[1, 1], [3.5, 2]]) {
+    await page.waitForFunction(t => __t.S.phase === 'celebrate' && __t.clk() - __t.S.cel.t0 >= t, t, {timeout: 20000, polling: 20});
+    await page.screenshot({path: `${shots}earth-celebrate-${n}.png`});
+  }
+  await page.mouse.click(195, 420);
+  await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 2000});
+  console.log(`earth    ok  celebration skipped to end screen: ${await page.textContent('#eTitle')}`);
+}
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }
 console.log(`\nNo page errors. Screenshots in tests/screenshots/`);

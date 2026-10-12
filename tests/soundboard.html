@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crease Chase soundboard</title>
+<style>body{font:16px system-ui;margin:12px}button{min-height:44px;min-width:44px;margin:3px;padding:0 12px}h3{margin:14px 0 4px}</style>
+<h2>Soundboard</h2>
+<p>Tap any button; the first tap unlocks audio.</p>
+<div id="b"></div>
+<script>const settings={sound:true};</script>
+<script src="../src/game/02-audio.js"></script>
+<script>
+const G=[
+ ['Bat contact',[['mid q.95 p1',()=>sfx.bat('mid',.95,1)],['mid q.6 p.6',()=>sfx.bat('mid',.6,.6)],['mid q.3 p.4',()=>sfx.bat('mid',.3,.4)],
+  ['edge',()=>sfx.bat('edge',.5,.6)],['top edge',()=>sfx.bat('top',.5,.6)],['block',()=>sfx.bat('block',.5,.3)],
+  ['contact(res)',()=>sfx.contact({label:'Four!',sub:'Cover drive',shot:'Drive',q:.8},{power:.8})]]],
+ ['No contact',[['swing p.3',()=>sfx.swing(.3)],['swing p1',()=>sfx.swing(1)],['keeper',()=>sfx.keeper(1)],['keeper (wide)',()=>sfx.keeper(.5)],['bounce',()=>sfx.bounce()]]],
+ ['Wickets',[['stumps',()=>sfx.stumps()],['bowled (stumps+groan)',()=>{sfx.stumps();sfx.groan(.3);}],['caught (catch+groan)',()=>{sfx.catch(.4);sfx.groan(.4);}],['dropped (gasp)',()=>sfx.gasp()]]],
+ ['Crowd',[['four',()=>sfx.cheer(false)],['six 60m',()=>sfx.cheer(true,60)],['six 100m',()=>sfx.cheer(true,100)],['groan',()=>sfx.groan()],['gasp',()=>sfx.gasp()],
+  ['win',()=>sfx.end('win')],['loss',()=>sfx.end('loss')],['tie',()=>sfx.end('tie')],['ambience on',()=>sfx.amb(true)],['duck',()=>sfx.duck(1)],['unduck',()=>sfx.duck(0)],['ambience off',()=>sfx.amb(false)]]],
+ ['Other',[['fw launch',()=>sfx.fwLaunch()],['fw boom 0',()=>sfx.fwBoom(0)],['fw boom .5',()=>sfx.fwBoom(.5)],['fw boom 1',()=>sfx.fwBoom(1)],['launch+boom',()=>{sfx.fwLaunch();sfx.fwBoom(.2);}],['thunder',()=>sfx.thunder()],['tick',()=>sfx.tick()]]]
+];
+const root=document.getElementById('b');
+G.forEach(([t,bs])=>{const h=document.createElement('h3');h.textContent=t;root.append(h);
+  bs.forEach(([n,f])=>{const b=document.createElement('button');b.textContent=n;b.onclick=f;root.append(b);});});
+</script>

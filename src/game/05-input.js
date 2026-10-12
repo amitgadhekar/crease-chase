@@ -16,12 +16,15 @@ function release(ts,a){
   if(S.phase!=='flight'||S.swing){S.bat={mode:'stance',t0:clock,from:null,aim:0};if(S.phase==='ready'||S.phase==='runup'||S.phase==='break')hint('Too soon. Let go as the ball reaches you.');return;}
   const dx=a.x-a.x0,dy=a.y-a.y0,L=Math.hypot(dx,dy),Lm=dragMax(),defend=L<14;
   const aim=defend?0:aimDeg(dx,dy);
-  S.swing={tc:gameTimeAt(ts)-S.ball.start+SWING_DELAY,aim,power:clamp(L/Lm,0.3,1),lofted:!defend&&S.loft,defend,done:false};
+  S.swing={tc:gameTimeAt(ts)-S.ball.start+SWING_DELAY,aim,power:clamp(L/Lm,0.3,1),lofted:!defend&&S.loft,defend,done:false};if(!defend)sfx.swing(S.swing.power);
   S.bat={mode:defend?'block':'swing',t0:gameTimeAt(ts),from:batAngleNow(),aim};
 }
 cvs.addEventListener('pointerup',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const a=S.aim;S.aim=null;if(!M||S.paused)return;release(perfOf(e),a);});
 cvs.addEventListener('pointercancel',()=>{S.aim=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};});
+function skipCelebration(){if(S.phase!=='celebrate'||S.paused||clock-S.cel.t0<0.5)return false;showEnd();return true;}
+addEventListener('pointerdown',e=>{if(skipCelebration())e.preventDefault();},true);
 window.addEventListener('keydown',e=>{
+  if(skipCelebration())return;
   if((e.key==='l'||e.key==='L')&&M&&!S.paused){setLoft(!S.loft);return;}
   if(e.key==='p'||e.key==='Escape'){if(M&&!S.paused)pause();return;}
   if(e.code==='Space'&&canAim()){e.preventDefault();S.bat.from=batAngleNow();release(performance.now(),{x0:0,y0:0,x:0,y:0});}

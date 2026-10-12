@@ -57,7 +57,7 @@ body{height:100%;margin:0;overflow:hidden;background:var(--board-edge);color:var
   background:rgba(29,58,43,.82);color:var(--chalk);font:900 24px/1 "Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   letter-spacing:.5px;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 #loftBtn[aria-pressed="true"]{background:var(--gold);border-color:#fff3d0;color:#1a1a1a;box-shadow:0 0 0 4px rgba(242,177,52,.35),0 3px 10px rgba(0,0,0,.35)}
-#loftBtn[hidden]{display:none}
+#loftBtn[hidden],#hud[hidden]{display:none}
 
 /* venue picker */
 .planets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}

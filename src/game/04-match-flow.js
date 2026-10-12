@@ -1,12 +1,12 @@
 /* ---------- match flow ---------- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
 function startMatch(){
-  audio();
+  sfx.amb(true);
   const L=LENGTHS[settings.len];
   const sup=settings.mode==='super',P=setPlanet(settings.planet);applyPlanet(P);
   M={mode:sup?'chase':settings.mode,superOver:sup,planet:P,diff:settings.diff,overs:sup?1:L.overs,wktsMax:settings.mode==='nets'?(settings.netsW||Infinity):sup?2:L.w,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
      swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0};
-  S.timing=null;S.hintCount=0;
+  S.timing=null;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
   if(M.mode==='chase'){
     M.ai=simulateAI(M.overs,M.wktsMax,M.diff,P.ai,sup);M.target=M.ai.runs+1;
     $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
@@ -65,6 +65,7 @@ function flightUpdate(){
         sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
   }
   if(S.phase==='flight'&&bt>=b.tEnd){
+    sfx.keeper(b.wide?0.5:1);
     if(sw&&!sw.done){sw.done=true;sw.missed=true;}
     if(b.wide)commit({runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'},1.0);
     else commit({runs:0,label:sw?'Beaten':'Left alone',cls:'dot'},0.9);
@@ -76,7 +77,7 @@ function doSwing(){
   S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
   if(r.miss){sw.missed=true;return;}
   const res=r.res,cur=ballPos(b,clock-b.start);
-  sfx.bat(res.q!=null?res.q:0.3);
+  sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
   if(res.stumps){S.stumps={t0:clock};sfx.stumps();}
   if(res.path){S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;}
   if(res.catcher!=null){S.fanim={i:res.catcher,x:res.catchPt.x,z:res.catchPt.z,speed:Math.max(4,Math.hypot(M.field[res.catcher].x-res.catchPt.x,M.field[res.catcher].z-res.catchPt.z)/Math.max(0.25,res.path.T*0.92))};}
@@ -107,8 +108,9 @@ function commit(res,dur,delay){
 function showOutcome(res,b){
   updateHUD();
   const speedNote=b.slower?'Slower ball, '+b.kmh+' km/h':'';
-  if(res.out){banner(res.label,res.sub||res.outText,'out',1800);sfx.groan();}
-  else if(res.boundary===6){banner('Six!',res.sub,'six',1800);sfx.cheer(true);}
+  if(res.label==='Dropped!')sfx.gasp(res.path.T);
+  if(res.out){banner(res.label,res.sub||res.outText,'out',1800);sfx.groan(res.catcher!=null?res.path.T:0.3);}
+  else if(res.boundary===6){banner('Six!',res.sub,'six',1800);sfx.cheer(true,res.dist);}
   else if(res.boundary===4){banner('Four!',res.sub||res.shot,'four',1700);sfx.cheer(false);}
   else if(res.wide){banner('Wide','One extra','small',1000);}
   else if(res.runs>0){banner(res.label,res.sub||'','small',1300);}
@@ -124,7 +126,7 @@ function afterResult(){
   if(!S.res.wide&&M.balls>0&&M.balls%6===0)newOver();else nextBall();
 }
 function endMatch(kind){
-  S.paused=true;S.phase='idle';
+  sfx.end(kind);
   const rk=M.diff+(M.superOver?'_super':''),r=records[rk]||(records[rk]={w:0,p:0,hs:0});
   if(M.mode==='chase'){r.p++;if(kind==='win')r.w++;}
   const isBest=M.runs>r.hs;if(isBest)r.hs=M.runs;store.set('records',records);
@@ -141,10 +143,15 @@ function endMatch(kind){
     .map(([a,b])=>'<div class="stat"><b>'+a+'</b><span>'+b+'</span></div>').join('');
   $('#eNote').textContent=isBest&&M.runs>0?'New highest score on '+M.diff+(M.superOver?' super overs':'')+'.':'';
   $('#againBtn').textContent=kind==='tie'&&M.superOver?'Play another super over':'Play again';
-  showScreen('end');
+  if(kind==='win')celebrate();else showEnd();
 }
-function quitToMenu(){S.paused=true;S.phase='idle';M=null;$('#hud').hidden=true;$('#loftBtn').hidden=true;hint('');refreshMenu();showScreen('menu');}
-function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;
+function celebrate(){
+  S.phase='celebrate';S.cel={t0:clock,fly:false};S.chase=null;S.trail3=[];S.aim=null;S.bat={mode:'celebrate',t0:clock,from:null,aim:0};
+  $('#loftBtn').hidden=true;fwReset();FW.next=clock+0.8;
+}
+function showEnd(){S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
+function quitToMenu(){S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;$('#hud').hidden=true;$('#loftBtn').hidden=true;hint('');refreshMenu();showScreen('menu');}
+function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}
 

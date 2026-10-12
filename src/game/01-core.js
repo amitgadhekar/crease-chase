@@ -3,7 +3,9 @@ const cvs=$('#scene'),ctx=cvs.getContext('2d');
 const store={get(k,d){try{const v=localStorage.getItem('cc_'+k);return v?JSON.parse(v):d;}catch(e){return d;}},
              set(k,v){try{localStorage.setItem('cc_'+k,JSON.stringify(v));}catch(e){}}};
 const LENGTHS=[{overs:1,w:2},{overs:2,w:3},{overs:5,w:5}];
-const settings=Object.assign({mode:'chase',diff:'medium',len:1,netsW:5,aim:'pull',planet:'earth',gap:2,assist:true,sound:true},store.get('settings',{}));
+const settings=Object.assign({mode:'chase',diff:'medium',len:1,netsW:5,planet:'earth',assist:true,sound:true},store.get('settings',{}));
+if(settings.mode!=='chase'&&settings.mode!=='nets')settings.mode='chase';
+const BALL_GAP=2;
 let mem=store.get('mem',{});
 const records=store.get('records',{});
 const KIT={you:{shirt:'#12606e',trim:'#f2b134',pants:'#e9edf0',helmet:'#15324d'},ai:{shirt:'#7a1f2b',pants:'#f1ece0',skin:'#b07a55'}};

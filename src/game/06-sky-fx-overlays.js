@@ -75,7 +75,7 @@ function fwDraw(){
   ctx.restore();
 }
 function ballNow(){
-  if(S.phase==='flight'){const t=clock-S.ball.start,p=ballPos(S.ball,S.padNow?Math.min(t,S.padNow.t):t);return p.z>-2.2?p:null;}
+  if(S.phase==='flight'){const sw=S.swing,t0=clock-S.ball.start,t=sw&&sw.cp&&!sw.missed?t0+sw.dl*clamp((t0-sw.tc)/SWING_DELAY+1,0,1):t0,p=ballPos(S.ball,S.padNow?Math.min(t,S.padNow.t):t);return p.z>-2.2?p:null;}
   if(S.phase==='result'){
     if(S.hit)return hitPos(S.hit,clock-S.hitStart);
     if(S.padHit){const h=S.padHit,u=clock-h.t0;return {x:h.x+0.15*Math.min(u,0.6),y:Math.max(0,h.y+0.6*u-4.9*u*u),z:h.z+0.5*Math.min(u,0.6)};}
@@ -90,8 +90,8 @@ function drawAim(){
   ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(a.x0,a.y0,5,0,7);ctx.fill();
   let label='Block';
   if(L>=14){
-    if(settings.aim!=='push'){ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;line(a.x0,a.y0,a.x,a.y);}
-    const loft=S.loft,col=loft?'#ffb627':'#f6f1e3',ang=settings.aim==='push'?Math.atan2(dy,dx):Math.atan2(-dy,-dx),ex=a.x0+Math.cos(ang)*Math.min(L,Lm),ey=a.y0+Math.sin(ang)*Math.min(L,Lm);
+    ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;line(a.x0,a.y0,a.x,a.y);
+    const loft=S.loft,col=loft?'#ffb627':'#f6f1e3',ang=Math.atan2(-dy,-dx),ex=a.x0+Math.cos(ang)*Math.min(L,Lm),ey=a.y0+Math.sin(ang)*Math.min(L,Lm);
     ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=5;ctx.lineCap='round';line(a.x0,a.y0,ex,ey);
     ctx.beginPath();ctx.moveTo(ex+Math.cos(ang)*12,ey+Math.sin(ang)*12);ctx.lineTo(ex+Math.cos(ang+2.4)*12,ey+Math.sin(ang+2.4)*12);ctx.lineTo(ex+Math.cos(ang-2.4)*12,ey+Math.sin(ang-2.4)*12);ctx.fill();
     const sh=shotFor(aimDeg(dx,dy));label=loft?sh.loft:sh.name;

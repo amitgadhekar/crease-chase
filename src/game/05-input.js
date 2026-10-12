@@ -1,7 +1,7 @@
 /* ---------- input ---------- */
 const dragMax=()=>Math.min(W,H)*0.3;
 function setLoft(v){S.loft=!!v;$('#loftBtn').setAttribute('aria-pressed',String(S.loft));}
-function aimDeg(dx,dy){return settings.aim==='push'?Math.atan2(dx,-dy)/D2R:Math.atan2(-dx,dy)/D2R;}
+function aimDeg(dx,dy){return Math.atan2(-dx,dy)/D2R;}
 function perfOf(e){const n=performance.now(),t=e.timeStamp;return (t>0&&t<=n+5&&n-t<1000)?t:n;}
 function gameTimeAt(p){return clock+(p-clockPerf)/1000;}
 function canAim(){return M&&!S.paused&&!S.swing&&(S.phase==='ready'||S.phase==='runup'||S.phase==='flight'||S.phase==='break');}

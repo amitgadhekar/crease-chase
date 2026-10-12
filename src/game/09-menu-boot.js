@@ -10,11 +10,11 @@ function refreshMenu(){
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.key;seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(settings[k])===b.dataset.v)));});
   $('#lenOpt').style.display=settings.mode==='chase'?'':'none';$('#netsOpt').style.display=settings.mode==='nets'?'':'none';
   $('#optAssist').checked=settings.assist;$('#optSound').checked=settings.sound;
-  const r=records[settings.diff+(settings.mode==='super'?'_super':'')];
-  $('#recordLine').textContent=r&&(r.p||r.hs)?'On '+settings.diff+': '+r.w+' of '+r.p+(settings.mode==='super'?' super overs won.':' chases won.')+' Highest score '+r.hs+'.':'';
+  const r=records[settings.diff];
+  $('#recordLine').textContent=r&&(r.p||r.hs)?'On '+settings.diff+': '+r.w+' of '+r.p+' chases won.'+' Highest score '+r.hs+'.':'';
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
-  const b=e.target.closest('button');if(!b)return;const k=seg.dataset.key;settings[k]=(k==='len'||k==='netsW'||k==='gap')?+b.dataset.v:b.dataset.v;store.set('settings',settings);refreshMenu();}));
+  const b=e.target.closest('button');if(!b)return;const k=seg.dataset.key;settings[k]=(k==='len'||k==='netsW')?+b.dataset.v:b.dataset.v;store.set('settings',settings);refreshMenu();}));
 $('#optAssist').addEventListener('change',e=>{settings.assist=e.target.checked;store.set('settings',settings);});
 $('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);if(settings.sound)audio();});
 $('#startBtn').addEventListener('click',startMatch);

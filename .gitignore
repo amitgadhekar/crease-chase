@@ -3,3 +3,4 @@ dist/
 tests/screenshots/
 .claude/settings.local.json
 .idea/
+.claude/worktrees/

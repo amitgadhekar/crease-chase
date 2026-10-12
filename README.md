@@ -18,9 +18,9 @@ Recorded clips in `src/sfx/` (trimmed, levelled, mono MP3), embedded into the HT
 
 | File | Source | Licence |
 |---|---|---|
-| bat.mp3 | https://freesound.org/s/162886/ | CC0 |
+| bat.mp3 | https://pixabay.com/sound-effects/film-special-effects-hitting-wood-6791/ | Pixabay Content License |
+| mishit.mp3 | https://freesound.org/s/816836/ | CC0 |
 | edge.mp3 | https://freesound.org/s/405550/ | CC0 |
-| mishit.mp3 | https://freesound.org/s/628352/ | CC0 |
 | block.mp3 | https://freesound.org/s/594342/ | CC0 |
 | swing.mp3 | https://freesound.org/s/474838/ | CC0 |
 | gloves.mp3 | https://freesound.org/s/164499/ | CC0 |

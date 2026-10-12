@@ -36,7 +36,7 @@ function bot(pk,diff,sigma,loftP,n,fb){
   return {rpb:runs/balls,bpo:balls/Math.max(1,outs),rpw:runs/Math.max(1,outs),fours:fours/balls,sixes:sixes/balls,how,outs};
 }
 globalThis.PLANET_ORDER=PLANET_ORDER;globalThis.PLANETS=PLANETS; // top-level consts are not context properties
-function aiTarget(diff,overs,wkts,pk,isSuper){const P=setPlanet(pk);let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,P.ai,isSuper).runs;return t/2000+1;}
+function aiTarget(diff,overs,wkts,pk){const P=setPlanet(pk);let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,P.ai).runs;return t/2000+1;}
 `;
 const ctx = {console, Math};
 vm.createContext(ctx);
@@ -50,7 +50,7 @@ const check = (label, v, lo, hi) => { if (v < lo || v > hi) { failures++; consol
 console.log(`\nBy difficulty on Earth (bot timing spread 45 ms, 30% lofted), ${N} balls each:`);
 for (const d of ['easy', 'medium', 'hard']) {
   const r = ctx.bot('earth', d, 0.045, 0.3, N);
-  console.log(`  ${d.padEnd(7)} ${fmt(r)}   AI 2-over target ~${ctx.aiTarget(d, 2, 3, 'earth', false).toFixed(1)}  super-over target ~${ctx.aiTarget(d, 1, 2, 'earth', true).toFixed(1)}`);
+  console.log(`  ${d.padEnd(7)} ${fmt(r)}   AI 2-over target ~${ctx.aiTarget(d, 2, 3, 'earth').toFixed(1)}`);
 }
 
 console.log(`\nFootwork bots on Earth (medium), ${5 * N} balls each:`);

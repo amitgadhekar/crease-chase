@@ -76,7 +76,6 @@ function setPlanet(key){
   return p;
 }
 function rollWind(p){if(!p.wind){WIND={x:0,z:0};return 0;}const a=Math.random()*Math.PI*2,v=p.wind*rnd(0.4,1);WIND={x:Math.sin(a)*v,z:Math.cos(a)*v};return v;}
-const SUPER_AI={easy:{0:.3,1:.28,2:.1,4:.15,6:.08,W:.09},medium:{0:.24,1:.26,2:.1,4:.2,6:.12,W:.08},hard:{0:.2,1:.22,2:.1,4:.24,6:.16,W:.08}};
 const DIFF={
   easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
   medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
@@ -371,8 +370,8 @@ function brainInsight(mem,type,ft){
   for(const L of lens){const s=mem[type+':'+L];if(!s||s.n<4)continue;const sc=bScore(mem,type+':'+L);if(sc<bs){bs=sc;best=L;}}
   return best&&bs<0.9?'Bowler\u2019s plan: more '+LEN_NAME[best]:'';
 }
-function simulateAI(overs,wkts,diffKey,mul,isSuper){
-  const w=isSuper?SUPER_AI[diffKey]:DIFF[diffKey].ai,keys=Object.keys(w);let runs=0,out=0,balls=0;
+function simulateAI(overs,wkts,diffKey,mul){
+  const w=DIFF[diffKey].ai,keys=Object.keys(w);let runs=0,out=0,balls=0;
   while(balls<overs*6&&out<wkts){const o=pick(keys,keys.map(k=>w[k]));balls++;if(o==='W')out++;else runs+=+o;}
   return {runs:Math.round(runs*(mul||1)),wkts:out,balls};
 }

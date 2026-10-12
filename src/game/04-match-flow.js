@@ -3,14 +3,14 @@ function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classL
 function startMatch(){
   sfx.amb(true);rpUI(false);
   const L=LENGTHS[settings.len];
-  const sup=settings.mode==='super',P=setPlanet(settings.planet);applyPlanet(P);
-  M={mode:sup?'chase':settings.mode,superOver:sup,planet:P,diff:settings.diff,overs:sup?1:L.overs,wktsMax:settings.mode==='nets'?(settings.netsW||Infinity):sup?2:L.w,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
+  const P=setPlanet(settings.planet);applyPlanet(P);
+  M={mode:settings.mode,planet:P,diff:settings.diff,overs:L.overs,wktsMax:settings.mode==='nets'?(settings.netsW||Infinity):L.w,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
      swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
   S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
   if(M.mode==='chase'){
-    M.ai=simulateAI(M.overs,M.wktsMax,M.diff,P.ai,sup);M.target=M.ai.runs+1;
+    M.ai=simulateAI(M.overs,M.wktsMax,M.diff,P.ai);M.target=M.ai.runs+1;
     $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
-    $('#iText').textContent=(sup?'Super over on '+P.name+'. ':P.name+'. ')+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
+    $('#iText').textContent=P.name+'. '+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
     showScreen('intro');S.paused=true;
   }else beginPlay();
 }
@@ -34,9 +34,9 @@ function newOver(){
   const ws=rollWind(M.planet);if(ws>0.5)notes.push('Wind '+Math.round(ws*3.6)+' km/h');
   if(M.overNo===1)notes.unshift(M.planet.name);
   updateHUD();
-  banner(M.superOver?'Super over':M.mode==='chase'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join('. '),'small',1900);
+  banner(M.mode==='chase'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join('. '),'small',1900);
   S.phase='break';S.t=0;S.breakDur=1.6;resetFielders();
-  if(S.hintCount<4)hint((settings.aim==='push'?'Drag':'Pull back')+' to aim, release to swing, tap to block');
+  if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
 function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
 function nextBall(){
@@ -46,7 +46,7 @@ function nextBall(){
   const pressure=M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
   const plan=planBall(mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot});
   S.pending=makeDelivery(plan,M.diff,M.spinDir);
-  S.phase='ready';S.t=0;S.readyDur=settings.gap||2;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
+  S.phase='ready';S.t=0;S.readyDur=BALL_GAP;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
 }
 function releaseBall(){S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
 
@@ -81,10 +81,11 @@ function doSwing(){
   const r=evalSwing(b,sw,M.diff,M.field);
   S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
   if(r.miss){sw.missed=true;return;}
-  const res=r.res,cur=ballPos(b,clock-b.start);
+  const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start);
   sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
   if(res.stumps){S.stumps={t0:clock};sfx.stumps();}
-  if(res.path){S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;}
+  if(res.path){const h=S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;
+    if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}}
   if(res.catcher!=null){S.fanim={i:res.catcher,x:res.catchPt.x,z:res.catchPt.z,speed:Math.max(4,Math.hypot(M.field[res.catcher].x-res.catchPt.x,M.field[res.catcher].z-res.catchPt.z)/Math.max(0.25,res.path.T*0.92))};}
   else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[M.diff].fSpeed};}
   let dur=1.2,tCross=0;
@@ -133,13 +134,13 @@ function afterResult(){
 }
 function endMatch(kind){
   sfx.end(kind);
-  const rk=M.diff+(M.superOver?'_super':''),r=records[rk]||(records[rk]={w:0,p:0,hs:0});
+  const r=records[M.diff]||(records[M.diff]={w:0,p:0,hs:0});
   if(M.mode==='chase'){r.p++;if(kind==='win')r.w++;}
   const isBest=M.runs>r.hs;if(isBest)r.hs=M.runs;store.set('records',records);
   let title,text;
   if(M.mode==='nets'){title=M.runs+' off '+M.balls;text=isFinite(M.wktsMax)&&M.wkts>=M.wktsMax?'Session over: all '+M.wktsMax+' wickets gone.':'Nets session ended. Out '+M.wkts+(M.wkts===1?' time.':' times.');}
   else if(kind==='win'){const wk=M.wktsMax-M.wkts,bl=M.overs*6-M.balls;title='You won';text='By '+wk+(wk===1?' wicket':' wickets')+(bl?', with '+bl+(bl===1?' ball':' balls')+' to spare.':' off the last ball.');}
-  else if(kind==='tie'){title='Tied';text='Scores level on '+M.runs+'.'+(M.superOver?' Play another super over to settle it.':' So close.');}
+  else if(kind==='tie'){title='Tied';text='Scores level on '+M.runs+'. So close.';}
   else{const by=M.target-1-M.runs;title=M.planet.team+' won';text='They won by '+by+(by===1?' run.':' runs.')+' You made '+M.runs+'/'+M.wkts+'.';}
   $('#eTitle').textContent=title;$('#eText').textContent=text;
   const avg=M.swings.length?Math.round(M.swings.reduce((a,b)=>a+b,0)/M.swings.length*1000):0;
@@ -147,8 +148,7 @@ function endMatch(kind){
   $('#eStats').innerHTML=[[M.runs+'',M.balls+' balls'],[sr+'','strike rate'],[M.fours+' / '+M.sixes,'fours / sixes'],
     [M.perfects+'','perfect timing'],[avg+' ms','avg timing error'],[M.wkts+'','wickets lost']]
     .map(([a,b])=>'<div class="stat"><b>'+a+'</b><span>'+b+'</span></div>').join('');
-  $('#eNote').textContent=isBest&&M.runs>0?'New highest score on '+M.diff+(M.superOver?' super overs':'')+'.':'';
-  $('#againBtn').textContent=kind==='tie'&&M.superOver?'Play another super over':'Play again';
+  $('#eNote').textContent=isBest&&M.runs>0?'New highest score on '+M.diff+'.':'';
   if(kind==='win')celebrate();else showEnd();
 }
 function celebrate(){

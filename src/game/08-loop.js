@@ -40,6 +40,7 @@ function update(dt){
 function frame(now){
   const dt=Math.min(0.25,(now-clockPerf)/1000);clockPerf=now;
   if(!S.paused){clock+=dt;update(dt);}
+  if(!S.paused&&S.phase==='result')recContact();
   const V=S.phase==='replay'?rpView():liveView();
   if(!S.paused&&(S.phase==='runup'||S.phase==='flight'||S.phase==='result'))recFrame(V);
   draw(V);requestAnimationFrame(frame);

@@ -69,7 +69,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   for parity with the old engine (Phase 2 switches to sRGB/tone mapping there).
 - **Time:** game clock `clock` only advances when not paused. Input timestamps are converted with `gameTimeAt()` so
   pausing never desyncs timing.
-- **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, settings.gap seconds) → `runup`
+- **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, `BALL_GAP` = 2 s) → `runup`
   → `flight` → `result` → (`replay` after a four or six, unless the match/innings just ended) → back to `ready`, or `break`
   at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
   Stump checks and swing resolution are processed in chronological order within a frame (see `flightUpdate`).
@@ -80,7 +80,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   Early timing pulls the shot to the leg side, late pushes it to the off side (`dir = aim + dt*300`).
 - **Shot quality:** `q = timing quality * (0.35 + 0.65 * shotFit)`. `shotFit` compares ball length/line with the chosen
   shot's preferred length/line (`SHOTS`). Poor fit can turn into an edge or top edge even with perfect timing.
-- **Batting input:** pull back like a slingshot (default) or point the way (setting). Drag length = power.
+- **Batting input:** pull back like a slingshot (only mode). Drag length = power.
   Ground shot by default; the **Loft** button lofts the next shot only and resets every ball (deliberate, so lofting
   can't stay on by accident). Tap = block, no touch = leave.
 - **Footwork:** `S.bpos={x,z}` = batter offset from guard in metres (+z down the pitch, +x across to off; z -0.5..1.8,
@@ -101,17 +101,18 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   still connect). More bowled when moving to leg, more LBW when moving across, emerge from this geometry. `stumpedResult`
   at the keeper (tEnd): beaten or left with the back foot (0.8+bp.z) past the popping crease (1.22); 0.88 vs spin (keeper
   up), 0.3 vs pace; bails only. The balance bots use the same functions via `beaten()`.
-- **Batter animation** (07, visual only): full-body procedural pose (24-number arrays: feet, hips, spine, shoulders,
-  hands, bat, head), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
+- **Batter animation** (07, visual only): full-body procedural pose (25-number arrays: feet, hips, spine, shoulders,
+  hands, bat, head, blade face azimuth `qFC`), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
   length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
+  Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
   without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`, fielders/bowler in `PG`
   (lower poly, 13 meshes each; `personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
   in 07-geometry build smooth parametric shapes; `specMat` adds the shine/rim light (batter gear only).
 - **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
   `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
-  `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label.
+  `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
   Crowd bed loops via `loopStart/loopEnd`. Only thunder is still synthesized. Clip sources/licences are listed in README.md.
 - **AI bowler brain:** per length/line stats of runs and wickets conceded (`mem`, persisted in localStorage `cc_mem`,
   capped at 40 samples). Weights favour what has cost it least; hard mode avoids repeating a length 3 times; pressure
@@ -120,7 +121,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   it into charge/back/across weights that scale lengths and lines (`FOOT_LEN`, `FOOT_LINE`: shorter and wider vs chargers,
   fuller vs back-foot players, straighter and yorkers vs moving across), and the plan text then names it (`FOOT_NOTE`).
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
-- **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier. Super over uses `SUPER_AI` weights.
+- **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
   plus `vis` for the look. `setPlanet` derives `ENV.carry`, `ENV.acc` (ground deceleration), `ENV.run` (fielder speed).
   Wind is rolled per over and drifts lofted shots. 3D lighting and fog per planet live in `LOOK3D` (07-render3d.js).
@@ -130,7 +131,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (106 floats/frame, max 600 frames, ~250 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (107 floats/frame, max 600 frames, ~250 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
@@ -151,14 +152,14 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 ## Decision log
 - Batting control: compared one-tap timing, single swipe, and drag-to-aim/release-to-swing. Chose release-to-swing
   (aim and timing are separate skills; finger-up timing is precise on phones). Then switched to slingshot aiming at the
-  owner's request (finger stays low, doesn't cover the ball); kept "point the way" as a setting.
+  owner's request (finger stays low, doesn't cover the ball); "point the way" was removed by owner decision.
 - Loft: button applying to one ball only, rather than drag length or a sticky toggle.
 - Venues are planets, not cities, by owner request. Physics differences are real, not cosmetic.
 - 3D: started on a custom ~100-line WebGL engine (CDN unreachable, single offline file). Moved to Three.js for the visual
   upgrades (shadows, PBR lighting, 3D crowd, bloom), bundled by esbuild so the file stays offline and self-contained
   (+~530 KB). Phase 1 was a parity port (same look, overlays aligned); engine.js removed. Babylon.js and PlayCanvas were
   rejected for size.
-- Pause between balls: `ready` phase with a countdown, configurable (1 / 2 / 3.5 s), plus longer run-ups.
+- Pause between balls: `ready` phase with a countdown, fixed at 2 s (`BALL_GAP`; the time-between-balls option was removed by owner decision), plus longer run-ups.
 - Footwork control: a bottom-left joystick (velocity, own pointer) over swipe gestures or dragging the batter, because the
   right thumb is already busy with the slingshot and swipes would collide with it. Arrows/WASD on desktop.
 - Footwork payoff: a timing-window and shot-fit `gain` from leaving the good-length zone. Shot fit alone (1:1 effective

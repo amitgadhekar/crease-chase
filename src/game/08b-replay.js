@@ -6,8 +6,8 @@ const RDISC=new Uint8Array(RFL);RDISC[7]=RDISC[9]=1;for(let j=0;j<NFL;j++)RDISC[
 RV.pose=RX.subarray(10,RF0);
 let RP=null;
 function recStart(){REC.n=0;REC.t0=clock;}
-function recFrame(V){
-  const r=REC.buf,n=REC.n,t=clock-REC.t0;if(n>=RMAX||(n&&t-r[(n-1)*RFL]<1/75))return;
+function recFrame(V,force){
+  const r=REC.buf,n=REC.n,t=clock-REC.t0;if(n>=RMAX||(!force&&n&&t-r[(n-1)*RFL]<1/75))return;
   const o=n*RFL,b=V.ball;
   r[o]=t;r[o+1]=b?b.x:NaN;r[o+2]=b?b.y:NaN;r[o+3]=b?b.z:NaN;
   r[o+4]=V.bz;r[o+5]=V.arm==null?NaN:V.arm;r[o+6]=V.brun;r[o+7]=V.brn?1:0;r[o+8]=V.st?V.st.a:NaN;r[o+9]=V.st&&V.st.bails?1:0;
@@ -15,6 +15,10 @@ function recFrame(V){
   for(let j=0;j<V.nf;j++){const f=V.f[j],k=o+RF0+j*6;r[k]=f.x;r[k+1]=f.z;r[k+2]=Math.sin(f.face);r[k+3]=Math.cos(f.face);r[k+4]=f.run;r[k+5]=(f.on?1:0)|(f.running?2:0)|(f.crouch?4:0);}
   REC.nf=V.nf;REC.n++;
 }
+// contact falls between two frames, so the replay gets a frame at exactly that moment: ball on the blade, impact pose
+function recContact(){
+  if(!S.hit||clock<=S.hitStart||REC.n&&S.hitStart-REC.t0<=REC.buf[(REC.n-1)*RFL])return;
+  const c=clock;clock=S.hitStart;recFrame(liveView(),true);clock=c;}
 // frame at time t: blended between the two recorded frames around it; flags and NaN slots come from the nearer one
 function recAt(t){
   const r=REC.buf;let lo=0,hi=REC.n-1;

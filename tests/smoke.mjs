@@ -16,6 +16,11 @@ const errors = [];
 page.on('pageerror', e => errors.push(e.stack || String(e)));
 page.on('console', m => { if (m.type() === 'error' && !/ERR_NAME_NOT_RESOLVED|fonts\.g/.test(m.text())) errors.push('console: ' + m.text()); });
 
+// three's camera must put world points on the same pixels as proj(), which the 2D overlays (aim, trail, glow) use.
+let camErr = 0;
+const camCheck = async where => { const e = await page.evaluate(() => __t.cam3());
+  camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity ${where}: ${e} px`); };
+
 await page.goto(url);
 for (const pk of planets) {
   await page.click('.seg[data-key=mode] button[data-v=nets]');
@@ -30,6 +35,7 @@ for (const pk of planets) {
   // On the first planet the batter charges down the pitch, so the footwork code path (moved contact point, gait) runs.
   if (pk === planets[0]) await page.evaluate(() => Object.assign(__t.S.bpos, {x: 0.1, z: 1.2}));
   await page.screenshot({path: `${shots}${pk}-runup.png`});
+  await camCheck(pk + ' runup');
   await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 15000, polling: 30});
   // Force a perfectly timed lofted cover drive so the hit path and chase camera code run.
   await page.evaluate(() => { const S = __t.S; S.swing = {tc: footAt(S.ball, S.bpos).t + 0.002, aim: 30, power: 1, lofted: true, defend: false, done: false};
@@ -66,6 +72,7 @@ if (planets.includes('earth')) {
     for (const [t, n] of [[1, 1], [3, 2]]) {
       await page.waitForFunction(t => __t.S.phase === 'replay' && __t.clk() - __t.rp().t0 >= t, t, {timeout: 20000, polling: 20});
       await page.screenshot({path: `${shots}earth-replay-${n}.png`});
+      await camCheck('replay ' + n);
     }
     if (await page.evaluate(() => __t.S.phase === 'replay')) await page.mouse.click(195, 500);
     await page.waitForFunction(() => ['ready', 'break'].includes(__t.S.phase) && !__t.S.aim, null, {timeout: 2000})
@@ -85,6 +92,7 @@ if (planets.includes('earth')) {
   for (const [t, n] of [[1, 1], [3.5, 2]]) {
     await page.waitForFunction(t => __t.S.phase === 'celebrate' && __t.clk() - __t.S.cel.t0 >= t, t, {timeout: 20000, polling: 20});
     await page.screenshot({path: `${shots}earth-celebrate-${n}.png`});
+    await camCheck('celebration ' + n);
   }
   await page.mouse.click(195, 420);
   await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 2000});
@@ -92,4 +100,4 @@ if (planets.includes('earth')) {
 }
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }
-console.log(`\nNo page errors. Screenshots in tests/screenshots/`);
+console.log(`\nNo page errors. Camera parity within ${camErr.toFixed(4)} px. Screenshots in tests/screenshots/`);

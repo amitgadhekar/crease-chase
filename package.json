@@ -11,6 +11,8 @@
     "test": "npm run test:balance && npm run test:smoke"
   },
   "devDependencies": {
-    "playwright": "1.56.0"
+    "esbuild": "0.28.2",
+    "playwright": "1.56.0",
+    "three": "0.186.1"
   }
 }

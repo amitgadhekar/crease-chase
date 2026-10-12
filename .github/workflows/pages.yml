@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - run: npm ci
       - run: node tests/balance.mjs
       - run: node build.mjs
       - run: mkdir _site && cp dist/crease-chase.html _site/index.html

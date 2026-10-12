@@ -32,7 +32,7 @@ const sfx={
     if(k==='block')play('block',{vol:0.8*v,rate});
     else if(k==='edge')play('edge',{vol:0.7*v,rate});
     else if(k==='top')play('mishit',{vol:0.9*v,rate});
-    else play('bat',{vol:(0.55+0.45*q*(0.5+0.5*pw))*v,rate});},
+    else play('bat',{vol:(1.3+0.7*q*(0.5+0.5*pw))*v,rate});},
   contact(r,s){sfx.bat(batKind(r),r.q,s&&s.power);},
   swing(pw){pw=pw||0.6;play('swing',{vol:0.25+0.35*pw,rate:jit(0.06)});},
   keeper(v){play('gloves',{vol:0.9*(v==null?1:v),rate:jit(0.04)});},
@@ -40,12 +40,12 @@ const sfx={
   bounce(){play('bounce',{vol:0.45,rate:jit(0.04)});},
   stumps(){play('stumps',{vol:0.6,rate:jit(0.03)});},
   cheer(big,dist){
-    if(!big){play('cheer',{vol:0.55});return;}
+    if(!big){play('cheer',{vol:0.3});return;}
     play('roar',{vol:0.35+0.4*Math.min(1,(dist||60)/100)});},
   groan(w){play('groan',{vol:0.5,delay:w});},
   gasp(w){play('gasp',{vol:0.45,delay:w});},
   end(kind){
-    if(kind==='win'){play('roar',{vol:0.8});play('cheer',{vol:0.4,delay:0.4});}
+    if(kind==='win'){play('roar',{vol:0.8});play('cheer',{vol:0.22,delay:0.4});}
     else if(kind==='loss')play('applause',{vol:0.5});
     else if(kind==='tie'){play('gasp',{vol:0.45});play('applause',{vol:0.45,delay:0.9});}},
   amb,

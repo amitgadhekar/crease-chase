@@ -16,6 +16,13 @@ const out = read('src/index.html').split('\n').map(line => {
     const files = readdirSync(join(root, m[1])).filter(f => f.endsWith('.js')).sort();
     return "(()=>{\n'use strict';\n" + files.map(f => readFileSync(join(root, m[1], f), 'utf8')).join('') + "\n})();";
   }
+  m = line.match(/^\s*\/\/ @include-sfx (\S+)$/);
+  if (m) {
+    // Clips become base64 strings keyed by camelCased filename: const SFX_DATA={bat:'...',fwLaunch:'...'}.
+    const entries = readdirSync(join(root, m[1])).filter(f => f.endsWith('.mp3')).sort().map(f =>
+      `${f.slice(0, -4).replace(/-(\w)/g, (_, c) => c.toUpperCase())}:'${readFileSync(join(root, m[1], f)).toString('base64')}'`);
+    return `const SFX_DATA={${entries.join(',')}};`;
+  }
   return line;
 }).join('\n');
 

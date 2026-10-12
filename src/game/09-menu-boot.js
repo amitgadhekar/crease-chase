@@ -30,7 +30,7 @@ $('#menuBtn').addEventListener('click',quitToMenu);
 $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.target.textContent='Done. The bowler starts fresh.';});
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
-if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock};
+if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();refreshMenu();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

@@ -38,7 +38,7 @@ build.mjs                 Bundler (no npm deps)
 tests/balance.mjs         Balance simulator over src/logic.js (runs in node:vm)
 tests/smoke.mjs           Playwright smoke test over dist/
 ```
-Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio synth sfx) ·
+Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
 03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys) · 06 sky drawing, particles,
 2D overlays (aim arrow, radar, timing bar, info text) · 07 3D scene (stadium, pitch, people, bat, stumps, ball) ·
 08 camera follow + main loop · 09 menu wiring + boot.
@@ -79,8 +79,10 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`, fielders/bowler in `PG`
   (lower poly, 13 draws each). `GB.surf`/`GB.join` in engine.js build smooth parametric shapes; `o.spec` adds an
   optional shine/rim light per draw (batter gear only).
-- **Audio** (02): all synthesized, routed through a master gain + compressor. Bat sound kind (mid/edge/top/block) is
-  picked from the result label. Crowd = layered formant-band noise voices. `tests/soundboard.html` auditions every sfx.
+- **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
+  `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
+  `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label.
+  Crowd bed loops via `loopStart/loopEnd`. Only thunder is still synthesized. Clip sources/licences are listed in README.md.
 - **AI bowler brain:** per length/line stats of runs and wickets conceded (`mem`, persisted in localStorage `cc_mem`,
   capped at 40 samples). Weights favour what has cost it least; hard mode avoids repeating a length 3 times; pressure
   situations add yorkers/bouncers; slower balls by difficulty. `brainInsight` produces the "Bowler's plan" text.

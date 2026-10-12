@@ -22,6 +22,11 @@ for (const pk of planets) {
   await page.click(`#planetGrid button[data-v=${pk}]`);
   await page.click('#startBtn');
   await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 15000, polling: 30});
+  if (pk === planets[0]) {
+    await page.waitForFunction(() => { const s = __t.sfx(); return s.expected > 0 && s.decoded === s.expected; }, null, {timeout: 10000, polling: 50})
+      .catch(async () => { errors.push('sfx decode: ' + JSON.stringify(await page.evaluate(() => __t.sfx()))); });
+    console.log(`sfx      ok  decoded ${JSON.stringify(await page.evaluate(() => __t.sfx()))}`);
+  }
   await page.screenshot({path: `${shots}${pk}-runup.png`});
   await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 15000, polling: 30});
   // Force a perfectly timed lofted cover drive so the hit path and chase camera code run.

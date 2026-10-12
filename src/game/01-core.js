@@ -13,7 +13,8 @@ let W=0,H=0,F=1,baseF=1,CX=0,HZ=0,baseHZ=0,hudBottom=80,stands=null,standsTop=0,
 let clock=0,clockPerf=performance.now();
 let M=null;
 const S={phase:'idle',t:0,paused:true,ball:null,pending:null,swing:null,aim:null,bat:{mode:'stance',t0:0,from:null,aim:0},
-  res:null,hit:null,hitStart:0,trail:[],trail3:[],timing:null,stumps:null,fpos:[],fanim:null,resultDur:1,breakDur:1,runupDur:1,hintCount:0,bowlerZ:31};
+  res:null,hit:null,hitStart:0,trail:[],trail3:[],timing:null,stumps:null,fpos:[],fanim:null,resultDur:1,breakDur:1,runupDur:1,hintCount:0,bowlerZ:31,
+  bpos:{x:0,z:0},stick:null,padNow:null,padHit:null};
 
 /* ---------- sizing ---------- */
 function resize(){

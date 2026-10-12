@@ -27,10 +27,11 @@ $('#restartBtn').addEventListener('click',startMatch);
 $('#quitBtn').addEventListener('click',()=>{if(M&&M.mode==='nets'&&M.balls>0)endMatch('nets');else quitToMenu();});
 $('#againBtn').addEventListener('click',startMatch);
 $('#menuBtn').addEventListener('click',quitToMenu);
+$('#rpSkip').addEventListener('click',()=>{if(S.phase==='replay'&&!S.paused)rpEnd();});
 $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.target.textContent='Done. The bowler starts fresh.';});
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
-if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
+if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();refreshMenu();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

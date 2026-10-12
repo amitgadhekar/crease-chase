@@ -28,7 +28,7 @@ function amb(on){
 }
 function batKind(r){const t=(r.label||'')+' '+(r.sub||'');return /top edge/i.test(t)?'top':/edge/i.test(t)?'edge':r.shot==='Block'?'block':'mid';}
 const sfx={
-  bat(k,q,pw){q=q==null?0.3:q;pw=pw==null?0.6:pw;const rate=jit(0.04),v=jit(0.08);
+  bat(k,q,pw,rs){q=q==null?0.3:q;pw=pw==null?0.6:pw;const rate=jit(0.04)*(rs||1),v=jit(0.08);
     if(k==='block')play('block',{vol:0.8*v,rate});
     else if(k==='edge')play('edge',{vol:0.7*v,rate});
     else if(k==='top')play('mishit',{vol:0.9*v,rate});

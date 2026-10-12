@@ -62,7 +62,7 @@ function build3D(){
 function lightFor(){
   const lk=LOOK3D[curPlanet]||LOOK3D.earth,sky=hex(lk.sky),dir=V3.norm([-0.35,0.85,-0.4]);
   const lum=0.3*sky[0]+0.59*sky[1]+0.11*sky[2],si=clamp((1.02-0.72*lum)/dir[1],0.25,1.6)*lk.k;
-  const fo=S.cel?Math.max(0,Math.hypot(cam.x,cam.z)+CAM_Z):0;
+  const fo=wideCam()?Math.max(0,Math.hypot(cam.x,cam.z)+CAM_Z):0;
   return {dir,sun:[si,si*0.97,si*0.92],sky:V3.sc(sky,0.72),gr:V3.sc(hex(lk.gr),0.72),fogC:lk.fog?hex(lk.fog[0]):[0,0,0],fog:lk.fog?[lk.fog[1]+fo,lk.fog[2]+fo]:[0,0],eye:[cam.x,cam.y,cam.z]};
 }
 function viewProj(){
@@ -108,19 +108,36 @@ const SH3=[
    li:{h:[.45,.45,.08],d:[.8,-.1,-.4]},lf:{h:[.35,.8,0],d:[.55,.7,-.4],lz:-.12}},
   {i:{dh:[0,-.06,-.05],h:[.3,.02,-.02],d:[.4,-.88,-.3],sr:.2,lx:.4,nod:.8},f:{h:[.32,.02,-.06],d:[.55,-.7,-.45],sr:.25},
    li:{h:[.22,.32,.05],d:[.3,-.2,-.9]},lf:{h:[.2,.45,0],d:[.3,.45,-.85]}}];
-const PB={key:'',sw:false,t0:0,dur:.4,fd:.3,from:new Float32Array(PN),cur:new Float32Array(BP.st),tg:new Float32Array(PN),tmp:new Float32Array(PN),a:null,b:null,ball:null,cx:0};
+const PB={key:'',sw:false,t0:0,dur:.4,fd:.3,from:new Float32Array(PN),cur:new Float32Array(BP.st),tg:new Float32Array(PN),tmp:new Float32Array(PN),out:new Float32Array(PN),a:null,b:null};
 const smooth=u=>u*u*(3-2*u);
 function batAngleNow(){return new Float32Array(PB.cur);}
-// trigger step: weights by length (b.full is high for short balls), toward the line of the ball, done well before contact
-function footPose(out,b,p){
+// trigger step: weights by the length met after footwork (full is high for short balls), toward the line of the ball relative
+// to the batter, done well before contact. BP.fw/bk/tr feet match FOOT in logic.js, which places the pads for LBW.
+function footPose(out,b,p,fa){
   out.set(BP.st);if(!b)return out;
-  const f=b.full,wf=clamp((.36-f)/.14,0,1),wb=clamp((f-.52)/.12,0,1),wt=1-wf-wb,e=smooth(p);
+  fa=fa||footAt(b,S.bpos);const [wf,wb,wt]=strideW(fa.full),e=smooth(p);
   for(let i=0;i<PN;i++)out[i]+=e*(wf*(BP.fw[i]-BP.st[i])+wb*(BP.bk[i]-BP.st[i])+wt*(BP.tr[i]-BP.st[i]));
-  if(PB.ball!==b){PB.ball=b;PB.cx=ballPos(b,b.tIdeal).x;}
-  out[qFX]+=e*wf*clamp(PB.cx*.45,-.12,.25);out[qBX]+=e*wb*clamp(PB.cx*.3,-.1,.15);
+  out[qFX]+=e*(wf*clamp(fa.xc*.45,-.12,.25)+wt*clamp(fa.xc*.3,-.1,.15));out[qBX]+=e*wb*clamp(fa.xc*.3,-.1,.15);
   const lift=Math.sin(Math.PI*p);out[qFLY]+=lift*(.09*wf+.03*wt);out[qBLY]+=lift*.06*wb;
   return out;}
-function footProg(b,bt){const te=Math.max(.12,Math.min(b.tIdeal*.6,b.tIdeal-.2));return clamp((bt-.04)/(te-.04),0,1);}
+function footProg(tI,bt){const te=Math.max(.12,Math.min(tI*.6,tI-.2));return clamp((bt-.04)/(te-.04),0,1);}
+// footwork gait: a chasse, one foot at a time stepping to just ahead of where the body is heading, so planted feet never slide
+const FT={f:[0,0],b:[0,0],mv:-1,last:1,go:false,u:0,a:[0,0],lift:0,t:0,px:0,pz:0};
+function feetTick(){
+  const dt=clamp(clock-FT.t,0,.1),p=S.bpos;FT.t=clock;
+  const lx=dt?clamp((p.x-FT.px)/dt*.08,-.25,.25):0,lz=dt?clamp((p.z-FT.pz)/dt*.08,-.25,.25):0,tx=p.x+lx,tz=p.z+lz;FT.px=p.x;FT.pz=p.z;
+  if(FT.mv<0){
+    const nf=Math.hypot(tx-FT.f[0],tz-FT.f[1])>.06,nb=Math.hypot(tx-FT.b[0],tz-FT.b[1])>.06;
+    const k=nf&&nb?(FT.go?1-FT.last:lz<0?1:0):nf?0:nb?1:-1;
+    FT.go=k>=0;if(FT.go){FT.mv=k;FT.u=0;FT.a=(k?FT.b:FT.f).slice();}
+  }
+  FT.lift=0;
+  if(FT.mv>=0){
+    FT.u=Math.min(1,FT.u+dt/.14);const F=FT.mv?FT.b:FT.f,e=smooth(FT.u);
+    F[0]=lerp(FT.a[0],tx,e);F[1]=lerp(FT.a[1],tz,e);FT.lift=Math.sin(Math.PI*FT.u)*.07;
+    if(FT.u>=1){FT.last=FT.mv;FT.mv=-1;}
+  }
+}
 function idlePose(p,a){
   if(a<=0)return;const w=clock,tap=Math.pow(Math.max(0,Math.sin(w*1.7)),8)*a;
   p[qHY]+=Math.sin(w*2.1)*.006*a;p[qLX]+=Math.sin(w*2.1+.6)*.015*a;p[qHZ]+=Math.sin(w*.75)*.018*a;p[qHX]+=Math.sin(w*.75)*.005*a;
@@ -135,7 +152,8 @@ function shotKeys(b,aim){
   PB.a=a;PB.b=f;PB.fd=L?.4:.3;}
 function poseTick(){
   const B=S.bat,b=S.ball,ph=S.phase,cel=B.mode==='celebrate',fly=!cel&&!!b&&(ph==='flight'||ph==='result'),bt=fly?clock-b.start:0,tg=PB.tg;
-  footPose(tg,fly?b:null,fly?footProg(b,bt):0);
+  const fa=fly?footAt(b,S.bpos):null;
+  footPose(tg,fly?b:null,fly?footProg(fa.t,bt):0,fa);
   let key='st',dur=.4,now=clock,sw=false;
   if(cel){now=performance.now()/1000;key='cel';dur=.45;poseSet(tg,UP.cel);tg[qAY]+=Math.sin(now*5)*.025;}
   else if(fly&&B.mode==='swing'){key='sw'+B.t0;sw=true;}
@@ -143,7 +161,7 @@ function poseTick(){
   else if(B.mode==='backlift'){key='bl'+B.t0;dur=.18;
     const k=S.aim?.55+.45*clamp(Math.hypot(S.aim.x-S.aim.x0,S.aim.y-S.aim.y0)/dragMax(),0,1):1;
     idlePose(tg,ph==='ready'||ph==='break'?1:0);PB.tmp.set(tg);poseSet(tg,UP.bl);for(let j=qAX;j<=qDZ;j++)tg[j]=PB.tmp[j]+(tg[j]-PB.tmp[j])*k;}
-  else if(fly&&!S.swing&&(ph==='result'||bt>b.tIdeal+.03)){key='lv';dur=.28;poseSet(tg,UP.leave);}
+  else if(fly&&!S.swing&&(ph==='result'||bt>fa.t+.03)){key='lv';dur=.28;poseSet(tg,UP.leave);}
   else idlePose(tg,ph==='ready'||ph==='break'?1:ph==='runup'?clamp(1-S.t/(S.runupDur*.6),0,1):0);
   if(key!==PB.key){PB.from.set(PB.cur);PB.key=key;PB.sw=sw;PB.dur=dur;PB.t0=sw?B.t0:now;if(sw)shotKeys(b,B.aim);}
   const c=PB.cur,f=PB.from,mix=(x,y,e)=>{for(let j=0;j<PN;j++)c[j]=x[j]+(y[j]-x[j])*e;};
@@ -152,7 +170,11 @@ function poseTick(){
     else{const u=clamp((t-SWING_DELAY)/PB.fd,0,1);mix(PB.a,PB.b,1-(1-u)*(1-u));}}
   else{const u=clamp((now-PB.t0)/PB.dur,0,1),bump=Math.sin(Math.PI*u);mix(f,tg,smooth(u));
     c[qFLY]+=bump*Math.min(.08,.3*Math.hypot(tg[qFX]-f[qFX],tg[qFZ]-f[qFZ]));c[qBLY]+=bump*Math.min(.08,.3*Math.hypot(tg[qBX]-f[qBX],tg[qBZ]-f[qBZ]));}
-  return c;}
+  feetTick();
+  const o=PB.out,p=S.bpos,F=FT;o.set(c);
+  o[qHX]+=.5*p.x+.25*(F.f[0]+F.b[0]);o[qHZ]+=.5*p.z+.25*(F.f[1]+F.b[1]);o[qHY]-=F.lift*.2;
+  o[qFX]+=F.f[0];o[qFZ]+=F.f[1];o[qBX]+=F.b[0];o[qBZ]+=F.b[1];if(F.mv>=0)o[F.mv?qBLY:qFLY]+=F.lift;
+  return o;}
 
 /* --- people: smooth procedural parts, built once. Limb parts are centred on the origin along y, between their joint centres --- */
 const SKIN=[0.69,0.48,0.33],PAD=[.95,.95,.93],GLOVE=[.96,.96,.96],GRIP=[.2,.15,.1],BLADE=[.89,.77,.56],GRILLE=[.34,.36,.4],H2=Math.PI/2;
@@ -255,8 +277,8 @@ function batsman3D(p){
   E3.draw(B.blade,mL(a,b,.58,[1,Math.max(0,Math.abs(d[0])-.4)*3,0]),BLADE,{spec:.15});
 }
 function stumps3D(z,hit){
-  const t=hit?clock-hit.t0:0,cream=[0.95,0.92,0.82],bail=[0.85,0.64,0.25];
-  [-0.114,0,0.114].forEach((x,i)=>{const tilt=hit?Math.min(1,t*7)*[0.35,-0.5,0.55][i]:0;
+  const t=hit?hit.a:0,cream=[0.95,0.92,0.82],bail=[0.85,0.64,0.25];
+  [-0.114,0,0.114].forEach((x,i)=>{const tilt=hit&&!hit.bails?Math.min(1,t*7)*[0.35,-0.5,0.55][i]:0;
     limb([x,0,z],[x+Math.sin(tilt)*0.7,Math.cos(tilt)*0.71,z-Math.abs(tilt)*0.3],0.019,cream);});
   if(!hit){limb([-0.114,0.725,z],[0,0.725,z],0.011,bail);limb([0,0.725,z],[0.114,0.725,z],0.011,bail);}
   else [-1,1].forEach(k=>{const y=0.73+3.2*t-4.9*t*t;if(y<0)return;const px=k*(0.06+0.9*t),pz=z-1.2*t;limb([px-0.05,y,pz],[px+0.05,y+0.02,pz],0.011,bail);});
@@ -270,14 +292,35 @@ function bowlerState(){
     z=Math.max(17.6,20.3-t*2.4);arm=Math.min(2*Math.PI,Math.PI+t*12);run=t*8;running=t<0.9;}
   S.bowlerZ=z;return {z,arm,run,running};
 }
+/* --- view state: everything render3D/draw take from the game. Live frames are built here; a replay feeds recorded
+   frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
+const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay';
+const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,arm:null,brun:0,brn:false,
+  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null});
+const LV=mkView();
+function liveView(){
+  const V=LV,ph=S.phase;
+  V.pose=poseTick();V.ball=ballNow();
+  V.st=S.stumps?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;
+  V.mk=!settings.assist?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
+  V.nf=0;
+  if(M){
+    const bs=bowlerState();V.bz=bs.z;V.arm=bs.arm;V.brun=bs.run;V.brn=bs.running;
+    S.fpos.forEach((p,i)=>{if(V.nf>=NFL)return;const f=M.field[i],o=V.f[V.nf++];o.on=!!f&&f.n!=='keeper'&&f.n!=='bowler';if(!o.on)return;
+      const mv=!!p.mv&&clock-p.mv<0.12,tx=mv&&S.fanim?S.fanim.x:0,tz=mv&&S.fanim?S.fanim.z:BATS_Z;
+      o.x=p.x;o.z=p.z;o.face=Math.atan2(tx-p.x,tz-p.z);o.running=mv;o.run=p.run;o.crouch=ph==='flight'||ph==='runup'?1:0;});
+  }
+  V.hideBat=!!(S.chase&&clock>=S.chase.t0);V.trail=V.hideBat?S.trail3:null;
+  return V;
+}
 function shadow3(x,z,r,a){E3.draw(GEO.disk,mT([x,0,z],0,r,1,r),[0,0,0],{a,lit:0,fog:0});}
 
-function render3D(bp){
+function render3D(V){
   if(!glOK||!R3)return;
-  const v=VIS,{view,proj}=viewProj(),R=R3.R;
+  const bp=V.ball,v=VIS,{view,proj}=viewProj(),R=R3.R;
   E3.frame(glc.width,glc.height,view,proj,lightFor());
   E3.flat(true);
-  if(S.cel)E3.draw(GEO.disk,mT([0,0,0],0,1800,1,1800),hex(v.ground[1]));
+  if(wideCam())E3.draw(GEO.disk,mT([0,0,0],0,1800,1,1800),hex(v.ground[1]));
   E3.draw(GEO.disk,mT([0,0,0],0,R+7,1,R+7),[1,1,1],{tex:R3.groundTex});
   E3.draw(R3.rope,I4,hex(v.rope),{lit:0});
   E3.draw(R3.ring,I4,[1,1,1],{a:0.45,lit:0});
@@ -287,45 +330,42 @@ function render3D(bp){
   const [cc,ca]=colA(v.crease),cw=0.05,crease=(px,pz,w,l)=>E3.draw(GEO.plane,mT([px,0,pz],0,w,1,l),cc,{a:ca,lit:0});
   for(const [zb,dirz] of [[0,1],[20.12,-1]]){crease(0,zb,2.64,cw);crease(0,zb+1.22*dirz,3.66,cw);crease(-1.32,zb,cw,2.44);crease(1.32,zb,cw,2.44);}
   if(M){
-    S.fpos.forEach((p,i)=>{const f=M.field[i];if(f&&f.n!=='keeper'&&f.n!=='bowler')shadow3(p.x,p.z,0.38,0.22);});
-    shadow3(0.42,S.bowlerZ,0.38,0.22);
+    for(let i=0;i<V.nf;i++){const p=V.f[i];if(p.on)shadow3(p.x,p.z,0.38,0.22);}
+    shadow3(0.42,V.bz,0.38,0.22);
   }
-  const bpz=poseTick();shadow3(bpz[qHX],bpz[qHZ]+.02,0.45,0.25);
+  const bpz=V.pose;shadow3(bpz[qHX],bpz[qHZ]+.02,0.45,0.25);
   if(bp)shadow3(bp.x,bp.z,0.07/(1+bp.y*0.15),0.35);
-  if(settings.assist){let b=null;
-    if(S.phase==='runup'&&S.t/S.runupDur>0.4)b=S.pending;else if(S.phase==='flight'&&clock-S.ball.start<S.ball.t1)b=S.ball;
-    if(b){E3.draw(GEO.disk,mT([b.xb,0,b.zb],0,0.24,1,0.24),[1,0.88,0.4],{a:0.28,lit:0,fog:0});E3.draw(GEO.ann,mT([b.xb,0,b.zb],0,0.26,1,0.26),[1,0.88,0.4],{lit:0,fog:0});}}
+  const mk=V.mk;
+  if(mk){E3.draw(GEO.disk,mT([mk.xb,0,mk.zb],0,0.24,1,0.24),[1,0.88,0.4],{a:0.28,lit:0,fog:0});E3.draw(GEO.ann,mT([mk.xb,0,mk.zb],0,0.26,1,0.26),[1,0.88,0.4],{lit:0,fog:0});}
   E3.flat(false);
   E3.draw(R3.stand,I4,[1,1,1],{tex:R3.standTex,lit:0});
-  stumps3D(20.12,null);stumps3D(0,S.stumps);
+  stumps3D(20.12,null);stumps3D(0,V.st);
   if(M){
     const kit=aiKit();
-    S.fpos.forEach((p,i)=>{const f=M.field[i];if(!f||f.n==='keeper'||f.n==='bowler')return;
-      const moving=p.mv&&clock-p.mv<0.12,tgt=moving&&S.fanim?[S.fanim.x,S.fanim.z]:[0,BATS_Z];
-      person3D(p.x,p.z,Math.atan2(tgt[0]-p.x,tgt[1]-p.z),{...kit,running:moving,run:p.run,crouch:S.phase==='flight'||S.phase==='runup'?1:0});});
-    const bs=bowlerState();person3D(0.42,bs.z,Math.PI,{...kit,running:bs.running,run:bs.run,arm:bs.arm});
+    for(let i=0;i<V.nf;i++){const p=V.f[i];if(p.on)person3D(p.x,p.z,p.face,{...kit,running:p.running,run:p.run,crouch:p.crouch});}
+    person3D(0.42,V.bz,Math.PI,{...kit,running:V.brn,run:V.brun,arm:V.arm});
   }
-  const chaseOn=!!(S.chase&&clock>=S.chase.t0);
-  if(!chaseOn)batsman3D(bpz);
+  if(!V.hideBat)batsman3D(bpz);
   if(bp)ball3([bp.x,bp.y+0.05,bp.z],0.05,[0.78,0.13,0.1]);
 }
 
 /* --- sky (2D canvas behind the 3D layer) --- */
 function renderSky(){
   const v=VIS,dB=distToBoundary(cam.x,cam.z,cam.fx,cam.fz)+7;let top=HZ-(v.standsH-cam.y)*F/dB;
-  if(S.cel&&!(top<HZ))top=HZ;
+  if(wideCam()&&!(top<HZ))top=HZ;
   const g=sk.createLinearGradient(0,0,0,Math.max(10,top));g.addColorStop(0,v.sky[0]);g.addColorStop(1,v.sky[1]);
   sk.fillStyle=g;sk.fillRect(0,0,W,H);
   yawShift=cam.yaw*D2R*F;
   drawSky(top);
 }
-function draw(){
-  const bp=ballNow();
-  renderSky();render3D(bp);
+function draw(V){
+  const bp=V.ball;
+  renderSky();render3D(V);
   ctx.clearRect(0,0,W,H);
   if(!glOK){ctx.fillStyle='#fff';ctx.font='600 16px Barlow,sans-serif';ctx.textAlign='center';ctx.fillText('3D graphics are not available on this device.',W/2,H/2);}
-  if(S.chase&&clock>=S.chase.t0)S.trail3.forEach((t,i)=>{const q=proj(t.x,t.y,t.z);if(!q)return;ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.03)+')';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(2,0.05*q.s),0,7);ctx.fill();});
+  if(V.trail)V.trail.forEach((t,i)=>{const q=proj(t.x,t.y,t.z);if(!q)return;ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.03)+')';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(2,0.05*q.s),0,7);ctx.fill();});
   drawFx();
-  if(S.cel)fwDraw();else{drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
+  if(S.phase==='replay')rpGlow(bp);
+  if(S.cel)fwDraw();else if(S.phase!=='replay'){drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
 }
 

@@ -22,13 +22,39 @@ function release(ts,a){
 cvs.addEventListener('pointerup',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const a=S.aim;S.aim=null;if(!M||S.paused)return;release(perfOf(e),a);});
 cvs.addEventListener('pointercancel',()=>{S.aim=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};});
 function skipCelebration(){if(S.phase!=='celebrate'||S.paused||clock-S.cel.t0<0.5)return false;showEnd();return true;}
-addEventListener('pointerdown',e=>{if(skipCelebration())e.preventDefault();},true);
+addEventListener('pointerdown',e=>{if(skipCelebration())e.preventDefault();else if(rpSkip(e)){e.preventDefault();e.stopPropagation();}},true);
 window.addEventListener('keydown',e=>{
   if(skipCelebration())return;
+  if(S.phase==='replay'&&e.key!=='p'&&e.key!=='Escape'){if(!e.repeat&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!['Shift','Meta','Control','Alt','Tab'].includes(e.key))rpSkip(e);return;}
+  if(FW_KEYS[e.code]&&!e.metaKey&&!e.ctrlKey&&!e.altKey){KEYS[e.code]=1;if(M)e.preventDefault();return;}
   if((e.key==='l'||e.key==='L')&&M&&!S.paused){setLoft(!S.loft);return;}
   if(e.key==='p'||e.key==='Escape'){if(M&&!S.paused)pause();return;}
   if(e.code==='Space'&&canAim()){e.preventDefault();S.bat.from=batAngleNow();release(performance.now(),{x0:0,y0:0,x:0,y:0});}
 });
+window.addEventListener('keyup',e=>{delete KEYS[e.code];});
+window.addEventListener('blur',()=>{for(const k in KEYS)delete KEYS[k];});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+
+/* ---------- footwork: joystick (own pointer, so the other thumb can bat) or arrows/WASD, until the ball pitches ---------- */
+const stickEl=$('#stick'),knob=stickEl.firstElementChild,KEYS={},FOOT_V={fwd:2.5,back:2,side:2};
+const FW_KEYS={ArrowUp:[0,1],KeyW:[0,1],ArrowDown:[0,-1],KeyS:[0,-1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
+function stickXY(e){const r=stickEl.getBoundingClientRect(),R=r.width/2,dx=(e.clientX-r.left-R)/R,dy=(e.clientY-r.top-R)/R,L=Math.hypot(dx,dy);return L>1?[dx/L,dy/L]:[dx,dy];}
+stickEl.addEventListener('pointerdown',e=>{if(!M||S.paused)return;e.preventDefault();S.stick={id:e.pointerId,v:stickXY(e)};try{stickEl.setPointerCapture(e.pointerId);}catch(_){}});
+stickEl.addEventListener('pointermove',e=>{if(S.stick&&e.pointerId===S.stick.id)S.stick.v=stickXY(e);});
+for(const t of ['pointerup','pointercancel'])stickEl.addEventListener(t,e=>{if(S.stick&&e.pointerId===S.stick.id)S.stick=null;});
+const footFree=()=>S.phase==='runup'||(S.phase==='flight'&&!S.swing&&clock-S.ball.start<S.ball.t1);
+let knobAt='';
+function footUpdate(dt){
+  const p=S.bpos,free=footFree();
+  if(S.phase==='ready'||S.phase==='break'){const d=Math.hypot(p.x,p.z),m=Math.min(d,FOOT_V.back*dt);if(d>0){p.x-=p.x/d*m;p.z-=p.z/d*m;}}
+  let vx=0,vz=0;
+  if(S.stick&&Math.hypot(...S.stick.v)>0.15){vx=S.stick.v[0];vz=-S.stick.v[1];}
+  for(const k in KEYS){vx+=FW_KEYS[k][0];vz+=FW_KEYS[k][1];}
+  const L=Math.hypot(vx,vz);if(L>1){vx/=L;vz/=L;}
+  if(free){p.x=clamp(p.x+vx*FOOT_V.side*dt,-0.6,0.6);p.z=clamp(p.z+vz*(vz>0?FOOT_V.fwd:FOOT_V.back)*dt,-0.5,1.8);}
+  const k=S.stick?S.stick.v:[vx,-vz],t='translate('+Math.round(k[0]*33)+'px,'+Math.round(k[1]*33)+'px)';
+  if(t!==knobAt){knobAt=t;knob.style.transform=t;}
+  stickEl.classList.toggle('locked',!free);
+}
 window.addEventListener('resize',resize);
 

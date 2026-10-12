@@ -1,12 +1,12 @@
 /* ---------- match flow ---------- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
 function startMatch(){
-  sfx.amb(true);
+  sfx.amb(true);rpUI(false);
   const L=LENGTHS[settings.len];
   const sup=settings.mode==='super',P=setPlanet(settings.planet);applyPlanet(P);
   M={mode:sup?'chase':settings.mode,superOver:sup,planet:P,diff:settings.diff,overs:sup?1:L.overs,wktsMax:settings.mode==='nets'?(settings.netsW||Infinity):sup?2:L.w,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
-     swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0};
-  S.timing=null;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
+     swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
+  S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
   if(M.mode==='chase'){
     M.ai=simulateAI(M.overs,M.wktsMax,M.diff,P.ai,sup);M.target=M.ai.runs+1;
     $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
@@ -15,7 +15,7 @@ function startMatch(){
   }else beginPlay();
 }
 function beginPlay(){
-  showScreen(null);$('#hud').hidden=false;$('#loftBtn').hidden=false;resize();S.paused=false;newOver();
+  showScreen(null);$('#hud').hidden=false;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver();
 }
 function newOver(){
   M.overNo++;M.overBalls=[];
@@ -29,7 +29,7 @@ function newOver(){
   M.bowlerType=type;M.spinDir=Math.random()<0.5?1:-1;
   const ff=fieldFor(M.shots,M.diff);M.field=ff.field;
   const notes=[type==='pace'?'Pace bowler':(M.spinDir>0?'Leg-spinner':'Off-spinner')];
-  const ins=brainInsight(mem,type);if(ins)notes.push(ins);
+  const ins=brainInsight(mem,type,M.foot);if(ins)notes.push(ins);
   if(ff.moved)notes.push(ff.moved===1?'One fielder moved deep':ff.moved+' fielders moved deep');
   const ws=rollWind(M.planet);if(ws>0.5)notes.push('Wind '+Math.round(ws*3.6)+' km/h');
   if(M.overNo===1)notes.unshift(M.planet.name);
@@ -40,39 +40,44 @@ function newOver(){
 }
 function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
 function nextBall(){
-  S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
   resetFielders();
   const left=M.overs*6-M.balls,need=M.target-M.runs;
   const pressure=M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
-  const plan=planBall(mem,M.bowlerType,M.diff,{last:M.lastLens,pressure});
+  const plan=planBall(mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot});
   S.pending=makeDelivery(plan,M.diff,M.spinDir);
   S.phase='ready';S.t=0;S.readyDur=settings.gap||2;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
 }
 function releaseBall(){S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
 
+// a pending swing resolves before the pads, as the timing model lets late swings still reach the ball
 function flightUpdate(){
-  const b=S.ball,bt=clock-b.start,sw=S.swing;
+  const b=S.ball,bt=clock-b.start,sw=S.swing,ph=S.padNow=padHit(b,S.bpos);
   if(!b.bounced&&bt>=b.t1){b.bounced=true;sfx.bounce();}
-  const ev=[];
-  if(sw&&!sw.done&&bt>=sw.tc)ev.push({t:sw.tc,k:'swing'});
-  if(!b.stumpChecked&&bt>=b.tStumps)ev.push({t:b.tStumps,k:'stumps'});
-  ev.sort((x,y)=>x.t-y.t);
+  const ev=[],pend=sw&&!sw.done;
+  if(pend&&bt>=sw.tc)ev.push({t:sw.tc,k:0});
+  if(ph){const t=Math.max(ph.t,pend?sw.tc:0);if(bt>=t)ev.push({t,k:1});}
+  else if(!b.stumpChecked&&bt>=b.tStumps)ev.push({t:b.tStumps,k:2});
+  ev.sort((x,y)=>x.t-y.t||x.k-y.k);
   for(const e of ev){
     if(S.phase!=='flight')return;
-    if(e.k==='swing')doSwing();
+    if(e.k===0)doSwing();
+    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:0.5,rate:0.7});const r=padResult(b,ph,!!sw);commit(r,r.out?1.9:1.1);}
     else{b.stumpChecked=true;
-      if(b.onStumps){if(sw&&!sw.done){sw.done=true;sw.missed=true;S.timing={dt:sw.tc-b.tIdeal,early:false,label:'Too late',zone:-1};}
-        sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
+      if(b.onStumps){tooLate(sw,b);sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
   }
-  if(S.phase==='flight'&&bt>=b.tEnd){
+  if(S.phase==='flight'&&bt>=b.tEnd&&!ph){
     sfx.keeper(b.wide?0.5:1);
     if(sw&&!sw.done){sw.done=true;sw.missed=true;}
-    if(b.wide)commit({runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'},1.0);
+    const st=stumpedResult(b,S.bpos);
+    if(st){sfx.stumps();S.stumps={t0:clock,bails:true};commit(st,1.9);}
+    else if(b.wide)commit({runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'},1.0);
     else commit({runs:0,label:sw?'Beaten':'Left alone',cls:'dot'},0.9);
   }
 }
+function tooLate(sw,b){if(sw&&!sw.done){sw.done=true;sw.missed=true;S.timing={dt:sw.tc-footAt(b,S.bpos).t,early:false,label:'Too late',zone:-1};}}
 function doSwing(){
-  const b=S.ball,sw=S.swing;sw.done=true;
+  const b=S.ball,sw=S.swing;sw.done=true;sw.bp={x:S.bpos.x,z:S.bpos.z};
   const r=evalSwing(b,sw,M.diff,M.field);
   S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
   if(r.miss){sw.missed=true;return;}
@@ -88,7 +93,7 @@ function doSwing(){
     const h=S.hit,bd=distToBoundary(h.x0,h.z0,h.ux,h.uz);
     if(h.air)tCross=res.boundary===6?bd/h.sh:h.T+0.5;
     else{const disc=h.s*h.s-2*h.a*bd;tCross=disc>0?(h.s-Math.sqrt(disc))/h.a:2;}
-    tCross=clamp(tCross,0.4,3.4);S.chase={t0:clock+0.15};dur=tCross+1.4;
+    tCross=clamp(tCross,0.4,3.4);S.chase={t0:clock+0.15,tx:clock+tCross};dur=tCross+1.4;
   }
   commit(res,dur,tCross);
 }
@@ -99,7 +104,7 @@ function commit(res,dur,delay){
   if(res.boundary===4)M.fours++;if(res.boundary===6)M.sixes++;
   M.overBalls.push(res.out?{t:'W',cls:'cw'}:res.wide?{t:'wd',cls:'cwd'}:res.boundary===6?{t:'6',cls:'c6'}:res.boundary===4?{t:'4',cls:'c4'}:{t:res.runs?String(res.runs):'\u2022'});
   if(res.dir!=null&&!res.out)M.shots.push({a:res.dir,runs:res.runs,lofted:!!res.lofted});
-  brainLearn(mem,b,res.runs,!!res.out);store.set('mem',mem);
+  brainLearn(mem,b,res.runs,!!res.out);store.set('mem',mem);footTrend(M.foot,S.bpos);
   M.typeStats[b.type].r+=res.runs;M.typeStats[b.type].n++;
   M.lastLens.push(b.len);if(M.lastLens.length>6)M.lastLens.shift();
   if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
@@ -123,7 +128,8 @@ function afterResult(){
     if(M.runs>=M.target)return endMatch('win');
     if(out||done)return endMatch(M.runs===M.target-1?'tie':'loss');
   }else if(M.wkts>=M.wktsMax)return endMatch('nets');
-  if(!S.res.wide&&M.balls>0&&M.balls%6===0)newOver();else nextBall();
+  const nx=!S.res.wide&&M.balls>0&&M.balls%6===0?newOver:nextBall;
+  if(S.res.boundary&&S.chase&&REC.n>1)rpStart(nx);else nx();
 }
 function endMatch(kind){
   sfx.end(kind);
@@ -147,10 +153,10 @@ function endMatch(kind){
 }
 function celebrate(){
   S.phase='celebrate';S.cel={t0:clock,fly:false};S.chase=null;S.trail3=[];S.aim=null;S.bat={mode:'celebrate',t0:clock,from:null,aim:0};
-  $('#loftBtn').hidden=true;fwReset();FW.next=clock+0.8;
+  $('#loftBtn').hidden=true;$('#stick').hidden=true;fwReset();FW.next=clock+0.8;
 }
-function showEnd(){S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
-function quitToMenu(){S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;$('#hud').hidden=true;$('#loftBtn').hidden=true;hint('');refreshMenu();showScreen('menu');}
+function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
+function quitToMenu(){rpUI(false);S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();showScreen('menu');}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}

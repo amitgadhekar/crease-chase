@@ -136,6 +136,47 @@ function makeDelivery(plan,diffKey,spinDir){
   return b;
 }
 
+/* ---------- footwork: bp = batter offset from guard in metres (+z down the pitch, +x across to off) ---------- */
+const POPPING=1.22,LEG_H=0.9,PAD_W=0.36,REACH_LEG=-0.65,BP0={x:0,z:0};
+const FOOT={fw:[-.33,1.8,-.47,.8],bk:[-.38,1.18,-.22,.6],tr:[-.43,1.46,-.38,.76]};
+function strideW(full){const wf=clamp((.36-full)/.14,0,1),wb=clamp((full-.52)/.12,0,1);return [wf,wb,1-wf-wb];}
+// Good length is the zone of uncertainty: footwork that takes the ball out of it, or goes back to a short ball (more time),
+// earns a gain (wider timing windows, better shot fit); footwork into it costs. Charging a short ball meets it on the rise (awk).
+const lenDanger=f=>clamp(1-Math.abs(f-0.45)/0.2,0,1);
+function footAt(b,bp){
+  bp=bp||BP0;const t=tAt(b,CONTACT_Z+bp.z),c=ballPos(b,t),full=clamp((b.zb-bp.z-1)/10,0,1);
+  const gain=lenDanger(b.full)-lenDanger(full)+0.2*clamp(-bp.z/0.4,0,1)*clamp((b.full-0.55)/0.1,0,1);
+  return {t,c,xc:c.x-bp.x,full,gain,awk:clamp((b.zb-6.5)/2,0,1)*clamp((bp.z-0.3)/0.9,0,1)};
+}
+function legsAt(b,bp){
+  bp=bp||BP0;const f=footAt(b,bp),[wf,wb,wt]=strideW(f.full),v=i=>wf*FOOT.fw[i]+wb*FOOT.bk[i]+wt*FOOT.tr[i];
+  return [{x:v(0)+wf*clamp(f.xc*.45,-.12,.25)+wt*clamp(f.xc*.3,-.1,.15)+bp.x,z:v(1)+bp.z},{x:v(2)+wb*clamp(f.xc*.3,-.1,.15)+bp.x,z:v(3)+bp.z}];
+}
+// knees bow toward the off side, so a leg covers from just behind the foot to well in front of it (ball radius included)
+function padHit(b,bp){
+  for(const L of legsAt(b,bp)){const t=tAt(b,L.z),p=ballPos(b,t);if(p.x>L.x-0.1&&p.x<L.x+PAD_W&&p.y<LEG_H)return {t,x:p.x,y:p.y,z:L.z};}
+  return null;
+}
+// LBW law: not if it pitched outside leg; impact in line, or outside off only when no shot was offered; and it would hit the stumps
+function padResult(b,h,offered){
+  const leg=b.zb>h.z&&b.xb<-STUMP_HALF,inLine=Math.abs(h.x)<STUMP_HALF;
+  if(b.onStumps&&!leg&&(inLine||(h.x>0&&!offered)))
+    return {runs:0,out:true,outText:'LBW',label:'LBW',sub:offered?'Trapped in front':'Padded up, no shot offered',cls:'out',pad:h};
+  if(b.wide)return {runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide',pad:h};
+  return {runs:0,label:'Hit on the pad',sub:!b.onStumps?'Missing the stumps':leg?'Pitched outside leg':'Hit outside the line',cls:'dot',pad:h};
+}
+const outOfCrease=(b,bp)=>!!bp&&legsAt(b,bp)[1].z>POPPING;
+// the keeper stands up to spin, so a charging batter who is beaten is usually stumped
+function stumpedResult(b,bp){
+  if(!outOfCrease(b,bp)||Math.random()>=(b.type==='spin'?0.88:0.3))return null;
+  return {runs:b.wide?1:0,wide:!!b.wide,out:true,outText:'Stumped',label:'Stumped!',sub:b.type==='spin'?'Down the pitch and beaten':'Out of the crease, keeper threw it in',cls:'out',stumped:true};
+}
+function beaten(b,bp,offered){
+  const h=padHit(b,bp);if(h)return padResult(b,h,offered);
+  if(b.onStumps)return {runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:offered?'Missed it':'Left it, and it hit the stumps',cls:'out',stumps:true};
+  return stumpedResult(b,bp)||(b.wide?{runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'}:{runs:0,label:offered?'Beaten':'Left alone',cls:'dot'});
+}
+
 /* ---------- fielding ---------- */
 function fieldName(f){
   if(f.n==='keeper')return 'the keeper';
@@ -179,7 +220,7 @@ function fieldFor(shots,diffKey){
 }
 
 /* ---------- shot resolution ---------- */
-function windows(diffKey,early){const k=DIFF[diffKey].win,b=early?EARLY:LATE;return {perfect:b.perfect*k,good:b.good*k,ok:b.ok*k,edge:b.edge*k};}
+function windows(diffKey,early,m){const k=DIFF[diffKey].win*(m||1),b=early?EARLY:LATE;return {perfect:b.perfect*k,good:b.good*k,ok:b.ok*k,edge:b.edge*k};}
 function resolveDefend(b,clean){
   if(clean){const r=Math.random()<0.12?1:0;return {runs:r,label:r?'Quick single':'Blocked',cls:r?'runs':'dot',dir:rnd(-25,25),lofted:false,path:{air:false,s:r?8:4,a:4},shot:'Block'};}
   if(b.onStumps&&Math.random()<0.35)return {runs:0,out:true,outText:'Played on',label:'Out!',sub:'Inside edge onto the stumps',cls:'out',stumps:true,shot:'Block'};
@@ -269,15 +310,15 @@ function resolveAir(c,dir,q,power,field,d){
     label:dropped?'Dropped!':runs?runLabel(runs):'No run',sub:dropped?'Put down at '+fieldName(nf.f):'Lands safely',cls:runs?'runs':'dot'};
 }
 function evalSwing(b,sw,diffKey,field){
-  const d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-b.tIdeal,early=dt<0,a=Math.abs(dt),w=windows(diffKey,early);
-  const c=ballPos(b,b.tIdeal);
-  const timing={dt,early,
+  const fa=footAt(b,sw.bp),d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),w=windows(diffKey,early,1+0.35*fa.gain);
+  const c=fa.c;
+  const timing={dt,early,win:1+0.35*fa.gain,
     label:a<=w.perfect?'Perfect':a<=w.good?'Good':a<=w.ok?(early?'Early':'Late'):a<=w.edge?(early?'Very early':'Very late'):(early?'Too early':'Too late'),
     zone:a<=w.perfect?3:a<=w.good?2:a<=w.ok?1:a<=w.edge?0:-1};
-  if(!(c.x<0.98&&c.x>-0.8&&c.y<2.05)){timing.label='Out of reach';timing.zone=-1;return {miss:true,timing};}
+  if(!(fa.xc<0.98&&fa.xc>REACH_LEG&&c.y<2.05)){timing.label='Out of reach';timing.zone=-1;return {miss:true,timing};}
   if(a>w.edge)return {miss:true,timing};
   if(sw.defend)return {timing,res:resolveDefend(b,a<=w.ok)};
-  const shot=shotFor(sw.aim),match=shotFit(shot,b.full,c.x),name=sw.lofted?shot.loft:shot.name;
+  const shot=shotFor(sw.aim),match=clamp(shotFit(shot,fa.full,fa.xc)*(1-0.5*fa.awk)+0.25*fa.gain,0.1,1),name=sw.lofted?shot.loft:shot.name;
   let edge=a>w.ok,mishit=false;
   const mt=sw.lofted?0.55:0.42;
   if(!edge&&match<mt&&Math.random()<(mt-match)*1.7){edge=true;mishit=true;}
@@ -294,18 +335,25 @@ function evalSwing(b,sw,diffKey,field){
 
 /* ---------- AI bowler brain: remembers what each length and line costs it ---------- */
 function bScore(mem,k){const s=mem[k]||{r:0,n:0,w:0},n=s.n+2;return (s.r+2.4)/n-5*s.w/n;}
+/* footwork tendency (recent bp where the ball pitched): ch = charges, bk = goes back, ac = moves across to off */
+function footTrend(ft,bp){ft.x+=((bp?bp.x:0)-ft.x)*0.2;ft.z+=((bp?bp.z:0)-ft.z)*0.2;return ft;}
+function footPlan(ft){return ft?{ch:clamp((ft.z-0.25)/0.6,0,1),bk:clamp((-ft.z-0.1)/0.25,0,1),ac:clamp((ft.x-0.12)/0.25,0,1)}:null;}
+const FOOT_LEN={ch:{Y:.7,F:.7,S:1.8,B:1.5},bk:{Y:1.5,F:1.6,S:.7,B:.7},ac:{Y:1.7,F:1.2,S:.8}};
+const FOOT_LINE={ch:{wide:2.2,leg:.7},bk:{},ac:{mid:1.8,leg:1.3,wide:.6}};
+const FOOT_NOTE={ch:'shorter and wider, you keep coming down the pitch',bk:'fuller, you keep going back',ac:'straight at the stumps, you keep moving across'};
+const footMul=(fp,T,k)=>fp?['ch','bk','ac'].reduce((m,j)=>m*lerp(1,T[j][k]||1,fp[j]),1):1;
 function planBall(mem,type,diffKey,ctx){
   const d=DIFF[diffKey],lens=type==='pace'?['Y','F','G','S','B']:['Y','F','G','S'];
   const base=type==='pace'?{Y:.7,F:1,G:1.6,S:.8,B:.45}:{Y:.3,F:1.3,G:1.7,S:.45};
-  const last=ctx.last||[];
+  const last=ctx.last||[],fp=footPlan(ctx.foot);
   const lw=lens.map(L=>{
-    let x=base[L]*Math.exp(-d.k*1.5*bScore(mem,type+':'+L));
+    let x=base[L]*Math.exp(-d.k*1.5*bScore(mem,type+':'+L))*footMul(fp,FOOT_LEN,L);
     if(ctx.pressure&&L==='Y')x*=1.9;
     if(ctx.pressure&&L==='B')x*=1.3;
     if(d.k>0.3&&last.length>=2&&last[last.length-1]===L&&last[last.length-2]===L)x*=0.3;
     return x;});
   const lines=['wide','off','mid','leg'],lb={wide:.45,off:1.5,mid:1,leg:.55};
-  return {type,len:pick(lens,lw),line:pick(lines,lines.map(l=>lb[l]*Math.exp(-d.k*1.2*bScore(mem,'line:'+l)))),
+  return {type,len:pick(lens,lw),line:pick(lines,lines.map(l=>lb[l]*footMul(fp,FOOT_LINE,l)*Math.exp(-d.k*1.2*bScore(mem,'line:'+l)))),
     slower:type==='pace'&&Math.random()<d.slower*(ctx.pressure?1.5:1)};
 }
 function brainLearn(mem,b,runs,out){
@@ -315,7 +363,9 @@ function brainLearn(mem,b,runs,out){
     if(s.n>40){s.r*=40/s.n;s.w*=40/s.n;s.n=40;}
   }
 }
-function brainInsight(mem,type){
+function brainInsight(mem,type,ft){
+  const fp=footPlan(ft),fk=fp&&['ch','bk','ac'].find(k=>fp[k]>=0.5);
+  if(fk)return 'Bowler\u2019s plan: '+FOOT_NOTE[fk];
   const lens=type==='pace'?['Y','F','G','S','B']:['F','G','S'];
   let best=null,bs=1e9;
   for(const L of lens){const s=mem[type+':'+L];if(!s||s.n<4)continue;const sc=bScore(mem,type+':'+L);if(sc<bs){bs=sc;best=L;}}

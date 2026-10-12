@@ -15,7 +15,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 ```bash
 npm install                      # once; then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file)
-npm run test:balance             # bot plays ~20k balls per row against src/logic.js; exits 1 if balance drifts
+npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) against src/logic.js; exits 1 if balance drifts
 npm run test:smoke               # builds, plays each planet in headless Chromium, fails on page errors
 npm test                         # both
 ```
@@ -23,7 +23,8 @@ Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL 
 Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub Pages). Every push to `main` runs
 `.github/workflows/pages.yml`: balance test, build, deploy `dist/crease-chase.html` as `index.html`. A failing balance
 test blocks the deploy. `dist/` is not committed.
-Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding or planet values.
+Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
+Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/wicket; "always charges" and "always across" must not beat it.
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
 
 ## Layout
@@ -39,9 +40,9 @@ tests/balance.mjs         Balance simulator over src/logic.js (runs in node:vm)
 tests/smoke.mjs           Playwright smoke test over dist/
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
-03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys) · 06 sky drawing, particles,
+03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
 2D overlays (aim arrow, radar, timing bar, info text) · 07 3D scene (stadium, pitch, people, bat, stumps, ball) ·
-08 camera follow + main loop · 09 menu wiring + boot.
+08 camera follow + main loop · 08b replay (recording, playback, replay cameras) · 09 menu wiring + boot.
 
 ## Core model (read before touching physics or rendering)
 - **World coords (metres):** batter's stumps at z=0, bowler's stumps at z=20.12, +z toward the bowler, +y up,
@@ -59,7 +60,8 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Time:** game clock `clock` only advances when not paused. Input timestamps are converted with `gameTimeAt()` so
   pausing never desyncs timing.
 - **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, settings.gap seconds) → `runup`
-  → `flight` → `result` → back to `ready`, or `break` at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
+  → `flight` → `result` → (`replay` after a four or six, unless the match/innings just ended) → back to `ready`, or `break`
+  at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
   Stump checks and swing resolution are processed in chronological order within a frame (see `flightUpdate`).
   A chase win goes to `celebrate` (~6 s, tap/key skips): bat raise, then `celCam` flies out to a wide orbit (camera raised,
   `HZ` moved up, `F` zoomed out; framing derived from the stand radius) with fireworks (`FW` in 06, max 600 sparks).
@@ -71,6 +73,24 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **Batting input:** pull back like a slingshot (default) or point the way (setting). Drag length = power.
   Ground shot by default; the **Loft** button lofts the next shot only and resets every ball (deliberate, so lofting
   can't stay on by accident). Tap = block, no touch = leave.
+- **Footwork:** `S.bpos={x,z}` = batter offset from guard in metres (+z down the pitch, +x across to off; z -0.5..1.8,
+  x ±0.6). Replays record it per frame: keep the name and shape. Driven by the `#stick` joystick (bottom-left, own pointer
+  id so the other thumb bats on `#scene` at the same time) or arrows/WASD, velocity control 2.5 m/s forward, 2 back/across
+  (`footUpdate`, 05). Free in `runup` and in `flight` until the ball pitches or a swing is released; walks back to guard in
+  `ready`/`break` and is zeroed at run-up start. Drawn as a chassé gait (`feetTick`, 07) on top of the pose.
+- **Moved contact point:** `footAt(b,bp)` in logic.js is the single source: `t` (ideal contact time at CONTACT_Z+bp.z),
+  contact `c`, `xc` (line relative to the batter), `full` (length met), `gain`, `awk`. `b.tIdeal` is the stationary value
+  only; anything that judges or shows timing uses `footAt`. `evalSwing` reads `sw.bp` (set in `doSwing`). Reach is checked
+  on `xc` (`REACH_LEG` -0.65: balls behind the legs can't be hit). `gain`: good length is the zone of uncertainty, so footwork
+  that takes the ball out of it (or goes back to a short ball) widens the timing windows ×(1+0.35·gain) and adds 0.25·gain to
+  shot fit; footwork into it costs. Charging a short ball meets it on the rise (`awk` cuts shot fit).
+- **Pads, LBW, stumped:** `legsAt` places both pads from the trigger-step feet (`FOOT` = the BP.fw/bk/tr feet in 07; change
+  both together) plus `bp`; `padHit` = first leg the ball reaches. `padResult` applies the LBW law (not pitched outside leg;
+  impact in line, or outside off only with no shot offered; would hit the stumps = `b.onStumps`), else "Hit on the pad" and
+  the ball drops. In `flightUpdate` the pad event replaces the stumps check and waits for a pending swing (late swings can
+  still connect). More bowled when moving to leg, more LBW when moving across, emerge from this geometry. `stumpedResult`
+  at the keeper (tEnd): beaten or left with the back foot (0.8+bp.z) past the popping crease (1.22); 0.88 vs spin (keeper
+  up), 0.3 vs pace; bails only. The balance bots use the same functions via `beaten()`.
 - **Batter animation** (07, visual only): full-body procedural pose (24-number arrays: feet, hips, spine, shoulders,
   hands, bat, head), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
   length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
@@ -86,6 +106,9 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - **AI bowler brain:** per length/line stats of runs and wickets conceded (`mem`, persisted in localStorage `cc_mem`,
   capped at 40 samples). Weights favour what has cost it least; hard mode avoids repeating a length 3 times; pressure
   situations add yorkers/bouncers; slower balls by difficulty. `brainInsight` produces the "Bowler's plan" text.
+  Footwork tendency: `M.foot` is a moving average of `S.bpos` per ball (`footTrend`), passed as `ctx.foot`; `footPlan` turns
+  it into charge/back/across weights that scale lengths and lines (`FOOT_LEN`, `FOOT_LINE`: shorter and wider vs chargers,
+  fuller vs back-foot players, straighter and yorkers vs moving across), and the plan text then names it (`FOOT_NOTE`).
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
 - **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier. Super over uses `SUPER_AI` weights.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
@@ -95,6 +118,15 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
   "scoring vs Earth" ratio (the test checks they stay within 0.8-1.25 of each other).
 - **Chase camera:** on fours and sixes the camera follows the ball (`updateCam`), and the banner and score reveal are
   deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
+- **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
+  live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (106 floats/frame, max 600 frames, ~250 KB, current
+  delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
+  per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
+  render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
+  Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near contact) until 0.4 s after contact,
+  then a spider-cam trailing the ball (closer and lower for low balls, backs off and rises for high ones so the stands stay in frame) at 1x until 0.3 s after it crosses the rope, with a glow ring on the ball (`rpGlow`). Tap/key/Skip skips after 0.3 s.
+  The batter is shown in replays (the live chase camera hides it).
 
 ## Constraints to keep
 - Output must stay ONE self-contained HTML file: inline CSS/JS, no build-time npm deps, works offline
@@ -115,6 +147,12 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 - 3D: custom ~100-line WebGL engine instead of Three.js, because the CDN couldn't be reached for testing and the
   single file must work offline. Three.js would make real shadow maps easier if ever needed.
 - Pause between balls: `ready` phase with a countdown, configurable (1 / 2 / 3.5 s), plus longer run-ups.
+- Footwork control: a bottom-left joystick (velocity, own pointer) over swipe gestures or dragging the batter, because the
+  right thumb is already busy with the slingshot and swipes would collide with it. Arrows/WASD on desktop.
+- Footwork payoff: a timing-window and shot-fit `gain` from leaving the good-length zone. Shot fit alone (1:1 effective
+  length, also tried 2-3x) gave a length-reading bot under 3%, because drives tolerate length; with `gain` it gets ~+15%.
+- LBW added with footwork, pads from the trigger-step feet. The always-swinging bot rarely misses, so its LBW share is ~4%;
+  human-like play (90 ms timing spread, 15% leaves) gives ~15-20% of dismissals, close to real cricket.
 
 ## Known gaps / backlog (ranked as discussed)
 1. Bowling: let the player bowl (line, length, pace, variations) to an AI batter, so a match is two real innings.
@@ -123,5 +161,6 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 4. Original collectible characters/kits as part of career.
 5. Unverified on real iPhone hardware: frame rate (~190 draw calls/frame, plus up to 600 2D firework sparks in the celebration). If slow: merge person parts into one
    mesh per person, reduce sphere/cylinder segments, cap devicePixelRatio lower.
-- No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic.
+- No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
+  and stumpings just knock the bails off.
 - Sun/moons/stars are screen-space with a yaw shift; Saturn's rings don't rotate with the chase camera.

@@ -75,9 +75,10 @@ function fwDraw(){
   ctx.restore();
 }
 function ballNow(){
-  if(S.phase==='flight'){const p=ballPos(S.ball,clock-S.ball.start);return p.z>-2.2?p:null;}
+  if(S.phase==='flight'){const t=clock-S.ball.start,p=ballPos(S.ball,S.padNow?Math.min(t,S.padNow.t):t);return p.z>-2.2?p:null;}
   if(S.phase==='result'){
     if(S.hit)return hitPos(S.hit,clock-S.hitStart);
+    if(S.padHit){const h=S.padHit,u=clock-h.t0;return {x:h.x+0.15*Math.min(u,0.6),y:Math.max(0,h.y+0.6*u-4.9*u*u),z:h.z+0.5*Math.min(u,0.6)};}
     if(S.ball&&!S.res.out&&!S.stumps){const t=clock-S.ball.start;const p=ballPos(S.ball,t);return p.z>-2.2?p:null;}
   }
   return null;
@@ -123,7 +124,7 @@ function drawRadar(bp){
 }
 function drawTimingBar(){
   const T=S.timing;if(!T||!M)return;
-  const we=windows(M.diff,true),wl=windows(M.diff,false),bw=Math.min(320,W*0.8),x0=(W-bw)/2,y=H-40,h=10;
+  const we=windows(M.diff,true,T.win),wl=windows(M.diff,false,T.win),bw=Math.min(320,W*0.8),x0=(W-bw)/2,y=H-40,h=10;
   const ppx=bw/(we.edge+wl.edge),c0=x0+we.edge*ppx,X=t=>c0+t*ppx;
   const zones=[[-we.edge,-we.ok,'#8b3a3a'],[-we.ok,-we.good,'#d99a2b'],[-we.good,-we.perfect,'#9bc53d'],[-we.perfect,wl.perfect,'#3ec46d'],
                [wl.perfect,wl.good,'#9bc53d'],[wl.good,wl.ok,'#d99a2b'],[wl.ok,wl.edge,'#8b3a3a']];

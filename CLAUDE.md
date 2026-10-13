@@ -18,6 +18,7 @@ npm run build                    # src/ -> dist/crease-chase.html (single self-c
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) against src/logic.js; exits 1 if balance drifts
 npm run test:smoke               # builds, plays each planet in headless Chromium, fails on page errors
 npm test                         # both
+npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
 Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests.
 Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub Pages). Every push to `main` runs
@@ -38,6 +39,9 @@ build.mjs                 Inlines CSS, logic.js and SFX into the HTML; bundles t
                           minified IIFE, target es2020/safari15) and inlines it. logic.js stays a plain script (balance test)
 tests/balance.mjs         Balance simulator over src/logic.js (runs in node:vm)
 tests/smoke.mjs           Playwright smoke test over dist/
+src/models/*.glb          Skinned models, embedded as base64 (MODEL_DATA) by build.mjs; generated, but committed
+tools/blender/            Model scripts run headless in Blender: rig.py (skeleton contract), sdf.py (shapes, meshing),
+                          batter.py (the batter). tools/model.mjs runs Blender, then gltf-transform prune/dedup/quantize
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
 03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
@@ -45,7 +49,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
 `geo`/`fillGeo` (-> BufferGeometry) · 07-people fielder/bowler species per planet (`SPECIES`, `spBuild`) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
-ball), batter pose, view state, adaptive quality ·
+ball), batter pose, view state, adaptive quality · 07-skin skinned batter (loads the GLB, drives its bones from the pose) ·
 08 camera follow + main loop · 08b replay (recording, playback, replay cameras) · 09 menu wiring + boot.
 
 ## Core model (read before touching physics or rendering)
@@ -140,8 +144,22 @@ ball), batter pose, view state, adaptive quality ·
   length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
   Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
+- **Skinned batter** (07-skin, tools/blender): one smooth skinned body (skin, shirt, collar/cuff trim, trousers; 4
+  material groups, ~5.2k tris) plus rigid kit parented to bones (helmet + grille, pads, gloves, shoes; ~4.7k tris), 19 bones,
+  ~180 KB GLB, ambient occlusion baked into vertex colours. `batJoints(p)` (07-render3d) turns a pose into joints; both
+  the procedural parts and the skeleton use it. **Skeleton contract** = `tools/blender/rig.py` (`HUMAN` lengths = the
+  pose's: thigh/shin .43, upper arm .31, forearm .30 to the grip, shoulders ±.19, spine+chest .5, neck .17; rest A-pose in
+  game coordinates, L = front side). Each bone stores rest `aim`/`ref` vectors (glTF extras -> `bone.userData`);
+  `skinVecs` gives the same two vectors from the pose (limb line + IK pole for elbows/knees, toe for shins, bat for hands,
+  half twists for spine and neck, clavicles follow 15% of the arm swing), and `skin3D` sets `bone.quaternion` to map one
+  onto the other (no AnimationMixer). Only the pelvis, hands and feet get positions: hands/feet are pinned to the pose's
+  hand points and ankles (a leg stretched past its reach stops short otherwise). The bat stays procedural (`batsman3D`),
+  so contact targeting is untouched. If the GLB fails to load, the procedural batter below stays (`__r.skin()` says why).
+  Materials are replaced by name with `kit()` ones (KIT colours, vertex colours on). Species can reuse the rig with their
+  own `HUMAN`-style lengths. Regenerate with `npm run model:batter` (Blender 5.2 at /Applications or `BLENDER=`; a
+  `-- --render DIR --poses poses.json` run renders turntables and game poses; `__r.drive()` dumps a pose).
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
-  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`; fielders/bowler are lower poly,
+  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG` (fallback); fielders/bowler are lower poly,
   13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
   in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
 - **Species** (07-people): fielders and bowler are a species per planet (Earth humans, Selenites, Scorchlings, Cloudwaders,
@@ -188,7 +206,7 @@ ball), batter pose, view state, adaptive quality ·
 - Output must stay ONE self-contained HTML file: inline CSS/JS, works offline, nothing loaded from a CDN at runtime
   (Google Fonts are optional with fallbacks). It is hosted on GitHub Pages and can also be published as a claude.ai artifact, whose CSP only allows scripts from
   cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com and styles from fonts.googleapis.com.
-  Build-time npm deps (three, esbuild, playwright) are devDependencies pinned to exact versions that were at least two weeks
+  Build-time npm deps (three, esbuild, playwright, @gltf-transform/cli for the model pipeline) are devDependencies pinned to exact versions that were at least two weeks
   old when added; the lock file resolves from registry.npmjs.org. three r163+ needs WebGL2 (iOS 15+).
 - localStorage keys are prefixed `cc_` (settings, mem, records); every access is wrapped in try/catch.
 - Mobile first: portrait iPhone, safe-area insets, `touch-action:none` on the input canvas, 44px+ touch targets.
@@ -207,6 +225,11 @@ ball), batter pose, view state, adaptive quality ·
   3D crowd, 3D fireworks (+~30 KB, the build is ~1.0 MB).
 - Fielders/bowler as procedural alien species per planet on the existing rig, over downloaded CC0 models: a Mars trial
   showed a style clash with the batter, no bowling action and +350 KB.
+- Batter: a smooth skinned model scripted in Blender (signed-distance shapes -> surface nets -> voxel remesh ->
+  decimate, automatic weights), rigged to our own skeleton so the procedural pose drives it and the bat/contact code is
+  unchanged. Loaded with three's GLTFLoader rather than a custom loader for robustness (+~79 KB code; model +~238 KB as
+  base64; the build is ~1.35 MB). No meshopt/Draco: WebAssembly may be blocked by the artifact CSP. Quadriflow remeshing was tried and refused
+  the mesh; decimation with its symmetry option folded faces along the mirror plane, so it runs without it.
 - Glow: additive glow sprites (fireworks, floodlight halos) instead of UnrealBloomPass. Bloom needs an EffectComposer: a
   full-res HalfFloat target (~24 MB at 1170x2532, ~4x with MSAA, else the scene loses antialiasing), fog then mixes in linear
   space before tone mapping so it no longer matches the 2D sky, and its cost is fill rate, which headless swiftshader (CPU,
@@ -224,8 +247,8 @@ ball), batter pose, view state, adaptive quality ·
 2. Career: ladder of AI teams, coins from wins, batter upgrades (timing window, power).
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
-5. Unverified on real iPhone hardware: frame rate (~85 draw calls/frame in a normal ball including the shadow pass, ~250 in the
-   celebration orbit; ~120k triangles, mostly crowd). The adaptive tiers react to it; if still slow: merge person parts into
+5. Unverified on real iPhone hardware: frame rate (~145 draw calls/frame between balls including the shadow pass, measured
+   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
   and stumpings just knock the bails off.

@@ -408,28 +408,39 @@ function ik(a,t,l1,l2,pole){
   return V3.add(V3.add(a,V3.sc(u,x)),V3.sc(V3.norm(V3.sub(pole,V3.sc(u,V3.dot(pole,u)))),h));}
 // blade face normal: azimuth ps (0 = toward the bowler, +90 = off side) made perpendicular to the blade; up if the blade points along it
 function faceN(d,ps){const n=[Math.sin(ps),0,Math.cos(ps)],m=V3.sub(n,V3.sc(d,V3.dot(n,d)));return Math.hypot(m[0],m[1],m[2])>.25?V3.norm(m):V3.norm(V3.sub([0,1,0],V3.sc(d,d[1])));}
-function batsman3D(B,p){
-  const hip=[p[qHX],p[qHY],p[qHZ]],ha=[-Math.sin(p[qHR]),0,Math.cos(p[qHR])];
+// batter joints of a pose (game coordinates). Index 0 = front side (left leg, left arm/top hand), 1 = back side. The
+// procedural parts and the skinned skeleton (07-skin.js) are both placed from these; lengths match rig.py's HUMAN.
+const BJ={t:[],an:[],hj:[],kp:[],kn:[],fw:[],sole:[],sp:[],ap:[],hd:[],e:[]};
+function batJoints(p){
+  const J=BJ,hip=[p[qHX],p[qHY],p[qHZ]],ha=[-Math.sin(p[qHR]),0,Math.cos(p[qHR])];
   const Y=V3.norm([p[qLX],1,p[qLZ]]),s0=[-Math.sin(p[qSR]),0,Math.cos(p[qSR])],s=V3.norm(V3.sub(s0,V3.sc(Y,V3.dot(s0,Y)))),n=V3.cross(Y,s);
+  Object.assign(J,{hip,ha,Y,s,n});
   const leg=(i,fx,fz,fr,ly,heel,side)=>{const t=[Math.cos(fr),0,Math.sin(fr)],an=[fx,.08+ly+heel*.05,fz],hj=V3.add(hip,V3.sc(ha,.1*side));hj[1]-=.04;
-    const fw=V3.norm([t[0]*.24,-heel*.07,t[2]*.24]),X=V3.norm(V3.cross([0,1,0],fw));
-    mB(B.shoe[i],V3.sub([fx+t[0]*.16,ly,fz+t[2]*.16],V3.sc(fw,.16)),X,V3.cross(fw,X),fw);
-    const kn=ik(hj,an,.43,.43,V3.add(t,V3.sc(ha,.25*side)));mL(B.thigh[i],hj,kn,.43);mL(B.pad[i],an,kn,.43,t);};
+    const fw=V3.norm([t[0]*.24,-heel*.07,t[2]*.24]),kp=V3.add(t,V3.sc(ha,.25*side));
+    J.t[i]=t;J.an[i]=an;J.hj[i]=hj;J.kp[i]=kp;J.kn[i]=ik(hj,an,.43,.43,kp);J.fw[i]=fw;J.sole[i]=V3.sub([fx+t[0]*.16,ly,fz+t[2]*.16],V3.sc(fw,.16));};
   leg(0,p[qFX],p[qFZ],p[qFR],p[qFLY],0,1);leg(1,p[qBX],p[qBZ],p[qBR],p[qBLY],p[qHL],-1);
-  mB(B.pelvis,hip,V3.cross([0,1,0],ha),[0,1,0],ha);
-  mB(B.torso,hip,n,Y,s);
   const sh=V3.add(hip,V3.sc(Y,.5)),H=[hip[0]+p[qAX],hip[1]+p[qAY],hip[2]+p[qAZ]],d=V3.norm([p[qDX],p[qDY],p[qDZ]]),H2=V3.add(H,V3.sc(d,.11));
-  const arm=(i,hd,side)=>{const sp=V3.add(sh,V3.sc(s,.19*side)),e=ik(sp,hd,.31,.3,[s[0]*.6*side+n[0]*.2,-.7,s[2]*.6*side+n[2]*.2]),f=V3.norm(V3.sub(hd,e));
-    mL(B.uarm[i],sp,e,.31);mL(B.sleeve[i],sp,V3.lerp(sp,e,.48),.15);mL(B.farm[i],e,hd,.3);
-    mL(B.glove[i],V3.sub(hd,V3.sc(f,.06)),V3.add(hd,V3.sc(f,.03)),.09);};
+  const arm=(i,hd,side)=>{const sp=V3.add(sh,V3.sc(s,.19*side)),ap=[s[0]*.6*side+n[0]*.2,-.7,s[2]*.6*side+n[2]*.2];
+    J.sp[i]=sp;J.ap[i]=ap;J.hd[i]=hd;J.e[i]=ik(sp,hd,.31,.3,ap);};
   arm(0,H,1);arm(1,H2,-1);
-  const hv=V3.norm([Y[0]+p[qNOD]*.3,Y[1],Y[2]+p[qNOD]*.12]),hd=V3.add(V3.add(hip,V3.sc(Y,.54)),V3.sc(hv,.19)),yw=p[qHDY],f=[Math.sin(yw),0,Math.cos(yw)];
-  mL(B.neck,sh,V3.sub(hd,V3.sc(hv,.06)),.17);
-  const fw=V3.norm(V3.sub(f,V3.sc(hv,V3.dot(f,hv)))),hx=V3.cross(hv,fw);
-  mB(B.head,hd,hx,hv,fw);mB(B.helmet,hd,hx,hv,fw);mB(B.grille,hd,hx,hv,fw);
-  const a=V3.add(H,V3.sc(d,.28)),b=V3.add(H,V3.sc(d,.86));
+  const hv=V3.norm([Y[0]+p[qNOD]*.3,Y[1],Y[2]+p[qNOD]*.12]),hc=V3.add(V3.add(hip,V3.sc(Y,.54)),V3.sc(hv,.19)),yw=p[qHDY],f=[Math.sin(yw),0,Math.cos(yw)];
+  const fw=V3.norm(V3.sub(f,V3.sc(hv,V3.dot(f,hv))));
+  Object.assign(J,{sh,H,d,hv,hc,face:fw,hx:V3.cross(hv,fw),nt:V3.sub(hc,V3.sc(hv,.06))});
+  return J;}
+// skin: the skinned model is shown, so only the bat is placed here
+function batsman3D(B,p,skin){
+  const J=batJoints(p),U=[0,1,0];
+  if(!skin){
+    for(let i=0;i<2;i++){const fw=J.fw[i],X=V3.norm(V3.cross(U,fw)),sp=J.sp[i],e=J.e[i],hd=J.hd[i],f=V3.norm(V3.sub(hd,e));
+      mB(B.shoe[i],J.sole[i],X,V3.cross(fw,X),fw);mL(B.thigh[i],J.hj[i],J.kn[i],.43);mL(B.pad[i],J.an[i],J.kn[i],.43,J.t[i]);
+      mL(B.uarm[i],sp,e,.31);mL(B.sleeve[i],sp,V3.lerp(sp,e,.48),.15);mL(B.farm[i],e,hd,.3);
+      mL(B.glove[i],V3.sub(hd,V3.sc(f,.06)),V3.add(hd,V3.sc(f,.03)),.09);}
+    mB(B.pelvis,J.hip,V3.cross(U,J.ha),U,J.ha);mB(B.torso,J.hip,J.n,J.Y,J.s);mL(B.neck,J.sh,J.nt,.17);
+    for(const m of [B.head,B.helmet,B.grille])mB(m,J.hc,J.hx,J.hv,J.face);}
+  const H=J.H,d=J.d,a=V3.add(H,V3.sc(d,.28)),b=V3.add(H,V3.sc(d,.86));
   mL(B.handle,V3.add(H,V3.sc(d,-.06)),V3.add(a,V3.sc(d,.02)),.36);
   mL(B.blade,a,b,.58,faceN(d,p[qFC]));
+  return J;
 }
 // s = 3 stumps then 2 bails
 function stumps3D(s,z,hit){
@@ -525,7 +536,7 @@ function render3D(V){
   G.mk.visible=G.mkr.visible=!!mk;
   if(mk){mT(G.mk,[mk.xb,0,mk.zb],0.24,1,0.24);mT(G.mkr,[mk.xb,0,mk.zb],0.26,1,0.26);}
   stumps3D(G.stumps[0],0,V.st);
-  G.bat.g.visible=!V.hideBat;if(!V.hideBat)batsman3D(G.bat,pz);
+  G.bat.g.visible=!V.hideBat;if(!V.hideBat){const J=batsman3D(G.bat,pz,SKN.on);if(SKN.on)skin3D(J);}
   T3.r.render(T3.scene,T3.cam);
 }
 if(location.hash==='#test')window.__r={info:()=>({calls:T3.r.info.render.calls,tris:T3.r.info.render.triangles}),tier:()=>Q.t,setTier:n=>{Q.t=n;Q.lock=true;qApply();}};

@@ -22,6 +22,11 @@ const camCheck = async where => { const e = await page.evaluate(() => __t.cam3()
   camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity ${where}: ${e} px`); };
 
 await page.goto(url);
+// the skinned batter must load (the game would silently fall back to the procedural one)
+await page.waitForFunction(() => __r.skin().on || __r.skin().err, null, {timeout: 10000, polling: 50}).catch(() => {});
+const skin = await page.evaluate(() => __r.skin());
+if (!skin.on) errors.push('skinned batter: ' + skin.err);
+else console.log('skin     ok  skinned batter loaded');
 for (const pk of planets) {
   await page.click('.seg[data-key=mode] button[data-v=nets]');
   await page.click(`#planetGrid button[data-v=${pk}]`);

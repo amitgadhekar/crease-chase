@@ -32,6 +32,14 @@ for (const line of read('src/index.html').split('\n')) {
     out.push(`const SFX_DATA={${entries.join(',')}};`);
     continue;
   }
+  m = line.match(/^\s*\/\/ @include-models (\S+)$/);
+  if (m) {
+    // GLB models as base64 strings keyed by filename: const MODEL_DATA={batter:'...'}.
+    const entries = readdirSync(join(root, m[1])).filter(f => f.endsWith('.glb')).sort().map(f =>
+      `${f.slice(0, -4)}:'${readFileSync(join(root, m[1], f)).toString('base64')}'`);
+    out.push(`const MODEL_DATA={${entries.join(',')}};`);
+    continue;
+  }
   out.push(line);
 }
 const html = out.join('\n');

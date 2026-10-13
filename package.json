@@ -8,9 +8,11 @@
     "build": "node build.mjs",
     "test:balance": "node tests/balance.mjs",
     "test:smoke": "node build.mjs && node tests/smoke.mjs",
-    "test": "npm run test:balance && npm run test:smoke"
+    "test": "npm run test:balance && npm run test:smoke",
+    "model:batter": "node tools/model.mjs batter"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "4.5.0",
     "esbuild": "0.28.2",
     "playwright": "1.56.0",
     "three": "0.186.1"

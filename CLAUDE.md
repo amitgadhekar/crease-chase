@@ -44,7 +44,7 @@ Game modules: 01 core state, settings, sizing, camera + projection, planet appli
 2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
-`geo`/`fillGeo` (-> BufferGeometry) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
+`geo`/`fillGeo` (-> BufferGeometry) · 07-people fielder/bowler species per planet (`SPECIES`, `spBuild`) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
 ball), batter pose, view state, adaptive quality ·
 08 camera follow + main loop · 08b replay (recording, playback, replay cameras) · 09 menu wiring + boot.
 
@@ -141,9 +141,20 @@ ball), batter pose, view state, adaptive quality ·
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
   Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
-  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`, fielders/bowler in `PG`
-  (lower poly, 13 meshes each; `personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
+  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG`; fielders/bowler are lower poly,
+  13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
   in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
+- **Species** (07-people): fielders and bowler are a species per planet (Earth humans, Selenites, Scorchlings, Cloudwaders,
+  Rustkin, Gravitons, Ringlings, Tidefolk); the batter stays human. `SPECIES[planet]` sets bone lengths and radii (1.4 m to
+  2.2 m tall), torso scale, gait (`st` stride, `lf` lift, `fq` cadence, `fl` low-gravity float), delivery bound `jp`, legwear,
+  and head/hand/foot builders. `spBuild` builds a species' parts once (cached), `spApply` swaps geometry and maps on the 13
+  rigs per planet. `person3D` places legs and arms by IK with the species' own lengths (`limb`), so nothing stretches; the hip
+  drops to keep feet on the ground. Skin, eyes and glow share one material: a 128 px atlas (pattern for limbs and head, four
+  swatches for features) as colour, emissive and roughness maps, so features cost no draw calls. Budget: 13 meshes per person
+  (thighs, shins, feet, torso, sleeves, forearm+hand, head with features, one extra: cap or Saturn's ring), 12 without the
+  extra. The torso texture paints trousers below the waist. The bowler's arm angle at release is fitted per species so the
+  hand meets the ball's release point (0.03-0.5 m; tallest species are furthest off for spin; `BZR` places the delivery stride). In the win celebration fielders
+  stand dejected (`V.dej`, three variants by index; not recorded, replays end before it).
 - **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
   `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
   `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
@@ -194,6 +205,8 @@ ball), batter pose, view state, adaptive quality ·
   (+~530 KB). Phase 1 was a parity port (same look, overlays aligned); engine.js removed. Babylon.js and PlayCanvas were
   rejected for size. Phase 2: sRGB/ACES, PBR + PMREM sky light, view-fitted shadow map, procedural textures, tiered stands,
   3D crowd, 3D fireworks (+~30 KB, the build is ~1.0 MB).
+- Fielders/bowler as procedural alien species per planet on the existing rig, over downloaded CC0 models: a Mars trial
+  showed a style clash with the batter, no bowling action and +350 KB.
 - Glow: additive glow sprites (fireworks, floodlight halos) instead of UnrealBloomPass. Bloom needs an EffectComposer: a
   full-res HalfFloat target (~24 MB at 1170x2532, ~4x with MSAA, else the scene loses antialiasing), fog then mixes in linear
   space before tone mapping so it no longer matches the 2D sky, and its cost is fill rate, which headless swiftshader (CPU,

@@ -77,7 +77,7 @@ function build3D(){
   A.halo.forEach((p,i)=>{hp.position.array.set(p,i*3);hp.color.array.set([1,.93,.8,.55*gl],i*4);});
   G.halo.geometry.setDrawRange(0,A.halo.length);hp.position.needsUpdate=hp.color.needsUpdate=true;G.panels.material.color.setScalar(.45+.55*gl);
   crowdBuild(A.rows,v,R,A.screen);qApply();
-  surround(WDV,v,lk,(R+7+1.15*v.standsH)/1800);G.wide.material.map.needsUpdate=true;CRWD.u.uHaze.value.set(lk.fog?lk.fog[0]:v.sky[1]);col(G.pm.shirt,k.shirt);col(G.pm.pants,k.pants);col(G.pm.skin,k.skin);
+  surround(WDV,v,lk,(R+7+1.15*v.standsH)/1800);G.wide.material.map.needsUpdate=true;CRWD.u.uHaze.value.set(lk.fog?lk.fog[0]:v.sky[1]);col(G.pm.shirt,k.shirt);col(G.pm.pants,k.pants);spApply(curPlanet);
   const d=G.dir=sunDir(lk);T3.sun.color.set(lk.sun[0]);T3.sun.intensity=lk.sun[1];Object.assign(T3.sun.shadow,{intensity:lk.sh,radius:lk.shr});
   T3.r.toneMappingExposure=lk.exp;T3.scene.environmentIntensity=lk.env;RIM.value.set(v.sky[1]).multiplyScalar(lk.rim);envBuild(v,lk,d);
   T3.scene.fog=lk.fog?T3.fog:null;if(lk.fog)T3.fog.color.set(lk.fog[0]);
@@ -298,10 +298,22 @@ const painted=(f,repeat,data)=>{const c=document.createElement('canvas');f(c);re
 function rig(){const g=new THREE.Group();g.matrixAutoUpdate=false;T3.world.add(g);return g;}
 const shade=o=>{o.traverse(m=>{m.castShadow=m.receiveShadow=true;});return o;};
 const pair=f=>[f(),f()];
-// fielder or bowler: 13 parts sharing the AI kit materials
-function personRig(G,sph){const g=rig(),P=G.pg,m=G.pm,p=(x,y)=>part(x,y,g);
-  const r={g,thigh:pair(()=>p(P.thigh,m.pants)),shin:pair(()=>p(P.shin,m.pants)),shoe:pair(()=>p(P.shoe,m.shoe)),torso:p(P.torso,m.shirt),
-    arm:pair(()=>p(P.arm,m.shirt)),hand:pair(()=>p(sph,m.skin)),head:p(P.head,m.skin),cap:p(P.cap,m.shirt)};shade(g);return r;}
+// fielder or bowler: 13 parts (legs, feet, torso, sleeves, forearms with hands, head with its features, one extra: cap or
+// ring); geometry and materials are swapped per planet by spApply
+function personRig(G){const g=rig(),P=SPG.earth,m=G.pm,p=(x,y)=>part(x,y,g);
+  const r={g,thigh:pair(()=>p(P.thigh,m.pants)),shin:pair(()=>p(P.shin,m.pants)),foot:pair(()=>p(P.foot,m.shoe)),torso:p(G.torso,m.torso),
+    uarm:pair(()=>p(P.uarm,m.shirt)),farm:pair(()=>p(P.farm,m.skin)),head:p(P.head,m.skin),ex:p(P.ex,m.ex)};shade(g);return r;}
+let SPX=null;
+function spApply(key){
+  const G=G3,B=spBuild(SPECIES[key]?key:'earth'),P=SPX=B.P,m=G.pm,k=aiKit(),sk=m.skin,tc=m.torso.map.image,g=tc.getContext('2d');
+  g.fillStyle=k.shirt;g.fillRect(0,0,16,64);g.fillStyle=k.pants;g.fillRect(0,0,16,14);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(0,13,16,1);m.torso.map.needsUpdate=true;
+  sk.map=B.tex.map;sk.emissiveMap=B.tex.em;sk.roughnessMap=B.tex.rough;
+  const ring=P.exM==='ring';col(m.ex,ring?'#f4dea2':k.shirt);m.ex.emissive.set(ring?'#c9a050':'#000');Object.assign(m.ex,{roughness:ring?.3:.88,metalness:ring?.4:0});
+  for(const r of [...G.fielders,G.bowler]){
+    for(let i=0;i<2;i++){r.thigh[i].geometry=B.thigh;r.shin[i].geometry=B.shin;r.foot[i].geometry=B.foot;r.uarm[i].geometry=B.uarm;r.farm[i].geometry=B.farm;
+      r.thigh[i].material=P.legs==='skin'?sk:m.pants;r.shin[i].material=P.legs==='pants'?m.pants:sk;r.foot[i].material=P.feet==='skin'?sk:m.shoe;}
+    r.head.geometry=B.head;r.ex.visible=!!B.ex;if(B.ex)r.ex.geometry=B.ex;}
+}
 function batterRig(){
   const k=KIT.you,g=rig(),p=(x,y)=>part(geo(x),y,g),pp=(x,y)=>{const q=geo(x);return pair(()=>part(q,y,g));},skin=kit(SKIN,{roughness:.6}),
     bar=(y,R,sp)=>arcG([0,y,0],R,[1,0,0],[0,0,1],H2-sp,H2+sp,.0055,14),vb=(th)=>arcG([0,-.03,0],.162,[0,1,0],[Math.sin(th),0,Math.cos(th)],1.2,2.25,.0055,10),
@@ -346,30 +358,49 @@ function buildScene(){
   const cream=std([0.95,0.92,0.82],{roughness:.45}),bail=std([0.85,0.64,0.25],{roughness:.5}),stumps=()=>[cream,cream,cream,bail,bail].map(m=>shade(part(cyl,m)));
   G.stumps=[stumps(),stumps()];stumps3D(G.stumps[1],20.12,null);
   G.ball=shade(part(sph,std([1,1,1],{map:painted(paintBall),roughness:.38})));G.ball.receiveShadow=false;
-  G.pm={shirt:kit(black,{roughness:.88}),pants:kit(black,{roughness:.9}),skin:kit(black,{roughness:.6}),shoe:kit([0.16,0.16,0.18],{roughness:.6})};
-  G.pg={thigh:geo(capG(.078,.066,.465,12,3)),shin:geo(capG(.064,.05,.465,12,3)),arm:geo(capG(.052,.04,.6,12,3)),shoe:geo(shoeG(12,6)),
-    torso:geo(torsoG(14,10,[[-.09,0,0],[-.08,.12,.09],[-.04,.165,.11],...TORSO.slice(3)])),
-    head:geo(GB.join(ellG([0,.06,0],[.046,.085,.046],8,4),ellG([0,.18,0],[.098,.115,.105],14,8),ellG([0,.165,.1],[.016,.024,.02],6,3))),
-    cap:geo(GB.join(ellG([0,.2,-.005],[.108,.1,.114],14,5,0,-.15),ellG([0,.205,.105],[.085,.009,.075],12,3,.2)))};
-  G.fielders=Array.from({length:NFL},()=>personRig(G,sph));G.bowler=personRig(G,sph);G.bat=batterRig();
+  const e=spBuild('earth').tex;
+  G.pm={shirt:kit(black,{roughness:.88}),pants:kit(black,{roughness:.9}),skin:kit([1,1,1],{map:e.map,emissiveMap:e.em,emissive:0xffffff,roughnessMap:e.rough,roughness:1}),
+    shoe:kit([0.16,0.16,0.18],{roughness:.6}),ex:kit(black,{roughness:.88,emissive:0}),torso:kit([1,1,1],{roughness:.88,map:painted(c=>{c.width=16;c.height=64;})})};
+  G.torso=geo(torsoG(14,10,[[-.09,0,0],[-.08,.12,.09],[-.04,.165,.11],...TORSO.slice(3)]));
+  G.fielders=Array.from({length:NFL},()=>personRig(G));G.bowler=personRig(G);G.bat=batterRig();
   return G;
 }
 
-function person3D(r,x,z,face,o){
-  const c=Math.cos(face),s=Math.sin(face),W3=(l)=>[x+l[0]*c+l[2]*s,l[1],z-l[0]*s+l[2]*c],R=[c,0,-s],U=[0,1,0],Fw=[s,0,c];
-  const ra=o.running?1:0,rn=o.run||0,cr=o.crouch||0;
-  const hy=0.92-cr*0.12;
-  const fL=[-0.12,Math.max(0,Math.cos(rn))*0.12*ra,Math.sin(rn)*0.34*ra],fR=[0.12,Math.max(0,-Math.cos(rn))*0.12*ra,-Math.sin(rn)*0.34*ra];
-  const hL=[-0.1,hy,0],hR=[0.1,hy,0];
-  const kL=[(hL[0]+fL[0])/2,(hL[1]+fL[1])/2,(hL[2]+fL[2])/2+0.07+cr*0.1],kR=[(hR[0]+fR[0])/2,(hR[1]+fR[1])/2,(hR[2]+fR[2])/2+0.07+cr*0.1];
-  [[hL,kL,fL],[hR,kR,fR]].forEach(([h,k,f],i)=>{mL(r.thigh[i],W3(h),W3(k),.465);mL(r.shin[i],W3(k),W3(f),.465);mB(r.shoe[i],W3(f),R,U,Fw);});
-  const lean=ra*0.12+cr*0.12,top=[0,hy+0.54,lean];
-  mB(r.torso,W3([0,hy,0]),Fw,V3.sc(V3.sub(W3(top),W3([0,hy,0])),1/.54),R);
-  const sL=[-0.2,top[1]-0.04,lean],sR=[0.2,top[1]-0.04,lean];
-  let aL=[-0.25,hy-0.08,-Math.sin(rn)*0.3*ra+cr*0.3],aR=[0.25,hy-0.08,Math.sin(rn)*0.3*ra+cr*0.3];
-  if(o.arm!=null){const th=o.arm;aR=[sR[0],sR[1]-Math.cos(th)*0.72,sR[2]-Math.sin(th)*0.72];aL=[-0.25,top[1]+0.1,0.45];}
-  mL(r.arm[0],W3(sL),W3(aL),.6);mL(r.arm[1],W3(sR),W3(aR),.6);mT(r.hand[0],W3(aL),.045,.045,.045);mT(r.hand[1],W3(aR),.045,.045,.045);
-  const t=W3(top);mB(r.head,t,R,U,Fw);mB(r.cap,t,R,U,Fw);
+// a limb from a toward t, clamped to its reach, joint by IK toward the pole; bones keep the species' lengths
+function limb(m1,m2,a,t,l1,l2,pole,side){
+  const d=V3.sub(t,a),D=Math.hypot(d[0],d[1],d[2]),M=(l1+l2)*.999;if(D>M)t=V3.add(a,V3.sc(d,M/D));
+  const k=ik(a,t,l1,l2,pole);mL(m1,a,k,l1,side);mL(m2,k,t,l2,side);return t;}
+// dejected variants (lost the match): torso lean, head drop; arms hanging, hands on hips, hands on knees
+const DEJ=[[.38,.95],[.24,.8],[.8,.4]];
+function person3D(r,x,z,face,o,id=0,dj=0){
+  const P=SPX,c=Math.cos(face),s=Math.sin(face),W=l=>[x+l[0]*c+l[2]*s,l[1],z-l[0]*s+l[2]*c],Wd=l=>[l[0]*c+l[2]*s,l[1],-l[0]*s+l[2]*c],R=Wd([1,0,0]),Fw=Wd([0,0,1]),U=[0,1,0];
+  const ra=o.running?1:0,cr=o.crouch||0,dv=id%3,dl=DEJ[dv],rn=(o.run||0)*P.fq,sn=Math.sin(rn),cs=Math.cos(rn),L=P.th+P.sh,k=L/.93,AL=P.ua+P.fa,tw=P.tw,bw=o.arm!=null;
+  const up=P.fl*ra*sn*sn+(bw?P.jp*Math.sin(Math.PI*clamp((o.arm-.4*Math.PI)/(.9*Math.PI),0,1)):0);
+  const A=.34*k*P.st*ra,lf=.12*k*P.lf*ra,fw=.12*tw+cr*.06,hw=.1*tw,kd=dv===2?dj:0;
+  const fL=[-fw,up+Math.max(0,cs)*lf,sn*A],fR=[fw,up+Math.max(0,-cs)*lf,-sn*A];
+  let hy=up+P.an+L*(P.kn-ra*.08-cr*.1-kd*.1);
+  for(const f of [fL,fR])hy=Math.min(hy,f[1]+P.an+Math.sqrt(Math.max(0,(L*.995)**2-f[2]**2-(fw-hw)**2)));
+  [fL,fR].forEach((f,i)=>{const sd=i?1:-1,a=limb(r.thigh[i],r.shin[i],W([sd*hw,hy,0]),W([f[0],f[1]+P.an,f[2]]),P.th,P.sh,Wd([sd*.12,0,1]),R);
+    mB(r.foot[i],[a[0],a[1]-P.an,a[2]],R,U,Fw);});
+  const ln=P.hu+ra*.12+cr*.3+dj*dl[0],cl=Math.cos(ln),sl=Math.sin(ln),Yl=[0,cl,sl],hip=[0,hy,0],top=V3.add(hip,V3.sc(Yl,P.tor));
+  mB(r.torso,W(hip),V3.sc(Wd([0,-sl,cl]),P.td),V3.sc(Wd(Yl),P.tor/.54),V3.sc(R,tw));
+  const shy=P.tor*.926-dj*.04,slump=[0,-sl*dj*.06,cl*dj*.06];
+  for(let i=0;i<2;i++){const sd=i?1:-1,S=V3.add(V3.add(V3.add(hip,V3.sc(Yl,shy)),slump),[sd*(.2*tw-dj*.02),0,0]);
+    let t=[sd*.07,-AL*.93,.07],p=[sd*.3,0,-1];
+    if(ra)t=V3.lerp(t,[sd*.03,-AL*.55,.12+sd*sn*.28*k],ra);
+    if(cr){t=V3.lerp(t,[-sd*.02,-AL*.62,AL*.5],cr);p=V3.lerp(p,[sd,-.2,-.3],cr);}
+    if(dj){const d=dv===0?[sd*.02,-AL*.97,.06]:V3.sub(dv===1?[sd*(.17*tw+.03),hy+.06,-.02]:[sd*fw,P.an+L*.55,L*.2],S);t=V3.lerp(t,d,dj);if(dv)p=V3.lerp(p,[sd,-.2,-.6],dj);}
+    if(bw&&i===1){const a=o.arm,tr=clamp(2*Math.PI-Math.acos(clamp((S[1]-o.rel)/(AL+P.hd),-1,1)),Math.PI+.2,Math.PI+.8),th=a<=Math.PI?a*tr/Math.PI:tr+(a-Math.PI)*(2*Math.PI-tr)/Math.PI;
+      t=[0,-Math.cos(th)*AL,-Math.sin(th)*AL];p=[1,0,0];}
+    else if(bw)t=V3.lerp(V3.sc([-.07,.2,.62],AL),t,clamp((o.arm-Math.PI)/Math.PI,0,1));
+    limb(r.uarm[i],r.farm[i],W(S),W(V3.add(S,t)),P.ua,P.fa,Wd(p),R);}
+  const hq=P.nod+ln*.35+dj*dl[1],Uh=Wd([0,Math.cos(hq),Math.sin(hq)]),Fh=Wd([0,-Math.sin(hq),Math.cos(hq)]),T=W(V3.add(top,slump));
+  mB(r.head,T,R,Uh,Fh);
+  if(r.ex.visible){
+    if(P.ring){const a=P.ring[1],ph=clock*.7+id,n=V3.norm(V3.add(V3.sc(Uh,Math.cos(a)),V3.sc(V3.add(V3.sc(R,Math.cos(ph)),V3.sc(Fh,Math.sin(ph))),Math.sin(a)))),
+        e1=V3.norm(V3.cross(n,Fh)),e2=V3.cross(e1,n),ps=clock*1.6,X=V3.add(V3.sc(e1,Math.cos(ps)),V3.sc(e2,Math.sin(ps)));
+      mB(r.ex,V3.add(T,V3.sc(Uh,P.ring[0]+.012*Math.sin(clock*2.3+id))),X,n,V3.cross(X,n));}
+    else mB(r.ex,T,R,Uh,Fh);}
 }
 // 2-bone IK: joint on the circle where both bones meet, on the side of the pole vector; reach is capped so bones never stretch
 function ik(a,t,l1,l2,pole){
@@ -408,21 +439,22 @@ function stumps3D(s,z,hit){
   if(!hit){s[3].visible=s[4].visible=true;mSeg(s[3],[-0.114,0.725,z],[0,0.725,z],0.011);mSeg(s[4],[0,0.725,z],[0.114,0.725,z],0.011);}
   else [-1,1].forEach((k,j)=>{const y=0.73+3.2*t-4.9*t*t,b=s[3+j];b.visible=y>=0;if(y<0)return;const px=k*(0.06+0.9*t),pz=z-1.2*t;mSeg(b,[px-0.05,y,pz],[px+0.05,y+0.02,pz],0.011);});
 }
+const BZR={pace:19.45,spin:19.6};
 function bowlerState(){
   let z=S.bowlerZ,arm=null,run=0,running=false;const pace=M.bowlerType==='pace';
-  if(S.phase==='runup'){const p=S.t/S.runupDur;z=lerp(pace?31:25.5,20.3,p);run=S.t*(pace?13:10);running=true;
+  if(S.phase==='runup'){const p=S.t/S.runupDur;z=lerp(pace?31:25.5,BZR[M.bowlerType],p);run=S.t*(pace?13:10);running=true;
     if(p>0.72)arm=lerp(0,Math.PI,(p-0.72)/0.28);}
   else if(S.phase==='ready'||S.phase==='break'){z=pace?31:25.5;}
   else if(S.phase==='flight'||S.phase==='result'){const t=S.phase==='flight'?clock-S.ball.start:S.t+0.8;
-    z=Math.max(17.6,20.3-t*2.4);arm=Math.min(2*Math.PI,Math.PI+t*12);run=t*8;running=t<0.9;}
+    z=Math.max(17.6,BZR[M.bowlerType]-t*2.4);arm=Math.min(2*Math.PI,Math.PI+t*12);run=t*8;running=t<0.9;}
   S.bowlerZ=z;return {z,arm,run,running};
 }
 /* --- view state: everything render3D/draw take from the game. Live frames are built here; a replay feeds recorded
    frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
 const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay';
 const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,arm:null,brun:0,brn:false,
-  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0});
-const LV=mkView(),CH={on:false,t0:-9};
+  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0,dej:0});
+const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
   const V=LV,ph=S.phase;
   V.pose=poseTick();V.ball=ballNow();
@@ -435,6 +467,7 @@ function liveView(){
       const mv=!!p.mv&&clock-p.mv<0.12,tx=mv&&S.fanim?S.fanim.x:0,tz=mv&&S.fanim?S.fanim.z:BATS_Z;
       o.x=p.x;o.z=p.z;o.face=Math.atan2(tx-p.x,tz-p.z);o.running=mv;o.run=p.run;o.crouch=ph==='flight'||ph==='runup'?1:0;});
   }
+  V.dej=S.cel?smooth(clamp((clock-S.cel.t0-.2)/.9,0,1)):0;
   V.hideBat=!!(S.chase&&clock>=S.chase.t0);V.trail=V.hideBat?S.trail3:null;
   // the crowd jumps once a boundary's ball crosses the rope (its outcome is no longer deferred) and through the win celebration
   const on=S.cel?clock-S.cel.t0>.4:ph==='result'&&!!S.res&&!!S.res.boundary&&!S.deferred;
@@ -484,9 +517,9 @@ function render3D(V){
   T3.scene.environmentIntensity=lk.env*(1+flash*2.5);
   G.wide.visible=wideCam();
   for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on;G.fielders[i].g.visible=on;G.fsh[i].visible=on&&!inShadow(p.x,p.z);
-    if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(G.fielders[i],p.x,p.z,p.face,p);}}
+    if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(G.fielders[i],p.x,p.z,p.face,p,i,V.dej);}}
   G.bowler.g.visible=!!M;
-  if(M)person3D(G.bowler,0.42,V.bz,Math.PI,{running:V.brn,run:V.brun,arm:V.arm});
+  if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});person3D(G.bowler,(pc?.3:.22)+.2*SPX.tw,V.bz,Math.PI,BO,1,V.dej);}
   G.ball.visible=!!bp;
   if(bp)mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);
   G.mk.visible=G.mkr.visible=!!mk;

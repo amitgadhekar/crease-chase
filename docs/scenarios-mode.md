@@ -89,8 +89,8 @@ short-format and T20 rows must match the pre-Test value (`FP` in balance.mjs; up
 - **Short balls:** `bodyHit`; `beaten(..., bat)` gives "Hit on the body/helmet" when not ducked (`b.duck`) or played, "Ducked"
   under a high one, and "Ducked into it" under one that keeps low. A block at chest height is a fend that can be caught by the
   close fielders; inside edges can go bat-pad to short leg; extra slips and a leg slip catch edges.
-- **Strike and Hold:** `testRecord` swaps on odd runs and at the over, the new batter takes strike (Law 18.11). `applyHold`
-  refuses the last run of an odd number (1 becomes 0, 3 becomes 2).
+- **Strike and Hold:** `testRecord` swaps on odd runs and at the over, the new batter takes strike (Law 18.11; `batRecord`, shared
+  with T20 since 2026-10-14). `applyHold` refuses the last run of an odd number (1 becomes 0, 3 becomes 2).
 - **Objectives:** `scenEnd` (chase, scoreBy, survive, avoidFO, tieOrWin, plus `session` for staged chases: reach `par` without
   being all out), `scenStars`, `stageNext` (carries runs needed, wickets, batters and ball age; each session brings its own
   attack, rested after the interval). `obj.wkts` = wickets the side can lose before it fails.
@@ -167,7 +167,16 @@ Runtime: the whole balance test takes ~40 s on a laptop, the Test part ~20 s at 
 - **Unlocks and stars:** a Series scenario opens when the one before has a star; Classics are open. Stars are per scenario id (each
   session of the final day has its own), best kept, in `cc_scen`. A session that misses its par still carries on (0 stars for it).
   The later sessions are also playable alone from their own data once unlocked.
-- **Not built:** mid-scenario save/resume (scenarios are short); a pause scorecard; a visible keeper; run-outs.
+- **Save and resume** (owner, 2026-10-14): one slot in `cc_scensave`, apart from `cc_t20` and the stars, so a T20 and a scenario
+  save coexist. Written after every recorded ball (after Hold resolves) and after each over's bowler and field are picked, so a
+  resume at an over boundary keeps that bowler (as in T20). It holds the scenario as played (a later session is a `stageNext`
+  object, not a `SCEN` entry), `M.st` without `sc` and `A` (`testAttack` is seeded, so the names come back), and the flow's maidens,
+  over runs, over number and chips, timing stats. The next delivery is re-planned. Resume continues the over with the same bowler
+  when one is picked (`st.bi`), else starts the next over. A drawn session saves the next session unplayed (Resume opens its
+  briefing); the result card clears it. Quitting keeps it, and a ball still in its Hold window is recorded as not held first (T20
+  too). A "Resume" tile tops the Scenarios list with the objective line ("Need 125, 6 wkts left · 168 balls left"). Saves are
+  versioned and validated; a bad one is not offered.
+- **Not built:** a pause scorecard; a visible keeper; run-outs.
 
 ## Owner decisions (2026-10-14: all recommendations accepted)
 

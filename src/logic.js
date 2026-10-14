@@ -18,13 +18,13 @@ const PLANETS={
   vis:{sw:'radial-gradient(circle at 35% 35%,#8fd0ff,#2b78c2 55%,#2d6b3c)',sky:['#5d9ccf','#cfe5f2'],ground:['#3c8a45','#2f7a39'],stripe:.055,
    pitch:['#e3cf9c','#cdb27a'],crease:'rgba(255,255,255,.92)',rope:'#f4efe1',standsH:14,stands:'#34424f',roof:'#d8d3c3',crowd:CROWD,
    boards:['#1d3a2b','#efe8d2','#f2b134'],ads:['Play straight','Crease Chase'],bodies:[],kit:{shirt:'#7a1f2b',pants:'#f1ece0'}}},
- moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:1.75,
+ moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:2.16,
   blurb:'One-sixth gravity and no air. Lofted shots fly for ages, so mistimed ones hang up to be caught. No swing at all.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#e4e4df,#8d8d88 60%,#5c5c58)',sky:['#000004','#0d0f1a'],stars:1,ground:['#9a9a96','#74736d'],stripe:.03,
    pitch:['#d6d3ca','#b2ada1'],crease:'rgba(255,255,255,.95)',rope:'#e6e9ef',standsH:8,stands:'#22262e',roof:'#aab4c0',
    crowd:['#e9edf2','#c4ccd6','#8fa3b8','#f2b134','#ffffff','#5d6b7a'],boards:['#14181f','#d9e2ec','#7fc8ff'],ads:['One-sixth gravity','Mind the craters'],
    bodies:[{t:'earth',x:.5,y:.5,r:.075}],kit:{shirt:'#dfe3e8',pants:'#9aa4b0',skin:'#c8d2dc'}}},
- mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,t20:1.57,
+ mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,t20:1.84,
   blurb:'Low gravity, no air and a giant sun. Spinners grip the scorched pitch.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#cfc3b8,#857a70 60%,#57504a)',sky:['#000000','#1a110a'],stars:.6,ground:['#7c7068','#5b524b'],stripe:.03,
    pitch:['#c4b59f','#9e8f7b'],crease:'rgba(255,255,255,.9)',rope:'#efe6da',standsH:7,stands:'#2b2522',roof:'#a99683',
@@ -36,7 +36,7 @@ const PLANETS={
    pitch:['#c99d58','#a98140'],crease:'rgba(255,248,225,.9)',rope:'#fbe8b8',standsH:11,stands:'#4b3818',roof:'#e6c27a',
    crowd:['#ffd36b','#e8743b','#fff2c9','#b5651d','#ffffff'],boards:['#3b2a0e','#fde7b0','#ffcf5c'],ads:['Thick air, big swing','Cloud Deck Oval'],
    bodies:[],haze:{c:'240,196,92',a:.32},particles:{color:'#fff0b3',alpha:.3,size:1.6,vx:.01,vy:-.025,n:40},kit:{shirt:'#6b2f8a',pants:'#f3e3c0'}}},
- mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,t20:1.53,
+ mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,t20:1.76,
   blurb:'A third of Earth\u2019s gravity on a hard, bouncy deck. Big carry and dusty gusts.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#f2a272,#c1502a 60%,#7a2c14)',sky:['#b9784e','#e8b98c'],ground:['#a4532d','#7c3b1f'],stripe:.04,
    pitch:['#d9a273','#ba7f53'],crease:'rgba(255,240,225,.9)',rope:'#f6dcc4',standsH:10,stands:'#3e231a',roof:'#c99872',
@@ -77,9 +77,9 @@ function setPlanet(key){
 }
 function rollWind(p){if(!p.wind){WIND={x:0,z:0};return 0;}const a=Math.random()*Math.PI*2,v=p.wind*rnd(0.4,1);WIND={x:Math.sin(a)*v,z:Math.cos(a)*v};return v;}
 const DIFF={
-  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,t20:1.09,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
-  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,t20:1.16,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
-  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,t20:1.25,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
+  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,t20:.85,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
+  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,t20:.9,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
+  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,t20:1,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
 };
 // timing windows in seconds (late side is tighter: the ball is past you)
 const EARLY={perfect:.025,good:.055,ok:.095,edge:.14}, LATE={perfect:.025,good:.045,ok:.065,edge:.09};
@@ -226,11 +226,11 @@ function bodyHit(b,bp){
   bp=bp||BP0;const z=BATS_Z+0.3+bp.z,t=tAt(b,z),p=ballPos(b,t),x=p.x-bp.x;
   return p.y>0.95&&p.y<2&&x>-0.62&&x<-0.05?{t,x:p.x,y:p.y,z,head:p.y>1.5}:null;
 }
-// bat (Tests): a ball at the body that was not ducked (b.duck) or played hits the batter (no run, no injury); a duck under a ball
-// that keeps low is hit on the helmet
+// bat (Tests; not {t20}): a ball at the body that was not ducked (b.duck) or played hits the batter (no run, no injury); a duck under
+// a ball that keeps low is hit on the helmet
 function beaten(b,bp,offered,bat){
   const h=padHit(b,bp);if(h)return padResult(b,h,offered);
-  if(bat){
+  if(bat&&!bat.t20){
     const k=bodyHit(b,bp);
     if(k&&!(b.duck&&k.y>1.15))return {runs:0,label:k.head?'Hit on the helmet':'Hit on the body',sub:b.duck?'Ducked into it':offered?'Beaten by the bounce':'Could not get out of the way',cls:'dot',body:k};
     if(b.duck&&!b.onStumps)return b.wide?{runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'}:{runs:0,label:'Ducked',sub:'Under the bouncer',cls:'dot'};
@@ -418,8 +418,10 @@ function canFinish(q,last,R){
   for(let k=0;k<R;k++){let b=-1;for(let i=0;i<q.length;i++)if(i!==last&&q[i]>0&&(b<0||q[i]>q[b]))b=i;if(b<0)return false;q[b]--;last=b;}
   return true;
 }
+// the player bats the XI in order (tiers as in Tests), whoever is on strike
 function newT20(attack,diffKey,target){
-  return {diff:diffKey,target,par:target/20,runs:0,balls:0,wkts:0,last:-1,bw:attack.map(()=>({o:0,b:0,r:0,w:0})),fow:[],ov:[],mem:{}};
+  return {diff:diffKey,target,par:target/20,runs:0,balls:0,wkts:0,last:-1,bw:attack.map(()=>({o:0,b:0,r:0,w:0})),fow:[],ov:[],mem:{},
+    bat:XI.map(p=>({name:p.name,tier:p.tier,runs:0,balls:0,out:false})),s:0,ns:1};
 }
 // max 4 overs each, never two in a row, phase roles; a bowler going above par+3 an over (hard: +2) is rested unless the quotas
 // force him; on hard the best death bowler keeps 2 overs for overs 18-20
@@ -449,9 +451,19 @@ function t20Pressure(st){const left=120-st.balls;return phaseOf(Math.floor(st.ba
 function t20Record(st,bi,res){
   const f=st.bw[bi],o=Math.floor(st.balls/6);st.runs+=res.runs;f.r+=res.runs;st.ov[o]={b:bi,r:(st.ov[o]?st.ov[o].r:0)+res.runs};
   if(res.out){st.wkts++;f.w++;st.fow.push({runs:st.runs,balls:st.balls+(res.wide?0:1),w:st.wkts});}
+  batRecord(st,res);
   if(res.wide)return false;
   st.balls++;if(++f.b<6)return false;
-  f.b=0;f.o++;st.last=bi;return true;
+  f.b=0;f.o++;st.last=bi;swapStrike(st);return true;
+}
+// T20 and Tests: the striker's runs and balls; after a wicket the next batter in takes strike (Law 18.11); odd runs swap the
+// strike (not boundaries or wides). Ends swap at the over (swapStrike)
+const swapStrike=st=>{const t=st.s;st.s=st.ns;st.ns=t;};
+function batRecord(st,res){
+  const bt=st.bat[st.s];
+  if(!res.wide){bt.balls++;bt.runs+=res.runs;}
+  if(res.out){bt.out=true;bt.how=res.outText;const nx=st.bat.findIndex((p,i)=>!p.out&&i!==st.s&&i!==st.ns);if(nx>=0)st.s=nx;}
+  else if(!res.wide&&!res.boundary&&res.runs%2)swapStrike(st);
 }
 
 /* ---------- Tests: attack, spells, captain, plans, strike rotation, objectives ---------- */
@@ -534,23 +546,21 @@ function testBall(st){
   if(!fieldOkTest(field))st.viol.field++;
   return {b,field,id,notes};
 }
-// one ball: runs, strike (odd runs swap; the new batter takes strike, Law 18.11; ends swap at the over), bowler figures, fatigue,
+// one ball: runs, strike (batRecord; ends swap at the over), bowler figures, fatigue,
 // ball age; hold refuses the odd run. Returns true when the over is complete
 function testRecord(st,b,res,hold,bp){
   if(hold)res=applyHold(res);
-  const B=st.bw[st.bi],bt=st.bat[st.s];
+  const B=st.bw[st.bi];
   st.runs+=res.runs;B.r+=res.runs;B.sr+=res.runs;
   if(b.bouncer&&++st.ovB>2)st.viol.bouncer++;
   if(res.boundary===4)st.fours++;if(res.boundary===6)st.sixes++;
   zoneAdd(st.Z,res.out?null:res.dir,res.wide?0:res.runs);st.last.push(b.len);if(st.last.length>3)st.last.shift();
   brainLearn(st.mem,b,res.runs,!!res.out);footTrend(st.foot,bp);
-  if(!res.wide){st.balls++;st.ob++;B.b++;bt.balls++;bt.runs+=res.runs;if(isTail(st,st.s))st.tailB++;}
-  if(res.out){
-    st.wkts++;B.w++;bt.out=true;st.fow.push({runs:st.runs,balls:st.balls,w:st.wkts});
-    const nx=st.bat.findIndex((p,i)=>!p.out&&i!==st.s&&i!==st.ns);if(nx>=0)st.s=nx;
-  }else if(!res.wide&&!res.boundary&&res.runs%2){const t=st.s;st.s=st.ns;st.ns=t;}
+  if(!res.wide){st.balls++;st.ob++;B.b++;if(isTail(st,st.s))st.tailB++;}
+  if(res.out){st.wkts++;B.w++;st.fow.push({runs:st.runs,balls:st.balls,w:st.wkts});}
+  batRecord(st,res);
   if(st.ob<6)return false;
-  const t=st.s;st.s=st.ns;st.ns=t;st.ovs++;st.ob=0;st.ovB=0;st.cond.ballAge++;
+  swapStrike(st);st.ovs++;st.ob=0;st.ovB=0;st.cond.ballAge++;
   B.o++;B.b=0;B.sp++;B.fat=Math.min(1,B.fat+TARCH[st.A[st.bi].arch].tire);
   st.bw.forEach((x,i)=>{if(i===st.bi)x.rest=0;else{x.rest++;x.fat=Math.max(0,x.fat-0.05);}});
   st.bi=-1;
@@ -694,11 +704,11 @@ function resolveAir(c,dir,q,power,field,d){
   return {runs,dir,lofted:true,path:{air:true,C,T,roll},fielderTo:{i:nf2.i,x:sx,z:sz},
     label:dropped?'Dropped!':runs?runLabel(runs):'No run',sub:dropped?'Put down at '+fieldName(nf.f):'Lands safely',cls:runs?'runs':'dot'};
 }
-// bat (Tests): {tier}; scales the timing window (less for a block: a tail-ender can defend, not score), power and edges, and enables
-// sweeps, fends and hooking risk. Without it: short formats and T20
+// bat: {tier}; scales the timing window (less for a block: a tail-ender can defend, not score), power and edges, and enables
+// fends and hooking risk, and in Tests sweeps ({tier,t20:1} in T20: no sweeps). Without it: short formats
 function evalSwing(b,sw,diffKey,field,bat){
   const T=bat?TIER[bat.tier]||TIER.A:null,fa=footAt(b,sw.bp),d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),
-    c=fa.c,shot=T?shotForBall(sw.aim,b,fa.full):shotFor(sw.aim),mb=T&&shot.sweep&&!sw.defend?{bp:sweepBp(sw.bp)}:null,
+    c=fa.c,shot=T&&!bat.t20?shotForBall(sw.aim,b,fa.full):shotFor(sw.aim),mb=T&&shot.sweep&&!sw.defend?{bp:sweepBp(sw.bp)}:null,
     wm=(1+0.35*fa.gain)*(T?sw.defend?Math.pow(T.win,0.3):T.win*(mb?shot.tw:1):1),w=windows(diffKey,early,wm);
   const timing={dt,early,win:wm,
     label:a<=w.perfect?'Perfect':a<=w.good?'Good':a<=w.ok?(early?'Early':'Late'):a<=w.edge?(early?'Very early':'Very late'):(early?'Too early':'Too late'),
@@ -810,6 +820,8 @@ function preparePath(p,start,dir){
 const lu=s=>s.split('|').map(p=>{const [name,tier,runs,balls]=p.split(';');return {name,tier,runs:+runs||0,balls:+balls||0};});
 const atk=s=>s.split(' ').map(p=>{const [arch,f,o]=p.split(':');return {arch,fatigue:+f||0,oversLeft:o===''||o==null?null:+o};});
 const MER='Meridian XI';
+// the player's side: the Series lineup in full, also the T20 batting order
+const XI=lu('A. Brennick;A|T. Voss;A|M. Calvane;A|D. Imrie;A|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E');
 const SCEN=[
  // ---- Series: a five-Test series against the Meridian XI; three moments per Test ----
  {id:'s1a',set:'series',test:1,team:MER,title:'The new ball',brief:'Meridian made 412. Your reply starts under cloud on day two. Ten overs without losing a wicket.',
@@ -862,7 +874,7 @@ const SCEN=[
   attack:atk('death:.2:1 express'),plan:'tail',stars:[{t:'win'},{t:'margin',win:1},{t:'bonus',noWkt:1}],band:[30,65]},
  {id:'s5a',set:'series',test:5,team:MER,stage:{g:'s5',n:1,of:3},title:'Final day: morning',brief:'The decider. Two hundred to win on the last day, in three sessions. First, a hundred by lunch with wickets in hand.',
   planet:'saturn',diff:'medium',day:5,ballAge:8,oppText:'Meridian XI 302 & 241. You 344 & 0/0.',obj:{type:'session',target:200,par:100,balls:60,wkts:10},
-  lineup:lu('A. Brennick;A|T. Voss;A|M. Calvane;A|D. Imrie;A|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  lineup:XI,striker:0,nonStriker:1,
   attack:atk('swing:0:6 express:0:5 cutter off leg'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:15},{t:'bonus',noWkt:1}],band:[40,85]},
  {id:'s5b',set:'series',test:5,team:MER,stage:{g:'s5',n:2,of:3},title:'Final day: afternoon',brief:'After lunch: spin from both ends and an older ball. Fifty-five more by tea and keep the tail out of it.',
   planet:'saturn',diff:'medium',day:5,ballAge:18,oppText:'Meridian XI 302 & 241. You 344 & 100/2.',obj:{type:'session',target:100,par:55,balls:60,wkts:7},

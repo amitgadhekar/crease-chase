@@ -1,14 +1,24 @@
 # T20 chase mode: design
 
-Status: steps 1-4 implemented (2026-10-13); step 5 (tuning on the owner's phone) is open. The owner accepted all
-recommendations below. The working model is summarised in CLAUDE.md (T20 chase); this doc keeps the reasoning and rejected options.
+Status: steps 1-4 implemented (2026-10-13), strike rotation (decision 1 revised) 2026-10-14; step 5 (tuning on the owner's
+phone) is open. The owner accepted all recommendations below. The working model is summarised in CLAUDE.md (T20 chase); this doc keeps the reasoning and rejected options.
 
 ## As built: departures and details
 
-- **Targets: option B** (see "Target and difficulty"). `DIFF.t20` 1.09 / 1.16 / 1.25 gives mean Earth targets ~201 / ~213 / ~230.
-  The standard bot wins ~98% / ~50% / ~5%: the bands hold, but hard is near-unwinnable for the bot, so tune it on the phone.
-- **Per-planet `t20` multiplier** (measured T20 scoring vs Earth): Moon 1.75, Mercury 1.57, Mars 1.53, Jupiter 0.77, Venus 0.75,
-  Saturn 0.70, Neptune 0.68. Medium-bot win rates per planet now ~40-55% (were 18-98%).
+- **Targets: option B** (see "Target and difficulty"). With strike rotation (2026-10-14) `DIFF.t20` .85 / .9 / 1 gives mean Earth
+  targets ~157 / ~166 / ~184 (were ~201 / ~213 / ~230 with the player always on strike: the tail now bats, the bot loses ~9.4
+  wickets on medium). The standard bot wins ~98% / ~50% / ~5% (3000 innings each: 98.1 / 50.5 / 5.5): the bands hold, but hard
+  is near-unwinnable for the bot, so tune it on the phone.
+- **Per-planet `t20` multiplier** (measured T20 scoring vs Earth): Moon 2.16, Mercury 1.84, Mars 1.76, Jupiter 0.77, Venus 0.75,
+  Saturn 0.70, Neptune 0.68. Moon, Mercury and Mars were re-measured with strike rotation (were 1.75 / 1.57 / 1.53): their top
+  order bats through, Earth's tail does not, so the ratio rose (Moon fell out of the 0.8-1.25 band). Medium-bot win rates per
+  planet ~45-60%.
+- **Strike rotation** (owner decision 1, 2026-10-14): the player bats the XI of the Scenarios series (`XI`: four A, two B, two C,
+  one D, two E), whoever is on strike, with `newTest`'s state shapes and the shared `batRecord`/`swapStrike` (odd runs, over end,
+  new batter on strike). Tiers apply as in Tests (`{tier,t20:1}`) without sweeps or body hits; Hold and the non-striker as in
+  Scenarios. HUD batters row, a batting table in the pause scorecard, save `v:2`. No tail-ender plans for the captain.
+- **Death vs middle check:** the tail bats more of the death, so the balance test compares the phases tier for tier (weighted by
+  death balls), on easy and medium only (on hard the top order is rarely in at the death).
 - **"Always loft" vs standard** is checked against the same pooled targets for both rows (hard is ~5% vs ~3%, and target
   noise alone could flip a gap that small).
 - **Close catchers:** slip, gully, short third and short fine leg are behind the batting camera; short leg and silly point
@@ -19,7 +29,7 @@ recommendations below. The working model is summarised in CLAUDE.md (T20 chase);
 - **Pace marker:** "half the target by over 10" is the straight line from 0 to the target over 120 balls, so the marker is
   runs minus `target × balls / 120` ("8 ahead" / "12 behind") plus a bar (runs / target) with a tick at the par point.
 - **Save:** after every ball and also right after each over is picked; otherwise a resume at an over boundary re-picks a
-  different bowler. Match end and Restart clear the save; Quit keeps it so the innings can be resumed (owner review fix). Resuming sets the menu to that match (planet, difficulty, T20). T20 learning is per match (`M.st.mem`), never `cc_mem`.
+  different bowler. Match end and Restart clear the save; Quit keeps it so the innings can be resumed (owner review fix). A ball still in its Hold window at Quit is recorded as not held first, so the save keeps it. Resuming sets the menu to that match (planet, difficulty, T20). T20 learning is per match (`M.st.mem`), never `cc_mem`.
 - **Records:** nets and 1-5 over chases share the `short` format.
 
 
@@ -54,7 +64,7 @@ recommendations below. The working model is summarised in CLAUDE.md (T20 chase);
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Strike rotation: is the player always on strike, or does a simulated partner face balls after odd runs? | Always on strike for v1 (same as today). A partner is a v2 option: it adds "keep the strike at the death" planning, but cuts the balls you actually bat. |
+| 1 | Strike rotation: is the player always on strike, or does a simulated partner face balls after odd runs? | **2026-10-14: you bat both**, like Scenarios: the XI in order with tiers, Hold and the non-striker. Superseded v1: always on strike (one unnamed batter); simpler, but no "keep the strike at the death" planning and no tail to protect. A simulated partner was rejected: it cuts the balls you actually bat. |
 | 2 | Targets: game-par based (decision 5), or real-looking totals (~160-210) by slowing scoring? | Game par. Slowing scoring would change batting feel, which matters most. |
 | 3 | Where it lives: a 4th "Match length" option in Chase, or a separate mode? | A 4th length, "T20 (20 overs, 10 wkts)". Fewer menu changes, and the same flow. |
 | 4 | Close catchers (slip, short leg, silly point) are drawn near the batter. Some may sit in the batting view. | Draw them and check the batting-camera view. Drop any that cover the ball's line. |

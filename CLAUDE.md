@@ -26,8 +26,9 @@ Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub P
 test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
 Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/wicket; "always charges" and "always across" must not beat it.
-Its T20 checks: standard bot wins easy >=75%, medium 40-60%, hard <=25% on Earth; "always loft" wins fewer than it on medium and hard
-(both scored against the same pooled targets); mean targets never fall from easy to hard on any planet; each planet's `t20` within
+Its T20 checks (the bot bats the XI with tiers and strike rotation, no Hold): standard bot wins easy >=75%, medium 40-60%, hard <=25%
+on Earth; "always loft" wins fewer than it on medium and hard (both scored against the same pooled targets); on easy and medium the
+death overs outscore the middle overs batter tier for tier (the tail bats more of the death); mean targets never fall from easy to hard on any planet; each planet's `t20` within
 0.8-1.25 of its measured T20 scoring ratio; zero illegal fields, bowler picks or quota breaches (plus captain and field fuzzing).
 Its Test checks: a seeded fingerprint of the short-format and T20 rows is unchanged (`FP`; update only on purpose); swing, reverse,
 turn and bounce follow ball age and day; each scenario's bot win rate within its `band`; farming beats not farming in last pairs and
@@ -218,16 +219,24 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
     (ICC clause 28: 2 out in overs 1-6, else 5; leg side <=5; <=2 behind square on the leg side; circle 27.43 x BOUNDARY/65).
   - `M.st` (`newT20`/`t20Record`): runs, balls, wickets, per-bowler figures, fall of wickets, runs per over, per-match `mem`
     (T20 never writes `cc_mem`). Pressure is `t20Pressure` (death overs, or the rate running ahead of par). `M.bowlerType`/`spinDir`
-    follow the bowler's archetype, so the existing bowler visuals apply. The player is always on strike.
-  - Targets (option B, owner): never fall as difficulty rises (~200 / ~215 / ~230 on Earth; `DIFF.t20` 1.09 / 1.16 / 1.25), so
+    follow the bowler's archetype, so the existing bowler visuals apply.
+  - Strike (owner, 2026-10-14: "you bat both"): the player bats the `XI` (the Series lineup, A-E tiers) as whoever is on strike;
+    `M.st.bat`/`s`/`ns` have `newTest`'s shapes, and `batRecord`/`swapStrike` (shared with `testRecord`) swap on odd runs and at the
+    over, the new batter taking strike after a wicket. As in Scenarios: the striker's tier (`scBat()` = `{tier,t20:1}`: windows,
+    power, edges, fends, hook risk in `evalSwing` and `aimSwing`, but no sweeps and no body hits in `beaten`), Hold (`commit` ->
+    `S.hold` -> `holdEnd` -> `recordBall`) and the non-striker (`nsTick`). Tests only: sweeps, duck/`bodyHit`, conditions, the radar's
+    square-root scale. The captain has no tail-ender plans in T20.
+  - Targets (option B, owner): never fall as difficulty rises (~157 / ~166 / ~184 on Earth; `DIFF.t20` .85 / .9 / 1; lower than
+    before strike rotation because the tail now bats), so
     win rates spread (standard bot ~98% / ~50% / ~5%). Planet `t20` = measured T20 scoring vs Earth (the short-format `ai`
     multipliers don't carry over to 20 overs). Re-measure both after any T20 logic change.
   - Save/resume: `t20Save` writes `cc_t20` after every ball and after each over is picked (attack names + archetypes, `M.st`, zones,
-    foot trend, current bowler/plan/field, over chips). `overNo*6 > balls` means the saved over is under way (resume continues it),
+    foot trend, current bowler/plan/field, over chips; `v:2`: lineup and strike are in `M.st`, v1 saves are not offered). `overNo*6 > balls` means the saved over is under way (resume continues it),
     else a new over is picked. "Resume T20" in the menu; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
-  - HUD: a full-width `#t20Slab` (phase chip, required vs current rate, bowler figures O-M-R-W and overs left, pace marker vs the
+  - HUD: a full-width `#t20Slab` (phase chip, required vs current rate, the batters as in `#scenSlab` (`batCard`), bowler figures O-M-R-W and overs left, pace marker vs the
     straight line to the target, i.e. half by over 10). Over-break banner: bowler change + field line (`fieldLine`). Radar: inner
-    circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard.
+    circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard (batting with how out, yet to bat, bowling,
+    fall of wickets, runs per over).
   - Close catchers (slip, gully, short leg, silly point) are drawn; from the portrait batting camera they are out of frame, and
     in landscape silly point/short leg stand clear of the batter and the ball's line, so none were moved.
 - **Scenarios** (Tests; `settings.mode` `scen`, `M.sc` = the scenario, `M.st` = `newTest`; design, numbers and departures in
@@ -235,7 +244,11 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   flow in 04c:
   - Menu mode "Scenarios" swaps venue/difficulty/Play for the list: the Series (5 Tests x 3, each unlocked by a star on the one
     before) and the Classics (all open). A tile opens the briefing (`#brief`: situation, objective, stars, conditions, pair).
-    Stars (best per scenario id) are saved in `cc_scen` = `{stars:{id:n}}`. No mid-scenario save.
+    Stars (best per scenario id) are saved in `cc_scen` = `{stars:{id:n}}`.
+  - Save/resume: one slot `cc_scensave` (`scenSave`/`scenSaved`/`resumeScen`), written after every recorded ball and after each over
+    is picked (`scenOver`); the scenario object as played, `M.st` minus `sc`/`A` (rebuilt, `testAttack` is seeded), maidens, over
+    runs, chips. `st.bi>=0` resumes mid-over (`beginPlay(true)`), else a new over. A drawn session saves the next session unplayed;
+    the result card clears it; quitting keeps it (an open Hold is recorded as not held first, T20 too). "Resume" tile tops the list.
   - Per over `scenOver` runs `testBall` (captain, spell, stock plan, field) for the first ball; per ball `scenNext` takes the
     next `testBall` (tail plans change the field ball by ball: `M.note`). Swings and pads use the striker's tier
     (`scBat()` -> `evalSwing`/`beaten`), so sweeps, fends, bat-pad catches, body hits and ducks apply; a missed sweep moves the
@@ -253,7 +266,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
     posed in its own frame (`nsPose`, facing +z) and placed at the bowler's end on the side away from the bowler, turned to
     face the striker. Backs up in the run-up (`nsTick`), walks back between balls. Both batters share the kit, so a strike change
     shows only in the HUD. `V.ns` and `V.bx` (bowler x: the release side, so around the wicket is drawn) are recorded.
-    Cost: ~30 draw calls (172 vs 142 between balls) and ~26k triangles, Tests only.
+    Cost: ~30 draw calls (172 vs 142 between balls) and ~26k triangles, Tests and T20.
   - Poses (07): `SW3` sweep and reverse sweep (impact, follow-through, lofted, and `l`: the crouch onto the back knee while a
     sweep is being aimed), family `FAM.sweep` (flat bat, contact window in front of the front pad); `qKN` kneel turns the back
     knee's IK pole down and forward; `UP.duck` (ball at the body), `UP.sway` (outside it), `UP.hit` (flinch for 0.7 s).
@@ -282,7 +295,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com and styles from fonts.googleapis.com.
   Build-time npm deps (three, esbuild, playwright, @gltf-transform/cli for the model pipeline) are devDependencies pinned to exact versions that were at least two weeks
   old when added; the lock file resolves from registry.npmjs.org. three r163+ needs WebGL2 (iOS 15+).
-- localStorage keys are prefixed `cc_` (settings, mem, records, t20, scen); every access is wrapped in try/catch.
+- localStorage keys are prefixed `cc_` (settings, mem, records, t20, scen, scensave); every access is wrapped in try/catch.
 - Mobile first, portrait primary, landscape supported (see Landscape above): safe-area insets on every edge (left/right/bottom
   in landscape), `touch-action:none` on the input canvas, 44px+ touch targets. Portrait must not change when landscape does:
   landscape rules live only in the `(orientation: landscape)` media blocks and `LAND` branches.
@@ -330,6 +343,9 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - T20 targets: option B (owner), never falling with difficulty, over the original 70/50/30% win-rate calibration (which made
   hard targets lower than easy ones). A per-planet `t20` multiplier, because the short-format `ai` ratios left Moon/Mercury/Mars
   at >90% and Venus/Saturn/Neptune at ~20% over 20 overs.
+- T20 strike (owner, 2026-10-14): you bat both, the XI in order with tiers, Hold and the non-striker, over "always on strike"
+  (v1): it adds keep-the-strike planning (Hold at the death), at the cost of balls the tail faces.
+  Targets were re-calibrated (`DIFF.t20`), and Moon/Mercury/Mars `t20` re-measured (their top order bats longer than Earth's).
 - T20 save after the over is picked too, not only after balls: otherwise a resume at an over boundary re-picks a different bowler.
 - LBW added with footwork, pads from the trigger-step feet. The always-swinging bot rarely misses, so its LBW share is ~4%;
   human-like play (90 ms timing spread, 15% leaves) gives ~15-20% of dismissals, close to real cricket.
@@ -345,7 +361,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
 5. Unverified on real iPhone hardware: frame rate (~145 draw calls/frame between balls including the shadow pass, measured
-   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd; Scenarios add the
+   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd; Scenarios and T20 add the
    non-striker: ~172 calls, ~190k triangles). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,

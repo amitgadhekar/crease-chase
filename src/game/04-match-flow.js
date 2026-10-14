@@ -94,7 +94,7 @@ function flightUpdate(){
 function tooLate(sw,b){if(sw&&!sw.done){sw.done=true;sw.missed=true;S.timing={dt:sw.tc-footAt(b,S.bpos).t,early:false,label:'Too late',zone:-1};}}
 function doSwing(){
   const b=S.ball,sw=S.swing;sw.done=true;sw.bp={x:S.bpos.x,z:S.bpos.z};
-  const r=evalSwing(b,sw,M.diff,M.field,M.sc?scBat():undefined);
+  const r=evalSwing(b,sw,M.diff,M.field,M.st&&M.st.bat?scBat():undefined);
   S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
   if(r.miss){sw.missed=true;if(r.bp)S.padBp=r.bp;return;}
   const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start);
@@ -116,7 +116,12 @@ function doSwing(){
 }
 function commit(res,dur,delay){
   const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
-  if(M.sc)return scenCommit(res,b,delay);
+  if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
+  // Tests and T20: a holdable ball is recorded when Hold is tapped or its window closes (holdEnd)
+  if((M.sc||M.t20)&&holdable(res)){S.hold={until:clock+0.6,res,b};$('#holdBtn').hidden=false;}else if(M.sc)scenRecord(res,b,false,delay>0);else recordBall(res,b);
+  if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
+}
+function recordBall(res,b){
   const legal=!res.wide;
   M.runs+=res.runs;if(legal)M.balls++;if(res.out)M.wkts++;
   if(res.boundary===4)M.fours++;if(res.boundary===6)M.sixes++;
@@ -125,9 +130,7 @@ function commit(res,dur,delay){
   brainLearn(M.t20?M.st.mem:mem,b,res.runs,!!res.out);if(!M.t20)store.set('mem',mem);footTrend(M.foot,S.bpos);
   M.typeStats[b.type].r+=res.runs;M.typeStats[b.type].n++;
   M.lastLens.push(b.len);if(M.lastLens.length>6)M.lastLens.shift();
-  if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
   if(M.t20)t20Ball(res);
-  if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
 }
 function showOutcome(res,b){
   updateHUD();
@@ -143,6 +146,7 @@ function showOutcome(res,b){
 function afterResult(){
   if(S.deferred){showOutcome(S.deferred.res,S.deferred.b);S.deferred=null;}
   if(M.sc)return scenAfter();
+  holdEnd(false);
   if(M.mode==='chase'){
     const out=M.wkts>=M.wktsMax,done=M.balls>=M.overs*6;
     if(M.runs>=M.target)return endMatch('win');
@@ -177,7 +181,8 @@ function celebrate(){
   $('#loftBtn').hidden=true;$('#stick').hidden=true;fwReset();FW.next=clock+0.8;
 }
 function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
-function quitToMenu(){rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();buildScenList();showScreen('menu');}
+// a ball still in its Hold window is recorded as not held, so the T20 or scenario save includes it
+function quitToMenu(){if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();buildScenList();showScreen('menu');}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#pCard').innerHTML=M.t20?t20Card():'';$('#pause .card').classList.toggle('split',!!M.t20);

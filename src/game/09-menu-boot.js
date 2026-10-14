@@ -25,6 +25,7 @@ $('#optAssist').addEventListener('change',e=>{settings.assist=e.target.checked;s
 $('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);if(settings.sound)audio();});
 $('#startBtn').addEventListener('click',startMatch);
 $('#resumeT20').addEventListener('click',resumeT20);
+$('#scenResume').addEventListener('click',resumeScen);
 $('#chaseBtn').addEventListener('click',()=>beginPlay());
 $('#introBack').addEventListener('click',quitToMenu);
 $('#pauseBtn').addEventListener('click',pause);
@@ -43,8 +44,11 @@ $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.targ
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
 if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
-  ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw)}:null,
+  ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),
+  s:M.st.s,ns:M.st.ns,bat:JSON.stringify(M.st.bat),hold:!!S.hold,ns3d:LV.ns.on}:null,
   scen:()=>M&&M.sc?{id:M.sc.id,runs:M.st.runs,wkts:M.st.wkts,balls:M.st.balls,s:M.st.s,ns:M.st.ns,ob:M.st.ob,hold:!!S.hold,pid:M.pid,ok:fieldOkTest(M.field),
+    bi:M.bi,overNo:M.overNo,chips:M.overBalls.map(c=>c.t).join(' '),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),bat:JSON.stringify(M.st.bat),
+    md:M.md.join(),hud:['#sOvers','#sTarget','#cObj','#cCond','#cBat0','#cBat1','#cBowl'].map(q=>$(q).textContent).join(' | '),
     viol:M.st.viol.bouncer+M.st.viol.field,ns3d:LV.ns.on}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
 buildPlanetGrid();buildScenList();applyPlanet(setPlanet(settings.planet));resize();refreshMenu();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);

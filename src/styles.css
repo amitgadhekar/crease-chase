@@ -89,7 +89,7 @@ body{height:100%;margin:0;overflow:hidden;background:var(--board-edge);color:var
 #rpSkip{position:absolute;right:14px;bottom:84px;min-width:84px;height:44px;padding:0 18px;border-radius:22px;border:2px solid var(--chalk);
   background:rgba(29,58,43,.82);color:var(--chalk);font:700 16px "Barlow",system-ui,sans-serif;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 @media (prefers-reduced-motion: reduce){#rpTag b::before{animation:none}}
-#loftBtn[hidden],#hud[hidden],#stick[hidden],#rpTag[hidden],#rpSkip[hidden],#t20Slab[hidden],#resumeT20[hidden],#scenSlab[hidden],#holdBtn[hidden],#eStars[hidden],#nextBtn[hidden]{display:none}
+#loftBtn[hidden],#hud[hidden],#stick[hidden],#rpTag[hidden],#rpSkip[hidden],#t20Slab[hidden],#resumeT20[hidden],#scenSlab[hidden],#holdBtn[hidden],#eStars[hidden],#nextBtn[hidden],#scenResume[hidden]{display:none}
 
 /* venue picker */
 .planets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -143,6 +143,7 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
   padding:7px 8px 6px;text-align:left;cursor:pointer;font:600 13px/1.15 "Barlow",system-ui,sans-serif}
 .sctile .st{font-size:13px;letter-spacing:1px;color:var(--ink-dim)}.sctile .st.on{color:var(--star)}
 .sctile.locked{opacity:.45;cursor:default}.sctile.locked .st{letter-spacing:0;font-size:12px}
+.scres{width:100%;margin:0 0 10px;box-shadow:inset 3px 0 0 var(--star)}.scres span{font-weight:500;color:var(--ink-dim)}
 .board .kick{font:700 12.5px "Barlow",system-ui,sans-serif;letter-spacing:.8px;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
 .board .opp{margin-top:8px;font-size:13.5px;font-variant-numeric:tabular-nums}
 .gcond{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 10px}
@@ -152,7 +153,7 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
 .gstars li::before,.estars li::before{content:"\2606";display:inline-block;width:1.3em;color:var(--ink-dim)}
 .gstars li.on::before,.estars li.on::before{content:"\2605";color:var(--star)}
 .gpair{display:flex;flex-direction:column;gap:3px;font-size:14px;margin:0 0 6px}.gpair b{font-weight:600;color:var(--ink-dim);margin-right:4px}
-.gpair .tier,.estars .tier{background:var(--seg);color:var(--ink)}.gpair .tier.tD,.gpair .tier.tE{background:rgba(224,128,111,.35)}
+.gpair .tier,.estars .tier,.sc .tier{background:var(--seg);color:var(--ink)}.gpair .tier.tD,.gpair .tier.tE,.sc .tier.tD,.sc .tier.tE{background:rgba(224,128,111,.35)}
 .estars{text-align:center;margin:0 0 10px}.estars .big3{font-size:38px;line-height:1.1;letter-spacing:4px;color:var(--star)}.estars .big3.none{color:var(--ink-dim)}
 .estars>span{font-size:13.5px;color:var(--ink-dim)}.estars ul{text-align:left;margin:8px 0 0}
 /* layout wrappers for the landscape two-column cards; no boxes of their own in portrait */

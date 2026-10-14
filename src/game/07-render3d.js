@@ -196,7 +196,7 @@ function blockKeys(b){const a=footPose(new Float32Array(PN),b,1);poseSet(a,UP.bl
 const BK={mid:[.63,0],block:[.6,0],edge:[.6,.05],toe:[.8,.02],top:[.36,.03],miss:[.63,0]};
 function aimSwing(b){
   const sw=S.swing;PB.a0=PB.a;PB.b0=PB.b;PB.fin=!sw||!M;if(PB.fin)return;
-  const fa=footAt(b,S.bpos),dt=sw.tc-fa.t,a=Math.abs(dt),sh=shotOf(sw.aim,b),T=M.sc&&TIER[M.st.bat[M.st.s].tier];
+  const fa=footAt(b,S.bpos),dt=sw.tc-fa.t,a=Math.abs(dt),sh=shotOf(sw.aim,b),T=M.st&&M.st.bat&&TIER[M.st.bat[M.st.s].tier];
   const w=windows(M.diff,dt<0,(1+.35*fa.gain)*(T?sw.defend?Math.pow(T.win,.3):T.win*(sh.sweep?sh.tw:1):1));
   const hit=fa.xc<.98&&fa.xc>REACH_LEG&&fa.c.y<2.05&&a<=w.edge&&!(b.onStumps&&!padHit(b,S.bpos)&&b.tStumps<sw.tc);
   const k=!hit?'miss':a>w.ok?'edge':sw.defend?'block':'mid',L=PB.L=sw.defend?FAM.block:FAM[sh.sweep?'sweep':SHOT_FAM[SHOTS.indexOf(sh)]],N=facePt(PB.a0,[0,0,0,0,0,0,0,0,0],.63,0,0);
@@ -294,7 +294,7 @@ function poseTick(){
   o[qFX]+=F.f[0];o[qFZ]+=F.f[1];o[qBX]+=F.b[0];o[qBZ]+=F.b[1];if(F.mv>=0)o[F.mv?qBLY:qFLY]+=F.lift;
   return o;}
 
-/* --- non-striker (Tests): the same model in its own frame (facing +z at the origin), placed at the bowler's end facing the
+/* --- non-striker (Tests and T20): the same model in its own frame (facing +z at the origin), placed at the bowler's end facing the
    striker, on the side away from the bowler. He backs up as the bowler runs in and walks back between balls. --- */
 const NSP=poseSet(new Float32Array(PN),{ff:[-.13,.06,1.4],fb:[.13,-.06,1.75],hip:[0,.93,0],hr:1.5708,lx:0,lz:.06,sr:1.5708,h:[.06,.12,.24],d:[.05,-.85,.5],nod:.2,hd:0,fc:0});
 function nsPose(o,ph,mv){
@@ -304,7 +304,7 @@ function nsPose(o,ph,mv){
   return o;}
 const NS={u:0,ph:0,mv:0,t:0},NS_Z=19.55;
 function nsTick(n,bx){
-  const dt=clamp(clock-NS.t,0,.1);NS.t=clock;n.on=!!(M&&M.sc);if(!n.on)return;
+  const dt=clamp(clock-NS.t,0,.1);NS.t=clock;n.on=!!(M&&(M.sc||M.t20));if(!n.on)return;
   const ph=S.phase,tu=ph==='runup'?1.4*smooth(clamp((S.t/S.runupDur-.3)/.7,0,1)):ph==='flight'?1.4+Math.min(.5,(clock-S.ball.start)*1.4):ph==='result'?NS.u:0;
   const du=clamp(tu-NS.u,-1.5*dt,1.8*dt);NS.u+=du;NS.ph+=Math.abs(du)/.7*Math.PI;NS.mv+=((Math.abs(du)>1e-4?1:0)-NS.mv)*Math.min(1,dt*10);
   n.x=bx>0?-1.05:1.05;n.u=NS.u;n.ph=NS.ph;n.mv=NS.mv;nsPose(n.pose,n.ph,n.mv);

@@ -41,8 +41,9 @@ function bot(pk,diff,sigma,loftP,n,fb){
 globalThis.PLANET_ORDER=PLANET_ORDER;globalThis.PLANETS=PLANETS;globalThis.DIFF=DIFF; // top-level consts are not context properties
 function aiTarget(diff,overs,wkts,pk){const P=setPlanet(pk),m=overs===20?P.t20:P.ai;let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,m).runs;return t/2000+1;}
 
-// T20 chase: the AI innings sets the target, then the bot bats 120 balls / 10 wickets against captain, plans and fields.
-// It keeps batting after reaching the target so every innings measures a full 20 overs; the win is runs >= target.
+// T20 chase: the AI innings sets the target, then the bot bats 120 balls / 10 wickets against captain, plans and fields, as
+// whoever is on strike (the XI's tiers, strike rotation in t20Record; no Hold). It keeps batting after reaching the target so
+// every innings measures a full 20 overs; the win is runs >= target.
 function t20Chase(pk,diff,loft,A){
   const P=setPlanet(pk),target=simulateAI(20,10,diff,P.t20).runs+1,attack=makeAttack(pk,diff),st=newT20(attack,diff,target),
     Z=[0,0,0,0,0,0,0,0],ft={x:0,z:0},last=[];let prev=-1;
@@ -58,10 +59,10 @@ function t20Chase(pk,diff,loft,A){
     let done=false;
     while(!done&&st.wkts<10){
       const b=makeDelivery(planBall(st.mem,bw.type,diff,{last,pressure:t20Pressure(st),foot:ft,bw,plan}),diff,bw);
-      const res=botBall(b,null,diff,0.045,loft[ph],field),R=A.ph[ph];
+      const tier=st.bat[st.s].tier,res=botBall(b,null,diff,0.045,loft[ph],field,{tier,t20:1}),R=A.ph[ph],T=R.t[tier]||(R.t[tier]={r:0,b:0});
       last.push(b.len);if(last.length>3)last.shift();
       brainLearn(st.mem,b,res.runs,!!res.out);footTrend(ft,null);zoneAdd(Z,res.out?null:res.dir,res.runs);
-      R.r+=res.runs;if(!res.wide)R.b++;if(res.out)R.w++;if(res.boundary===4)R.f++;if(res.boundary===6)R.s++;
+      R.r+=res.runs;T.r+=res.runs;if(!res.wide){R.b++;T.b++;}if(res.out)R.w++;if(res.boundary===4)R.f++;if(res.boundary===6)R.s++;
       done=t20Record(st,bi,res);
       if(res.boundary&&!done){field=adjust(field,Z,{pp,n:1}).field;A.fields++;if(!fieldOk(field,pp))A.bad.field++;}
     }
@@ -73,7 +74,7 @@ function t20Chase(pk,diff,loft,A){
 const LOFT_STD={pp:.3,mid:.25,death:.45},LOFT_ALL={pp:1,mid:1,death:1};
 function t20Run(pk,diff,loftP,n){
   const A={n:0,runs:0,wk:0,balls:0,tg:0,win:0,s:[],plan:{},fields:0,bad:{captain:0,field:0,quota:0},ph:{}};
-  for(const p of ['pp','mid','death'])A.ph[p]={r:0,b:0,w:0,f:0,s:0};
+  for(const p of ['pp','mid','death'])A.ph[p]={r:0,b:0,w:0,f:0,s:0,t:{}};
   for(let i=0;i<n;i++)t20Chase(pk,diff,loftP===1?LOFT_ALL:LOFT_STD,A);
   return A;
 }
@@ -236,7 +237,7 @@ const T20N = +process.env.T20_N || 600, t0 = Date.now();
 const pct = v => `${(v * 100).toFixed(0).padStart(3)}%`;
 const rpo = p => (p.r / Math.max(1, p.b) * 6).toFixed(1).padStart(5);
 const t20fmt = A => `win ${pct(A.win / A.n)}  target ${(A.tg / A.n).toFixed(0).padStart(3)}  runs ${(A.runs / A.n).toFixed(0).padStart(3)}  wkts ${(A.wk / A.n).toFixed(1).padStart(4)}  ` +
-  `balls/wkt ${(A.balls / Math.max(1, A.wk)).toFixed(0).padStart(3)}  per over: PP ${rpo(A.ph.pp)} mid ${rpo(A.ph.mid)} death ${rpo(A.ph.death)}  ` +
+  `balls/wkt ${(A.balls / Math.max(1, A.wk)).toFixed(0).padStart(3)}  per over: PP ${rpo(A.ph.pp)} mid ${rpo(A.ph.mid)} death ${rpo(A.ph.death)} (${deathGain(A).toFixed(1).padStart(4)} same batters)  ` +
   `4s ${pct((A.ph.pp.f + A.ph.mid.f + A.ph.death.f) / (A.balls || 1))} 6s ${pct((A.ph.pp.s + A.ph.mid.s + A.ph.death.s) / (A.balls || 1))}`;
 // the DIFF t20 multiplier that would put this row's win rate at `want`, from the same innings
 const fitMul = (A, m, want) => {
@@ -244,6 +245,9 @@ const fitMul = (A, m, want) => {
   for (let i = 0; i < 30; i++) { const x = (lo + hi) / 2, w = A.s.filter(([s, t]) => s >= Math.round((t - 1) * x / m) + 1).length / A.n; if (w > want) lo = x; else hi = x; }
   return lo;
 };
+// the tail bats more of the death overs, so the death is compared with the middle overs tier by tier (weighted by death balls)
+const deathGain = A => { const D = A.ph.death.t, Md = A.ph.mid.t; let g = 0, n = 0;
+  for (const k in D) if (Md[k] && Md[k].b) { g += D[k].r - D[k].b * Md[k].r / Md[k].b; n += D[k].b; } return g / Math.max(1, n) * 6; };
 const bad = {captain: 0, field: 0, quota: 0};
 const addBad = A => { for (const k in bad) bad[k] += A.bad[k]; };
 console.log(`\nT20 chases on Earth (20 overs, 10 wkts), ${T20N} innings each; std = 45 ms spread, lofts 30% (25% middle, 45% death); loft = always lofted:`);
@@ -258,7 +262,8 @@ for (const d of ['easy', 'medium', 'hard']) {
   // both rows are scored against the same pooled targets, so target noise can't flip a small gap (hard: ~6% vs ~3%)
   const T = [...std.s, ...loft.s].map(x => x[1]), pw = A => A.s.reduce((w, [r]) => w + T.filter(t => r >= t).length, 0) / (A.n * T.length);
   if (d !== 'easy') check(`T20 ${d} always-loft minus standard win rate (pooled targets)`, (pw(loft) - pw(std)) * 100, -100, -0.01);
-  check(`T20 ${d} death minus middle runs per over`, std.ph.death.r / std.ph.death.b * 6 - std.ph.mid.r / std.ph.mid.b * 6, 0.01, 99);
+  // not on hard: the bot's top order is rarely still in at the death there (under a ball per innings), too noisy to check
+  if (d !== 'hard') check(`T20 ${d} death minus middle runs per over, same batters`, deathGain(std), 0.01, 99);
   const ov = Object.values(std.plan).reduce((a, b) => a + b, 0);
   if (d === 'medium') console.log(`  plans (share of overs): ${Object.entries(std.plan).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v / ov * 100).toFixed(0)}%`).join(', ')}`);
 }
@@ -283,7 +288,7 @@ console.log(`  T20 section took ${((Date.now() - t0) / 1000).toFixed(1)} s (T20_
 const t1 = Date.now();
 // Short formats and T20 must not change when Test code is added: the same seeded rows hash the same as before the Test code.
 // Update FP only when short-format or T20 balance is changed on purpose.
-const FP = 'e249b80';
+const FP = 'f18c8567';
 {
   const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const SM = Object.create(Math); SM.random = mulberry(20261014);

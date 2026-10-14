@@ -33,6 +33,7 @@
     <button id="pauseBtn" aria-label="Pause"><i></i><i></i></button>
     <div class="slab" id="t20Slab" hidden>
       <div class="trow"><span id="tPhase" class="tchip"></span><span id="tRate" class="small"></span></div>
+      <div class="trow pair"><span id="tBat0"></span><span id="tBat1"></span></div>
       <div class="trow"><span id="tBowler" class="small"></span><span id="tPace" class="small"></span></div>
       <div id="tBar" aria-hidden="true"><i id="tFill"></i><b id="tTick"></b></div>
     </div>
@@ -61,7 +62,7 @@
       <div class="opt"><span class="lbl">Mode</span>
         <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="nets">Nets</button><button data-v="scen">Scenarios</button></div></div>
       <div class="cbody">
-      <div class="opt" id="scenOpt"><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
+      <div class="opt" id="scenOpt"><button class="sctile scres" id="scenResume" hidden></button><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
         <span class="lbl">Classics</span><div class="scgrid" id="scenClassics"></div></div>
       <div class="opt" id="venueOpt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
       <div class="opt" id="diffOpt"><span class="lbl">Bowler</span>

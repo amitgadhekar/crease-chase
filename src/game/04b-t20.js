@@ -33,13 +33,14 @@ function t20Ball(res){
 }
 // overNo counts the overs started, so a save made after an over's last ball (overNo*6 == balls) resumes with a new over
 function t20Save(){
-  store.set('t20',{v:1,pk:M.pk,diff:M.diff,target:M.target,ai:M.ai,attack:M.attack.map(b=>({arch:b.arch,name:b.name})),st:M.st,zones:M.zones,foot:M.foot,
+  store.set('t20',{v:2,pk:M.pk,diff:M.diff,target:M.target,ai:M.ai,attack:M.attack.map(b=>({arch:b.arch,name:b.name})),st:M.st,zones:M.zones,foot:M.foot,
     bi:M.bi,pid:M.plan.id,field:M.field,overNo:M.overNo,overBalls:M.overBalls,fours:M.fours,sixes:M.sixes,perfects:M.perfects,swings:M.swings,lastLens:M.lastLens});
   M.saved=true;
 }
 function t20Saved(){const s=store.get('t20',null);
-  return s&&s.v===1&&s.st&&PLANETS[s.pk]&&DIFF[s.diff]&&Array.isArray(s.attack)&&s.attack.length===5&&s.attack.every(a=>a&&ARCH[a.arch])
-    &&Array.isArray(s.st.bw)&&s.st.bw.length===5&&(s.pid==null||TPL[s.pid])&&(s.field==null||Array.isArray(s.field))?s:null;}
+  return s&&s.v===2&&s.st&&PLANETS[s.pk]&&DIFF[s.diff]&&Array.isArray(s.attack)&&s.attack.length===5&&s.attack.every(a=>a&&ARCH[a.arch])
+    &&Array.isArray(s.st.bw)&&s.st.bw.length===5&&Array.isArray(s.st.bat)&&s.st.bat.length===XI.length&&s.st.bat.every(p=>p&&TIER[p.tier])
+    &&s.st.s!==s.st.ns&&[s.st.s,s.st.ns].every(i=>Number.isInteger(i)&&i>=0&&i<XI.length)&&(s.pid==null||TPL[s.pid])&&(s.field==null||Array.isArray(s.field))?s:null;}
 function resumeT20(){
   const s=t20Saved();if(!s)return;
   Object.assign(settings,{mode:'chase',len:3,planet:s.pk,diff:s.diff});store.set('settings',settings);
@@ -53,10 +54,14 @@ function figures(i){
   const st=M.st,f=st.bw[i],md=st.ov.filter((v,o)=>v&&v.b===i&&!v.r&&o<Math.floor(st.balls/6)).length;
   return {o:f.o+(f.b?'.'+f.b:''),md,r:f.r,w:f.w,t:(f.o+(f.b?'.'+f.b:''))+'-'+md+'-'+f.r+'-'+f.w};
 }
-// pause screen: bowling figures, fall of wickets, runs per over
+// pause screen: batting (the striker marked; the rest of the XI yet to bat), bowling figures, fall of wickets, runs per over
 function t20Card(){
   const st=M.st,row=(c,tag)=>'<tr>'+c.map(x=>'<'+(tag||'td')+'>'+x+'</'+(tag||'td')+'>').join('')+'</tr>';
-  let h='<table class="sc"><thead>'+row(['Bowling','O','M','R','W','Econ'],'th')+'</thead><tbody>';
+  let h='<table class="sc"><thead>'+row(['Batting','','R','B'],'th')+'</thead><tbody>';
+  st.bat.forEach((p,i)=>{if(i===st.s||i===st.ns||p.out||p.balls)h+=row([(i===st.s?'▸ ':'')+batTag(p),p.out?p.how||'out':'not out',p.runs,p.balls]);});
+  const yet=st.bat.filter((p,i)=>!p.out&&!p.balls&&i!==st.s&&i!==st.ns);
+  h+='</tbody></table>'+(yet.length?'<p class="sc"><b>Yet to bat</b> '+yet.map(p=>p.name).join(', ')+'</p>':'');
+  h+='<table class="sc"><thead>'+row(['Bowling','O','M','R','W','Econ'],'th')+'</thead><tbody>';
   M.attack.forEach((b,i)=>{const f=figures(i),bl=st.bw[i].o*6+st.bw[i].b;
     h+=row([b.name+' <small>'+ARCH[b.arch].name+'</small>',f.o,f.md,f.r,f.w,bl?(f.r/bl*6).toFixed(1):'-']);});
   h+='</tbody></table><p class="sc"><b>Fall of wickets</b> '+(st.fow.length?st.fow.map(w=>w.w+'-'+w.runs+' ('+oversText(w.balls)+')').join(', '):'none')+'</p>';

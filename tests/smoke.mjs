@@ -13,6 +13,7 @@ const url = pathToFileURL(fileURLToPath(new URL('../dist/crease-chase.html', imp
 const browser = await chromium.launch({args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 const page = await browser.newPage({viewport: {width: 390, height: 844}});
 const errors = [];
+let scenGood = null; // a valid scenario save, for the landscape menu
 page.on('pageerror', e => errors.push(e.stack || String(e)));
 page.on('console', m => { if (m.type() === 'error' && !/ERR_NAME_NOT_RESOLVED|fonts\.g/.test(m.text())) errors.push('console: ' + m.text()); });
 
@@ -107,7 +108,8 @@ if (planets.includes('earth')) {
 }
 if (planets.includes('earth')) {
   // T20: two overs with forced swings (ready/break waits cut short), a bowler change and a field change, every field legal
-  // (fieldOk), then save, reload, resume and compare the match state.
+  // (fieldOk), the strike after every ball (odd runs, wickets, over ends), a Hold, the non-striker drawn, then save, reload,
+  // resume and compare the match state (lineup and strike included). A v1 save is not offered.
   await page.evaluate(() => localStorage.removeItem('cc_t20'));
   await page.reload();
   await page.click('.seg[data-key=mode] button[data-v=chase]');
@@ -120,36 +122,53 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.getM().zones[5] = 20; });
   const skip = () => { const S = __t.S; if (S.phase === 'ready') S.t = Math.max(S.t, S.readyDur - 0.1); if (S.phase === 'break') S.t = Math.max(S.t, S.breakDur - 0.1);
     return S.phase === 'flight'; };
-  const seen = {bi: new Set(), field: new Set()}, kinds = ['drive', 'block', 'loft'];
+  const seen = {bi: new Set(), field: new Set(), odd: 0, hold: false}, kinds = ['drive', 'push', 'block', 'loft', 'push'];
   let last = await page.evaluate(() => __t.t20());
-  for (let i = 0; last.balls < 12 || seen.bi.size < 2 || seen.field.size < 2; i++) {
-    if (i >= 24) { errors.push(`T20: after ${i} balls saw ${seen.bi.size} bowlers and ${seen.field.size} fields`); break; }
+  for (let i = 0; last.balls < 12 || seen.bi.size < 2 || seen.field.size < 2 || !seen.odd || !seen.hold; i++) {
+    if (i >= 40) { errors.push(`T20: after ${i} balls saw ${seen.bi.size} bowlers, ${seen.field.size} fields, ${seen.odd} odd runs, Hold ${seen.hold}`); break; }
     seen.bi.add(last.bi); seen.field.add(last.field);
     if (!last.ok) errors.push(`T20: illegal field in over ${last.overNo}: ${last.field}`);
+    if (i && !last.ns3d) errors.push('T20: no non-striker');
+    const before = last;
     await page.waitForFunction(`(${skip})()`, null, {timeout: 30000, polling: 30});
-    await page.evaluate(kind => { const S = __t.S, f = footAt(S.ball, S.bpos), aim = f.full > 0.62 ? -85 : 30;
-      S.swing = {tc: f.t + 0.002, aim, power: 1, lofted: kind === 'loft', defend: kind === 'block', done: false};
-      S.bat = {mode: kind === 'block' ? 'block' : 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim}; }, kinds[i % 3]);
+    await page.evaluate(([kind, aim0]) => { const S = __t.S, f = footAt(S.ball, S.bpos), aim = kind === 'push' ? aim0 : f.full > 0.62 ? -85 : 30;
+      S.swing = {tc: f.t + 0.002, aim, power: kind === 'push' ? 0.35 : 1, lofted: kind === 'loft', defend: kind === 'block', done: false};
+      S.bat = {mode: kind === 'block' ? 'block' : 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim}; }, [kinds[i % 5], [25, -40, 60, -70][i % 4]]);
+    await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 30});
+    // the first holdable ball is held (the 0.6 s window is game time, so the tap goes in the same evaluate that sees it)
+    const r = await page.evaluate(hold => { const h = hold && __t.t20().hold && !document.querySelector('#holdBtn').hidden; if (h) document.querySelector('#holdBtn').click();
+      const r = __t.S.res; return {runs: r.runs, out: !!r.out, wide: !!r.wide, boundary: r.boundary || 0, held: !!r.held, h}; }, !seen.hold);
+    if (r.h) { seen.hold = true; if (!r.held) errors.push('T20: Hold tapped, ball not held ' + JSON.stringify(r)); }
     await page.waitForFunction(() => ['ready', 'break', 'replay'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
     if (await page.evaluate(() => __t.S.phase === 'replay')) { await page.waitForTimeout(400); await page.mouse.click(195, 500); }
     await page.waitForFunction(() => ['ready', 'break'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
     last = await page.evaluate(() => __t.t20());
+    // strike: the new batter takes strike after a wicket, odd runs swap (not boundaries or wides), ends swap at the over
+    let s = before.s, ns = before.ns;
+    if (r.out) s = JSON.parse(before.bat).findIndex((p, j) => !p.out && j !== before.s && j !== before.ns);
+    else if (!r.wide && !r.boundary && r.runs % 2) { [s, ns] = [ns, s]; seen.odd++; }
+    if (last.balls !== before.balls && last.balls % 6 === 0) [s, ns] = [ns, s];
+    if (last.s !== s || last.ns !== ns) errors.push(`T20 strike: ${JSON.stringify(r)} at ball ${before.balls} (${before.s}/${before.ns}) gave ${last.s}/${last.ns}, expected ${s}/${ns}`);
   }
   const bw = JSON.parse(last.bw);
   if (bw.some(f => f.o > 4) || bw.filter(f => f.o > 0).length < 2) errors.push('T20 figures: ' + last.bw);
   await page.screenshot({path: `${shots}earth-t20.png`});
-  await page.evaluate(() => { __t.S.paused = true; });
+  await page.click('#pauseBtn');
+  await page.screenshot({path: `${shots}earth-t20-pause.png`});
   const saved = await page.evaluate(() => __t.t20());
   await page.reload();
   await page.waitForSelector('#resumeT20:not([hidden])', {timeout: 5000}).catch(() => errors.push('T20: no Resume button after reload'));
   await page.click('#resumeT20');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
   const back = await page.evaluate(() => __t.t20());
-  for (const k in saved) if (saved[k] !== back[k]) errors.push(`T20 resume: ${k} was ${saved[k]}, resumed ${back[k]}`);
-  console.log(`earth    ok  T20 ${back.runs}/${back.wkts} after ${back.balls} balls, ${seen.bi.size} bowlers, ${seen.field.size} fields, resumed after reload`);
+  for (const k in saved) if (k !== 'ns3d' && saved[k] !== back[k]) errors.push(`T20 resume: ${k} was ${saved[k]}, resumed ${back[k]}`);
+  console.log(`earth    ok  T20 ${back.runs}/${back.wkts} after ${back.balls} balls, ${seen.bi.size} bowlers, ${seen.field.size} fields, ${seen.odd} strike changes on odd runs, a Hold, resumed after reload with batter ${back.s} on strike`);
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.evaluate(() => localStorage.getItem('cc_t20') === null || document.querySelector('#resumeT20').hidden)) errors.push('T20: save lost on quit (Resume must stay available)');
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('cc_t20')); s.v = 1; delete s.st.bat; localStorage.setItem('cc_t20', JSON.stringify(s)); });
+  await page.reload();
+  if (await page.isVisible('#resumeT20')) errors.push('T20: a v1 save is offered for resume');
 }
 if (planets.includes('earth')) {
   // Scenarios: the list, a briefing, a survive scenario (forced duck under a bouncer, forced swings, then a forced end: result card
@@ -263,18 +282,108 @@ if (planets.includes('earth')) {
     .catch(() => errors.push('Scenarios: no interstitial after the first session'));
   const lunch = await page.textContent('#gTitle');
   await page.screenshot({path: `${shots}scen-stage.png`});
+  // the interval saves the next session unplayed: Resume opens its briefing
+  const ls = await page.evaluate(() => JSON.parse(localStorage.getItem('cc_scensave')));
+  if (!ls || ls.st || ls.sc.id !== 's5b') errors.push('Scenarios: next session not saved at the interval ' + JSON.stringify(ls && {id: ls.sc.id, st: !!ls.st}));
+  await page.reload();
+  await page.click('#scenResume');
+  if (!await page.isVisible('#brief') || (await page.textContent('#gTitle')) !== await page.evaluate(() => scenById('s5b').title)) errors.push('Scenarios: Resume at the interval did not open the next briefing');
   await page.click('#gPlay');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
   const s2 = await page.evaluate(() => { const M = __t.getM(); return {id: M.sc.id, target: M.sc.obj.target, lineup: M.sc.lineup.length}; });
   if (s2.id !== 's5b' || s2.target > 100 || s2.target < 94) errors.push('Scenarios: next session ' + JSON.stringify(s2));
   console.log(`scen     ok  s5a -> "${lunch}" -> ${s2.id}, ${s2.target} to win with ${s2.lineup} batters`);
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+
+  // Save and resume (cc_scensave): a mid-over resume restores score, strike, bowler, field, over chips and HUD and plays on; quitting
+  // in a Hold window records that ball; quitting after an over's last ball resumes with a new over and another bowler; a save made in
+  // the over break keeps its bowler; a corrupt save is not offered.
+  const wf = fn => page.waitForFunction(fn, null, {timeout: 30000, polling: 30});
+  const sNow = () => page.evaluate(() => __t.scen());
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('cc_scensave')));
+  const quit = () => page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  const toBreak = async () => { await page.click('#scenResume'); await wf(() => __t.S.phase === 'break'); return sNow(); };
+  const resume = async () => { await page.reload();
+    if (!await page.waitForSelector('#scenResume:not([hidden])', {timeout: 5000}).catch(() => null)) { errors.push('Scenarios: no Resume entry after reload'); return null; }
+    return toBreak(); };
+  const same = (a, b, where) => { for (const k in a) if (!['ns3d', 'hold'].includes(k) && a[k] !== b[k]) errors.push(`Scenario resume ${where}: ${k} was ${a[k]}, resumed ${b[k]}`); };
+  let i = 0;
+  const play = async () => { await wf(`(${skipS})()`); await bat([25, -40, 0, 60, -70][i % 5], {power: [0.3, 0.45, 0.35][i % 3]}); i++; await wf(() => __t.S.phase !== 'flight'); };
+  await page.evaluate(() => localStorage.removeItem('cc_scensave'));
+  await page.reload();
+  if (await page.isVisible('#scenResume')) errors.push('Scenarios: Resume shown with no save');
+  const c6 = await page.evaluate(() => [...document.querySelectorAll('#scenClassics .sctile')].findIndex(b => b.querySelector('b').textContent === scenById('c6').title) + 1);
+  await page.click(`#scenClassics .sctile:nth-child(${c6})`);
+  await page.click('#gPlay');
+  await wf(() => __t.S.phase === 'break');
+  let c = await sNow();
+  while (c.balls < 3 || c.ob === 0) { if (i > 14) { errors.push('Scenarios: no mid-over state ' + JSON.stringify(c)); break; } await play(); await settle(); c = await sNow(); }
+  const mid = await resume();
+  if (mid) {
+    same(c, mid, 'mid-over');
+    console.log(`scen     ok  c6 mid-over resume: ${mid.runs}/${mid.wkts} after ${mid.balls} balls, ball ${mid.ob + 1} of over ${mid.overNo}, batter ${mid.s} on strike, bowler ${mid.bi}`);
+    await play(); await settle(); c = await sNow();
+    if (c.chips === mid.chips && c.overNo === mid.overNo) errors.push('Scenarios: no ball played after a mid-over resume');
+  }
+  // quit while the Hold window is open: the ball is recorded as not held and is in the save
+  let hq = null;
+  for (let k = 0; k < 20 && !hq; k++) {
+    await play();
+    hq = await page.evaluate(() => { if (!__t.scen().hold) return null; const a = __t.scen(); __t.S.paused = true; document.querySelector('#quitBtn').click(); return a; });
+    if (!hq) await settle();
+  }
+  const hs = await saved();
+  if (!hq) errors.push('Scenarios: no Hold window to quit in');
+  else if (!hs || hs.st.balls !== hq.balls + 1 || !await page.isVisible('#scenResume')) errors.push(`Scenarios: quit in a Hold window: ${hq.balls} balls before, saved ${hs && hs.st.balls}`);
+  else { c = await toBreak(); if (c.balls !== hq.balls + 1) errors.push('Scenarios: resumed after a Hold quit with ' + c.balls + ' balls'); }
+  // quit straight after an over's last ball (st.bi -1 in the save): the resume starts the next over with another bowler
+  let ob = null;
+  for (let k = 0; k < 16 && !ob; k++) {
+    const pre = await sNow();
+    await play();
+    if (pre.ob !== 5) { await settle(); continue; }
+    await quit();
+    const sv = await saved();
+    if (sv && sv.st && sv.st.bi === -1) ob = {pre, sv}; else await toBreak();
+  }
+  if (!ob) errors.push('Scenarios: never quit at the end of an over');
+  else {
+    const nb = await resume();
+    if (nb && (nb.overNo !== ob.sv.overNo + 1 || nb.chips !== '' || nb.balls !== ob.sv.st.balls || nb.bi === ob.pre.bi || nb.bi < 0))
+      errors.push(`Scenarios: over-boundary resume ${JSON.stringify({overNo: nb.overNo, saved: ob.sv.overNo, chips: nb.chips, bi: nb.bi, was: ob.pre.bi})}`);
+    // the save now holds the picked over (bowler and field): a reload in the over break keeps them
+    const nb2 = nb && await resume();
+    if (nb2) same(nb, nb2, 'over break');
+    if (nb2) console.log(`scen     ok  c6 Hold quit kept the ball (${hq && hq.balls + 1} balls); over ${nb2.overNo} resumed after the over's last ball with bowler ${nb2.bi} (was ${ob.pre.bi}), kept after a reload in the break`);
+  }
+  await quit();
+  // a corrupt or foreign save is not offered and causes no page error
+  const good = await page.evaluate(() => localStorage.getItem('cc_scensave'));
+  for (const bad of ['{bad json', JSON.stringify({...JSON.parse(good), v: 2}), JSON.stringify({...JSON.parse(good), sc: {...JSON.parse(good).sc, id: 'zz'}}),
+    JSON.stringify({...JSON.parse(good), st: {...JSON.parse(good).st, bat: [], bi: 'x'}}), '{"v":1,"sc":null}']) {
+    await page.evaluate(b => localStorage.setItem('cc_scensave', b), bad);
+    await page.reload();
+    if (await page.isVisible('#scenResume')) errors.push('Scenarios: a corrupt save is offered: ' + bad.slice(0, 60));
+  }
+  await page.evaluate(b => localStorage.setItem('cc_scensave', b), good);
+  await page.reload();
+  await page.screenshot({path: `${shots}scen-resume-menu.png`});
+  scenGood = good;
 }
 {
   // Landscape phone: its own layout and camera framing. A run-up and a forced shot, with camera parity in both.
   const land = await browser.newPage({viewport: {width: 844, height: 390}});
   land.on('pageerror', e => errors.push('landscape: ' + (e.stack || String(e))));
   await land.goto(url);
+  if (scenGood) {
+    await land.evaluate(b => localStorage.setItem('cc_scensave', b), scenGood);
+    await land.reload();
+    await land.click('.seg[data-key=mode] button[data-v=scen]');
+    const r = await land.evaluate(() => { const b = document.querySelector('#scenResume').getBoundingClientRect(); return {w: b.width, right: b.right, top: b.top, vw: innerWidth}; });
+    if (!await land.isVisible('#scenResume') || r.right > r.vw || r.w < 200) errors.push('landscape: Resume entry ' + JSON.stringify(r));
+    await land.screenshot({path: `${shots}landscape-scen-menu.png`});
+    console.log(`land     ok  scenario Resume entry ${JSON.stringify(r)}`);
+  }
   await land.click('.seg[data-key=mode] button[data-v=nets]');
   await land.click('#planetGrid button[data-v=earth]');
   await land.click('#startBtn');
@@ -292,6 +401,23 @@ if (planets.includes('earth')) {
     camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity landscape ${where}: ${e} px`);
   }
   console.log(`land     ok  844x390 run-up and shot: ${await land.evaluate(() => __t.S.res ? __t.S.res.label : __t.S.phase)}`);
+  // T20 in the phone layout: the slab (with the batters) stays in its column above the stick, and the pause scorecard
+  await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await land.waitForTimeout(100);
+  if (await land.isVisible('#end')) await land.click('#menuBtn');
+  await land.click('.seg[data-key=mode] button[data-v=chase]');
+  await land.click('.seg[data-key=len] button[data-v="3"]');
+  await land.click('#startBtn');
+  await land.click('#chaseBtn');
+  // a spinner's run-up is only 1.1 s
+  await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 0.5, null, {timeout: 30000, polling: 30});
+  await land.screenshot({path: `${shots}landscape-t20.png`});
+  const lay = await land.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(), t = r('#t20Slab');
+    return {bottom: t.bottom, stick: r('#stick').top, right: t.right, target: r('#targetSlab').left}; });
+  if (lay.bottom > lay.stick || lay.right > lay.target) errors.push('landscape T20 slab overlaps: ' + JSON.stringify(lay));
+  await land.click('#pauseBtn');
+  await land.screenshot({path: `${shots}landscape-t20-pause.png`});
+  console.log(`land     ok  T20 slab ${JSON.stringify(lay)}`);
   await land.close();
 }
 await browser.close();

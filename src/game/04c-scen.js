@@ -1,5 +1,5 @@
 /* ---------- Scenarios: Test situations (SCEN in logic.js). Briefing, per-over captain and field, per-ball strike, Hold and duck,
-   sessions (stageNext), stars and unlocks (cc_scen). The player bats whoever is on strike. ---------- */
+   sessions (stageNext), stars and unlocks (cc_scen), save and resume (cc_scensave). The player bats whoever is on strike. ---------- */
 const scenRec=(()=>{const r=store.get('scen',null);return r&&r.stars&&typeof r.stars==='object'?r:{stars:{}};})();
 const SERIES=SCEN.filter(s=>s.set==='series'),CLASSICS=SCEN.filter(s=>s.set==='classic');
 const scStars=id=>Math.min(3,Math.max(0,Math.round(+scenRec.stars[id])||0));
@@ -36,6 +36,8 @@ function starText(s,sc){
 const condTag=(day,age,spin)=>'Day '+day+' · Ball '+age+' ov'+(spin&&day>=3?' · Turning':!spin&&age>=35?' · Reverse':!spin&&age<15?' · Swing':'');
 const kickText=sc=>sc.stage?'Test '+sc.test+' · Session '+sc.stage.n+' of '+sc.stage.of:sc.set==='series'?'Test '+sc.test+' of 5 · '+sc.team:'Classic';
 const batTag=p=>p.name+' <i class="tier t'+p.tier+'" title="'+TIER[p.tier].n+'">'+p.tier+'</i>';
+// HUD partner card (Scenarios and T20): strike marker, name and tier, runs (* not out) and balls
+const batCard=(st,i)=>{const p=st.bat[i];return '<b>'+(i===st.s?'▸ ':'')+'</b>'+batTag(p)+' <em>'+p.runs+(p.out?'':'*')+'</em><small>('+p.balls+')</small>';};
 
 /* --- menu list and briefing --- */
 function scenTile(sc){
@@ -49,6 +51,8 @@ function buildScenList(){
     row.innerHTML='<span class="sct"><i style="background:'+P.vis.sw+'"></i>Test '+t+'<small>'+P.name+'</small></span>';
     ss.forEach(s=>row.appendChild(scenTile(s)));se.appendChild(row);}
   CLASSICS.forEach(s=>cl.appendChild(scenTile(s)));
+  const sv=scenSaved(),rb=$('#scenResume'),o=sv&&sv.sc.obj,st=sv&&sv.st;rb.hidden=!sv;
+  if(sv)rb.innerHTML='<b>Resume: '+scBase(sv.sc).title+'</b><span>'+(st?objNow(st,o)+(o.type==='survive'?'':' · '+plural(Math.max(0,o.balls-st.balls),'ball')+' left'):kickText(sv.sc)+', about to start')+'</span>';
   const tot=SCEN.reduce((a,s)=>a+scStars(s.id),0);$('#scenTotal').textContent=tot+' of '+SCEN.length*3+' stars';
 }
 // the briefing card, also shown between sessions of a staged scenario (st = the session just played)
@@ -66,12 +70,43 @@ function scenBrief(sc,done){
 }
 
 /* --- match start, overs, balls --- */
-function startScen(sc){
-  if(M&&M.saved)store.del('t20');
-  const st=newTest(sc);
+function scenMatch(sc,st){
   M=newMatch(setPlanet(sc.planet),'scen',sc.diff,{overs:Math.ceil(sc.obj.balls/6),w:sc.obj.wkts});
   Object.assign(M,{sc,st,attack:st.A,md:st.A.map(()=>0),ovR:0,target:sc.obj.target||0,next:null,pid:null,overDone:false});
-  beginPlay();
+}
+function startScen(sc){
+  if(M&&M.saved)store.del('t20');
+  scenMatch(sc,newTest(sc));beginPlay();
+}
+/* --- save and resume: one slot, written after every recorded ball and after each over's bowler and field are picked (so a resume at
+   an over boundary keeps that bowler). The scenario is stored as played (a later session is a stageNext object); st.sc and st.A are
+   rebuilt (testAttack is seeded). A drawn session of a staged chase saves the next session, unplayed. --- */
+function scenSave(){
+  const sc=M.sc,st=M.st,e=scenEnd(st),nx=e&&e.result==='draw'&&sc.stage&&stageNext(sc,st);
+  if(!e)store.set('scensave',{v:1,sc,st:{...st,sc:null,A:null},md:M.md,ovR:M.ovR,overNo:M.overNo,overBalls:M.overBalls,perfects:M.perfects,swings:M.swings});
+  else if(nx)store.set('scensave',{v:1,sc:nx});
+  else store.del('scensave');
+}
+function scenSaved(){
+  const s=store.get('scensave',null),I=Number.isInteger;
+  try{
+    const sc=s.v===1&&s.sc,st=s.st,n=sc.lineup.length,a=sc.attack.length,ix=i=>I(i)&&i>=0&&i<n;
+    if(!(scenById(sc.id)&&PLANETS[sc.planet]&&DIFF[sc.diff]&&I(sc.obj.balls)&&I(sc.obj.wkts)&&Array.isArray(sc.stars)&&sc.lineup.every(p=>TIER[p.tier])
+      &&sc.attack.every(b=>ARCH[b.arch])&&ix(sc.striker)&&ix(sc.nonStriker)))return null;
+    if(!st)return s;
+    return st.bat.length===n&&st.bat.every(p=>TIER[p.tier])&&st.bw.length===a&&ix(st.s)&&ix(st.ns)&&st.s!==st.ns&&I(st.bi)&&st.bi>=-1&&st.bi<a&&(st.bi<0||TPL[st.pid])
+      &&[st.runs,st.balls,st.wkts,st.ob,s.overNo].every(I)&&st.cond.day&&st.fc&&st.mem&&st.Z.length===8&&s.md.length===a&&Array.isArray(s.overBalls)&&Array.isArray(s.swings)
+      &&!scenEnd({...st,sc})?s:null;
+  }catch(e){return null;}
+}
+// mid-over (st.bi set) the same bowler carries on with the over; after an over's last ball the next over is picked as usual
+function resumeScen(){
+  const s=scenSaved();if(!s)return;
+  if(!s.st)return scenBrief(s.sc);
+  const sc=s.sc,st={...s.st,sc,A:testAttack(sc)};
+  scenMatch(sc,st);
+  Object.assign(M,{md:s.md,ovR:s.ovR,overNo:s.overNo,overBalls:s.overBalls,perfects:s.perfects,swings:s.swings,runs:st.runs,wkts:st.wkts,balls:st.balls,fours:st.fours,sixes:st.sixes});
+  beginPlay(st.bi>=0);
 }
 // "Umbrella field: 4 slips, gully, silly point, short leg": the close catchers, else the deep fielders
 function testFieldLine(f,id){
@@ -81,7 +116,7 @@ function testFieldLine(f,id){
 }
 function scenOver(){
   const st=M.st,nx=M.next=testBall(st),bw=st.A[st.bi],B=st.bw[st.bi];
-  M.bi=st.bi;M.bowlerType=bw.type;M.spinDir=bw.dir||1;M.field=nx.field;M.pid=nx.id;
+  M.bi=st.bi;M.bowlerType=bw.type;M.spinDir=bw.dir||1;M.field=nx.field;M.pid=nx.id;scenSave();
   return [...nx.notes,ARCH[bw.arch].name+' from '+bw.name+(B.sp?', over '+(B.sp+1)+' of his spell':', new spell')+(B.fat>=0.5?', tiring':''),testFieldLine(nx.field,nx.id)];
 }
 function scenNext(){
@@ -89,16 +124,13 @@ function scenNext(){
   if(nx.id!==M.pid){const p=st.bat[st.s];M.note=TPL[nx.id].name+(isTail(st,st.s)?' for '+p.name:'');}
   M.field=nx.field;M.pid=nx.id;return nx.b;
 }
-const scBat=()=>({tier:M.st.bat[M.st.s].tier});
+// the striker's tier (Tests and T20; T20 has no sweeps or body hits)
+const scBat=()=>({tier:M.st.bat[M.st.s].tier,t20:!!M.t20});
 const holdable=r=>!r.out&&!r.wide&&!r.boundary&&!r.lofted&&r.runs%2===1;
-function scenCommit(res,b,delay){
-  if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
-  if(holdable(res)){S.hold={until:clock+0.6,res,b};$('#holdBtn').hidden=false;}else scenRecord(res,b,false,delay>0);
-  if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
-}
 function holdEnd(held){
   const h=S.hold;if(!h)return;S.hold=null;$('#holdBtn').hidden=true;
-  scenRecord(h.res,h.b,held);if(held){S.res=applyHold(h.res);banner('Held','Kept the strike','small',1000);}
+  if(M.sc)scenRecord(h.res,h.b,held);else{recordBall(held?applyHold(h.res):h.res,h.b);updateHUD();}
+  if(held){S.res=applyHold(h.res);banner('Held','Kept the strike','small',1000);}
 }
 function scenRecord(res,b,held,quiet){
   const st=M.st,bi=st.bi,r=held?applyHold(res):res,bp=S.swing&&S.swing.bp||{x:S.bpos.x,z:S.bpos.z};
@@ -107,7 +139,7 @@ function scenRecord(res,b,held,quiet){
   if(done){if(!M.ovR)M.md[bi]++;M.ovR=0;}
   M.overDone=done;
   M.overBalls.push(r.out?{t:'W',cls:'cw'}:r.wide?{t:'wd',cls:'cwd'}:r.boundary===6?{t:'6',cls:'c6'}:r.boundary===4?{t:'4',cls:'c4'}:{t:r.runs?String(r.runs):'•'});
-  if(!quiet)updateHUD();
+  scenSave();if(!quiet)updateHUD();
 }
 function scenAfter(){
   holdEnd(false);
@@ -147,19 +179,22 @@ function scNextOf(sc){
 }
 
 /* --- HUD: objective, partner card, conditions, bowler --- */
+// "Need 12, last pair" / "Survive 30 balls, no wicket": the HUD's objective line and the menu's Resume entry
+function objNow(st,o){
+  const left=Math.max(0,o.balls-st.balls),wl=o.wkts-st.wkts,need=Math.max(0,(o.target||0)-st.runs),wt=wl===1?'last pair':wl+' wkts left';
+  return o.type==='survive'?'Survive '+plural(left,'ball')+(wl===1?', no wicket':', '+(wl-1)+' wkt to spare'):o.type==='session'?'Par '+o.par+', '+need+' to win, '+wt:
+    need>0?'Need '+need+(o.type==='tieOrWin'&&need>1?' ('+(need-1)+' ties)':'')+', '+wt:'Target reached';
+}
 function scenHUD(){
-  const st=M.st,o=M.sc.obj,left=Math.max(0,o.balls-st.balls),wl=o.wkts-st.wkts,need=Math.max(0,(o.target||0)-st.runs),C=st.cond,bi=M.bi;
+  const st=M.st,o=M.sc.obj,left=Math.max(0,o.balls-st.balls),need=Math.max(0,(o.target||0)-st.runs),C=st.cond,bi=M.bi;
   $('#sOvers').textContent=oversText(st.balls)+' of '+oversText(o.balls)+' overs';
   const sv=o.type==='survive',ss=o.type==='session';
   $('#sTargetLbl').textContent=sv?'Survive':ss?'Par':'Need';
   $('#sTarget').textContent=sv?left:ss?Math.max(0,o.par-st.runs):need;
   $('#sNeed').textContent=sv?plural(left,'ball').replace(/^\d+ /,''):'from '+plural(left,'ball');
-  const wt=wl===1?'last pair':wl+' wkts left';
-  $('#cObj').textContent=sv?'Survive '+plural(left,'ball')+(wl===1?', no wicket':', '+(wl-1)+' wkt to spare'):ss?'Par '+o.par+', '+need+' to win, '+wt:
-    need>0?'Need '+need+(o.type==='tieOrWin'&&need>1?' ('+(need-1)+' ties)':'')+', '+wt:'Target reached';
+  $('#cObj').textContent=objNow(st,o);
   const bw=bi>=0?st.A[bi]:null;
   $('#cCond').textContent=condTag(C.day,C.ballAge,bw&&bw.type==='spin');
-  const card=i=>{const p=st.bat[i];return '<b>'+(i===st.s?'▸ ':'')+'</b>'+batTag(p)+' <em>'+p.runs+(p.out?'':'*')+'</em><small>('+p.balls+')</small>';};
-  $('#cBat0').innerHTML=card(st.s);$('#cBat1').innerHTML=card(st.ns);
+  $('#cBat0').innerHTML=batCard(st,st.s);$('#cBat1').innerHTML=batCard(st,st.ns);
   if(bw){const f=st.bw[bi];$('#cBowl').textContent=bw.name+' '+f.o+(f.b?'.'+f.b:'')+'-'+M.md[bi]+'-'+f.r+'-'+f.w;$('#cPlan').textContent=M.pid?TPL[M.pid].name:'';}
 }

@@ -31,6 +31,11 @@
       <div id="sNeed" class="small"></div>
     </div>
     <button id="pauseBtn" aria-label="Pause"><i></i><i></i></button>
+    <div class="slab" id="t20Slab" hidden>
+      <div class="trow"><span id="tPhase" class="tchip"></span><span id="tRate" class="small"></span></div>
+      <div class="trow"><span id="tBowler" class="small"></span><span id="tPace" class="small"></span></div>
+      <div id="tBar" aria-hidden="true"><i id="tFill"></i><b id="tTick"></b></div>
+    </div>
   </div>
 
   <div id="banner" aria-live="polite"><span id="bMain"></span><span id="bSub"></span></div>
@@ -52,12 +57,14 @@
       <div class="opt"><span class="lbl">Bowler</span>
         <div class="seg" data-key="diff"><button data-v="easy">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button></div></div>
       <div class="opt" id="lenOpt"><span class="lbl">Match length</span>
-        <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button></div></div>
+        <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button><button data-v="3">T20</button></div>
+        <p class="pblurb" id="lenBlurb"></p></div>
       <div class="opt" id="netsOpt"><span class="lbl">Session ends after</span>
         <div class="seg" data-key="netsW"><button data-v="3">3 wickets</button><button data-v="5">5 wickets</button><button data-v="10">10 wickets</button><button data-v="0">No limit</button></div></div>
       <label class="tog"><input type="checkbox" id="optAssist"> Show where the ball will pitch</label>
       <label class="tog"><input type="checkbox" id="optSound"> Sound</label>
       <button class="primary" id="startBtn">Play</button>
+      <button class="secondary" id="resumeT20" hidden>Resume T20</button>
       <details class="how" open>
         <summary>How to bat</summary>
         <ul>
@@ -85,6 +92,7 @@
   <section id="pause" class="screen" aria-label="Paused">
     <div class="card">
       <div class="board"><h2>Paused</h2><p id="pText"></p></div>
+      <div id="pCard"></div>
       <button class="primary" id="resumeBtn">Resume</button>
       <button class="secondary" id="restartBtn">Restart</button>
       <button class="secondary" id="quitBtn">Quit to menu</button>

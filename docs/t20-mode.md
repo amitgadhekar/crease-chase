@@ -1,6 +1,27 @@
 # T20 chase mode: design
 
-Status: approved 2026-10-13; the owner accepted all recommendations below. Implementation in progress, step 1 first.
+Status: steps 1-4 implemented (2026-10-13); step 5 (tuning on the owner's phone) is open. The owner accepted all
+recommendations below. The working model is summarised in CLAUDE.md (T20 chase); this doc keeps the reasoning and rejected options.
+
+## As built: departures and details
+
+- **Targets: option B** (see "Target and difficulty"). `DIFF.t20` 1.09 / 1.16 / 1.25 gives mean Earth targets ~201 / ~213 / ~230.
+  The standard bot wins ~98% / ~50% / ~5%: the bands hold, but hard is near-unwinnable for the bot, so tune it on the phone.
+- **Per-planet `t20` multiplier** (measured T20 scoring vs Earth): Moon 1.75, Mercury 1.57, Mars 1.53, Jupiter 0.77, Venus 0.75,
+  Saturn 0.70, Neptune 0.68. Medium-bot win rates per planet now ~40-55% (were 18-98%).
+- **"Always loft" vs standard** is checked against the same pooled targets for both rows (hard is ~5% vs ~3%, and target
+  noise alone could flip a gap that small).
+- **Close catchers:** slip, gully, short third and short fine leg are behind the batting camera; short leg and silly point
+  (4 m, x = ±3.9) are off-screen in portrait and stand clear of the batter and the ball's line in landscape. None moved or dropped.
+- **Mid-over swap:** tried after every boundary that doesn't end the over (one `adjust` move, `fieldOk`-checked); the note
+  ("Mid-on moves to long-on") shows at the next ball, so it doesn't cover the boundary banner.
+- **Overs left** in the banner and HUD count the current over ("2 overs left" = this one and one more; "last over").
+- **Pace marker:** "half the target by over 10" is the straight line from 0 to the target over 120 balls, so the marker is
+  runs minus `target × balls / 120` ("8 ahead" / "12 behind") plus a bar (runs / target) with a tick at the par point.
+- **Save:** after every ball and also right after each over is picked; otherwise a resume at an over boundary re-picks a
+  different bowler. Match end and Restart clear the save; Quit keeps it so the innings can be resumed (owner review fix). Resuming sets the menu to that match (planet, difficulty, T20). T20 learning is per match (`M.st.mem`), never `cc_mem`.
+- **Records:** nets and 1-5 over chases share the `short` format.
+
 
 ## Decisions
 
@@ -129,7 +150,11 @@ per ball:   length/line = planBall(mem, bowler, plan.mix, ctx)       // existing
 
 - `simulateAI` gains a T20 model: per-phase outcome weights (powerplay and death more boundaries and more wickets) instead of one
   flat table, still scaled by the planet `ai` multiplier.
-- Calibration: the balance test plays N full T20 chases with the standard bot against the new attack and fields, per difficulty, on Earth.
+- **Owner decision (2026-10-13, option B): targets must never fall as difficulty rises** (roughly easy ~200, medium ~215, hard ~230
+  on Earth). Hard is then genuinely harder, and win rates spread wider. Test bands: easy ≥ 75%, medium 40-60%, hard ≤ 25% for the
+  standard bot. A per-planet T20 multiplier (measured scoring ratio vs Earth) keeps planets fair, because the short-format `ai`
+  multipliers don't carry over to 20 overs. This supersedes the 70/50/30 calibration below.
+- Original calibration (superseded): the balance test plays N full T20 chases with the standard bot against the new attack and fields, per difficulty, on Earth.
   Targets are set so the bot wins about 70% (easy), 50% (medium) and 30% (hard). The AI's simulated innings is then tuned to produce those
   targets. The intro screen keeps "Team 214/6 · You need 215 from 120 balls".
 - Wickets matter: 10 wickets over 120 balls. The bot measures roughly 26 balls per wicket on medium, so a reckless player can be all out.
@@ -174,7 +199,7 @@ per ball:   length/line = planBall(mem, bowler, plan.mix, ctx)       // existing
    scorecard, menu option and Resume.
 4. **Visual check.** Close catchers in the batting view, field changes in replays, and smoke test T20 paths (start, a few
    overs, a forced bowler change, resume).
-5. **Tuning pass on the owner's phone**, then update CLAUDE.md (core model bullets and decision log) and fold this doc into it.
+5. **Tuning pass on the owner's phone** (open). CLAUDE.md has the core model bullets and decision-log lines.
 
 ## Rejected options
 

@@ -13,51 +13,51 @@ const normAng=a=>((a+180)%360+360)%360-180;
 /* ---------- venues: physics + look ---------- */
 const CROWD=['#e85d4a','#f2b134','#ffffff','#3d7dd8','#2ec27e','#f28fb6','#1f2937','#e9e2cf','#12606e'];
 const PLANETS={
- earth:{name:'Earth',team:'Earth XI',g:9.8,air:1,swing:1,spin:1,bounce:1,pace:1,boundary:65,wind:0,ai:1,
+ earth:{name:'Earth',team:'Earth XI',g:9.8,air:1,swing:1,spin:1,bounce:1,pace:1,boundary:65,wind:0,ai:1,t20:1,
   blurb:'Home conditions: normal gravity and a little swing. The baseline.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#8fd0ff,#2b78c2 55%,#2d6b3c)',sky:['#5d9ccf','#cfe5f2'],ground:['#3c8a45','#2f7a39'],stripe:.055,
    pitch:['#e3cf9c','#cdb27a'],crease:'rgba(255,255,255,.92)',rope:'#f4efe1',standsH:14,stands:'#34424f',roof:'#d8d3c3',crowd:CROWD,
    boards:['#1d3a2b','#efe8d2','#f2b134'],ads:['Play straight','Crease Chase'],bodies:[],kit:{shirt:'#7a1f2b',pants:'#f1ece0'}}},
- moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,
+ moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:1.75,
   blurb:'One-sixth gravity and no air. Lofted shots fly for ages, so mistimed ones hang up to be caught. No swing at all.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#e4e4df,#8d8d88 60%,#5c5c58)',sky:['#000004','#0d0f1a'],stars:1,ground:['#9a9a96','#74736d'],stripe:.03,
    pitch:['#d6d3ca','#b2ada1'],crease:'rgba(255,255,255,.95)',rope:'#e6e9ef',standsH:8,stands:'#22262e',roof:'#aab4c0',
    crowd:['#e9edf2','#c4ccd6','#8fa3b8','#f2b134','#ffffff','#5d6b7a'],boards:['#14181f','#d9e2ec','#7fc8ff'],ads:['One-sixth gravity','Mind the craters'],
    bodies:[{t:'earth',x:.5,y:.5,r:.075}],kit:{shirt:'#dfe3e8',pants:'#9aa4b0',skin:'#c8d2dc'}}},
- mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,
+ mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,t20:1.57,
   blurb:'Low gravity, no air and a giant sun. Spinners grip the scorched pitch.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#cfc3b8,#857a70 60%,#57504a)',sky:['#000000','#1a110a'],stars:.6,ground:['#7c7068','#5b524b'],stripe:.03,
    pitch:['#c4b59f','#9e8f7b'],crease:'rgba(255,255,255,.9)',rope:'#efe6da',standsH:7,stands:'#2b2522',roof:'#a99683',
    crowd:['#ffd9a8','#ffffff','#c96f3c','#7f8c99','#f2b134'],boards:['#1c1714','#ffe2b8','#ff9d3d'],ads:['Sunside Ground','Bring sunscreen'],
    bodies:[{t:'sun',x:.2,y:.6,r:.13,c:'#fff3c4'}],haze:{c:'255,214,150',a:.13},kit:{shirt:'#c25b1f',pants:'#efe2d0'}}},
- venus:{name:'Venus',team:'Cloud Deck XI',g:8.87,air:.72,swing:2.4,spin:.9,bounce:.85,pace:.88,boundary:54,wind:2,ai:0.92,
+ venus:{name:'Venus',team:'Cloud Deck XI',g:8.87,air:.72,swing:2.4,spin:.9,bounce:.85,pace:.88,boundary:54,wind:2,ai:0.92,t20:0.75,
   blurb:'Soupy air slows the ball and makes it swing wildly. A small ground, but sixes are hard to clear.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#fbe6a6,#d9a441 60%,#9a6a1d)',sky:['#c98d2e','#f3d491'],clouds:1,ground:['#8a6a2c','#6a501f'],stripe:.03,
    pitch:['#c99d58','#a98140'],crease:'rgba(255,248,225,.9)',rope:'#fbe8b8',standsH:11,stands:'#4b3818',roof:'#e6c27a',
    crowd:['#ffd36b','#e8743b','#fff2c9','#b5651d','#ffffff'],boards:['#3b2a0e','#fde7b0','#ffcf5c'],ads:['Thick air, big swing','Cloud Deck Oval'],
    bodies:[],haze:{c:'240,196,92',a:.32},particles:{color:'#fff0b3',alpha:.3,size:1.6,vx:.01,vy:-.025,n:40},kit:{shirt:'#6b2f8a',pants:'#f3e3c0'}}},
- mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,
+ mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,t20:1.53,
   blurb:'A third of Earth\u2019s gravity on a hard, bouncy deck. Big carry and dusty gusts.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#f2a272,#c1502a 60%,#7a2c14)',sky:['#b9784e','#e8b98c'],ground:['#a4532d','#7c3b1f'],stripe:.04,
    pitch:['#d9a273','#ba7f53'],crease:'rgba(255,240,225,.9)',rope:'#f6dcc4',standsH:10,stands:'#3e231a',roof:'#c99872',
    crowd:['#f2c49b','#e8743b','#ffffff','#8a3b21','#f2b134'],boards:['#3a1a10','#f6dcc4','#ffb07a'],ads:['Red Dust Arena','Thin air, long carry'],
    bodies:[{t:'sun',x:.25,y:.45,r:.028,c:'#f7efe0'},{t:'disc',x:.62,y:.3,r:.009,c1:'#a8978a',c2:'#5e5248'},{t:'disc',x:.5,y:.62,r:.006,c1:'#a39282',c2:'#5e5248'}],
    haze:{c:'232,150,96',a:.15},particles:{color:'#efae7c',alpha:.55,size:2,vx:.07,vy:.012,n:70},kit:{shirt:'#2d4b7a',pants:'#e7d8c9'}}},
- jupiter:{name:'Jupiter',team:'Storm XI',g:24.79,air:1,swing:1.2,spin:.9,bounce:.72,pace:1,boundary:50,wind:13,ai:0.81,
+ jupiter:{name:'Jupiter',team:'Storm XI',g:24.79,air:1,swing:1.2,spin:.9,bounce:.72,pace:1,boundary:50,wind:13,ai:0.81,t20:0.77,
   blurb:'Two and a half times Earth\u2019s gravity. The ball dips hard and keeps low, and storms gust across a small floating deck.',
   vis:{sw:'repeating-linear-gradient(170deg,#ecc89c 0 4px,#b5693c 4px 7px,#f3dcb6 7px 10px)',sky:['#a8592e','#ecc596'],bands:['#c47a46','#f0d3a8','#9e5a34','#e8b98a'],
    ground:['#5d6772','#454d57'],stripe:.06,pitch:['#d8cbb0','#b8aa8d'],crease:'rgba(255,255,255,.9)',rope:'#ffe3c2',standsH:6,stands:'#2d3138',roof:'#8e98a3',
    crowd:['#ffb37a','#ffffff','#e45d3a','#ffd36b','#9aa6b2'],boards:['#262a30','#ffe3c2','#ff8f5a'],ads:['Storm Deck','Heavy gravity, low bounce'],
    bodies:[{t:'disc',x:.7,y:.35,r:.02,c1:'#f2e28a',c2:'#b9952f'},{t:'disc',x:.45,y:.62,r:.012,c1:'#d9d2c4',c2:'#8b8072'}],
    lightning:1,haze:{c:'214,140,90',a:.15},kit:{shirt:'#b3421f',pants:'#f2e6d6'}}},
- saturn:{name:'Saturn',team:'Ringside XI',g:10.44,air:.85,swing:1.4,spin:1,bounce:.95,pace:.97,boundary:62,wind:10,ai:0.87,
+ saturn:{name:'Saturn',team:'Ringside XI',g:10.44,air:.85,swing:1.4,spin:1,bounce:.95,pace:.97,boundary:62,wind:10,ai:0.87,t20:0.7,
   blurb:'Close to Earth gravity under the rings, with steady crosswinds that push lofted shots off line.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#f6e4b8,#c9a66a 60%,#8a6a3a)',sky:['#b89a5c','#f0e2bd'],rings:1,ground:['#5f6f66','#47544c'],stripe:.05,
    pitch:['#e2d6b8','#c3b694'],crease:'rgba(255,255,255,.9)',rope:'#fff4da',standsH:6,stands:'#30352f',roof:'#b9b29a',
    crowd:['#f6e3b0','#ffffff','#7fb38f','#e8c46a','#c06a3a'],boards:['#2c2f28','#fff1cf','#e8c46a'],ads:['Ringside Deck','Watch the gusts'],
    bodies:[{t:'disc',x:.14,y:.3,r:.018,c1:'#efd9a7',c2:'#a8865a'}],haze:{c:'240,220,170',a:.12},
    particles:{color:'#fffbe8',alpha:.55,size:1.4,vx:.035,vy:.006,n:35},kit:{shirt:'#3d6b4f',pants:'#f4ecd6'}}},
- neptune:{name:'Neptune',team:'Deep Blue XI',g:11.15,air:.8,swing:1.8,spin:1.1,bounce:1.12,pace:.95,boundary:60,wind:19,ai:0.82,
+ neptune:{name:'Neptune',team:'Deep Blue XI',g:11.15,air:.8,swing:1.8,spin:1.1,bounce:1.12,pace:.95,boundary:60,wind:19,ai:0.82,t20:0.68,
   blurb:'Slightly heavier gravity, an icy skiddy pitch and the fastest winds in the solar system.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#9fd0ff,#2f6fd6 60%,#16337a)',sky:['#061a4a','#2a5fb0'],stars:.5,ground:['#2d6a85','#1d4a63'],stripe:.05,
    pitch:['#d4e9f0','#a9c9d6'],crease:'rgba(20,60,110,.85)',rope:'#e6f6ff',standsH:9,stands:'#0f2236',roof:'#6f9fc4',
@@ -77,9 +77,9 @@ function setPlanet(key){
 }
 function rollWind(p){if(!p.wind){WIND={x:0,z:0};return 0;}const a=Math.random()*Math.PI*2,v=p.wind*rnd(0.4,1);WIND={x:Math.sin(a)*v,z:Math.cos(a)*v};return v;}
 const DIFF={
-  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
-  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
-  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
+  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,t20:1.09,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
+  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,t20:1.16,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
+  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,t20:1.25,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
 };
 // timing windows in seconds (late side is tighter: the ball is past you)
 const EARLY={perfect:.025,good:.055,ok:.095,edge:.14}, LATE={perfect:.025,good:.045,ok:.065,edge:.09};
@@ -114,15 +114,16 @@ function ballPos(b,t){
   if(y<0){const u1=2*b.vyB/G,v2=b.vyB*0.4,w=u-u1;y=Math.max(0,v2*w-0.5*G*w*w);}
   return {x:b.xb+(b.xt-b.xb)*(b.zb-z)/b.zb,y,z};
 }
-function makeDelivery(plan,diffKey,spinDir){
-  const d=DIFF[diffKey], pace=plan.type==='pace';
-  let v=(pace?rnd(d.pace[0],d.pace[1]):rnd(21.5,25))*ENV.pace;
+function makeDelivery(plan,diffKey,sd){
+  const d=DIFF[diffKey], pace=plan.type==='pace', bw=typeof sd==='object'?sd:null;
+  let v=(bw?(pace?rnd(d.pace[0]*bw.pace[0],d.pace[1]*bw.pace[1]):rnd(...bw.v)*d.spd*(plan.flat?1.08:1)):pace?rnd(d.pace[0],d.pace[1]):rnd(21.5,25))*ENV.pace;
   if(plan.slower)v*=rnd(0.74,0.8);
   const zr=pace?19.0:19.3, yr=pace?2.15:1.95, xr=pace?0.3:0.22;
   const zb=rnd(...LENS[plan.len]);
   let xt=rnd(...LINES[plan.line]);
-  if(Math.random()<d.wide)xt=(Math.random()<0.7?1:-1)*rnd(1.0,1.2);
-  const dev=clamp(pace?gauss()*d.swing*ENV.swing:spinDir*rnd(0.18,0.42)*ENV.spin,-0.65,0.65);
+  if(bw)xt+=gauss()*0.14*(1-bw.acc*d.acc);
+  if(Math.random()<d.wide*(bw?bw.wide:1))xt=(Math.random()<0.7?1:-1)*rnd(1.0,1.2);
+  const dev=clamp(pace?(bw?(bw.swDir*0.5+gauss())*bw.sw*(plan.sw||1):gauss())*d.swing*ENV.swing:(bw?(plan.dir||bw.dir)*rnd(...bw.turn)*d.turn:sd*rnd(0.18,0.42))*ENV.spin,-0.65,0.65);
   const x0=xt-dev, xb=xr+(x0-xr)*(zr-zb)/zr;
   const t1=(zr-zb)/v, vy0=(0.5*G*t1*t1-yr)/t1, vImpact=vy0-G*t1;
   const full=clamp((zb-1)/10,0,1);
@@ -181,6 +182,7 @@ function fieldName(f){
   if(f.n==='keeper')return 'the keeper';
   if(f.n==='bowler')return 'the bowler';
   if(f.n==='slip')return 'slip';
+  if(POS[f.n])return POS[f.n][2];
   const a=Math.atan2(f.x,f.z)/D2R, d=Math.hypot(f.x,f.z), deep=d>BOUNDARY*0.7, x=Math.abs(a);
   if(a>=0){if(x<25)return deep?'long-off':'mid-off';if(x<70)return deep?'deep cover':'cover';if(x<112)return deep?'deep point':'point';if(x<140)return deep?'third man':'gully';return deep?'third man':'slip';}
   if(x<25)return deep?'long-on':'mid-on';if(x<70)return deep?'deep midwicket':'midwicket';if(x<112)return deep?'deep square leg':'square leg';return deep?'fine leg':'short fine leg';
@@ -218,6 +220,165 @@ function fieldFor(shots,diffKey){
   return {field:out,moved};
 }
 
+/* ---------- T20: positions, field templates, fielding restrictions ---------- */
+// [angle, metres or 'deep' (0.9 x boundary), name]. Ring positions scale with BOUNDARY/65; close catchers (<=17 m) stay put.
+const POS={slip:[150,17,'slip'],gully:[125,14,'gully'],third:[140,20,'short third'],silly:[80,4,'silly point'],point:[96,24,'point'],
+ cover:[52,26,'cover'],midoff:[16,26,'mid-off'],midon:[-16,26,'mid-on'],midwk:[-55,26,'midwicket'],sqleg:[-96,24,'square leg'],
+ shortleg:[-75,4,'short leg'],sfine:[-140,14,'short fine leg'],longoff:[12,'deep','long-off'],longon:[-12,'deep','long-on'],
+ dcover:[50,'deep','deep cover'],dpoint:[95,'deep','deep point'],tman:[150,'deep','third man'],dmid:[-50,'deep','deep midwicket'],
+ dsq:[-90,'deep','deep square leg'],fine:[-150,'deep','fine leg']};
+// each template pairs a field with a delivery mix: len/line base weights, sw swing x, slow slower-ball x, wrong googly x, flat quicker spin
+const TPL={
+ PA:{name:'Attacking pace field',f:'slip gully point cover midoff midon midwk tman fine',atk:1,len:{Y:.5,F:1.4,G:1.6,S:.5,B:.3},line:{wide:.3,off:2,mid:1,leg:.3},sw:1.3},
+ PC:{name:'Pace containing field',f:'point cover midoff midon midwk sqleg third tman fine',len:{Y:.5,F:.6,G:1.8,S:1,B:.4},line:{wide:.3,off:1.3,mid:1.5,leg:.5}},
+ PS:{name:'Powerplay spin field',f:'slip shortleg point cover midoff midon midwk dmid longon',atk:1,len:{Y:.3,F:1,G:2,S:.4},line:{wide:.2,off:1,mid:2,leg:.5}},
+ OF:{name:'Off-side field',f:'point cover midoff midwk dcover longoff tman dmid longon',len:{Y:.5,F:.8,G:1.6,S:1,B:.3},line:{wide:.8,off:2,mid:.7,leg:.2},slow:1.5},
+ SB:{name:'Short-ball trap',f:'sfine sqleg midon midoff cover point third dsq dmid',atk:1,len:{Y:.3,F:.3,G:.6,S:2,B:1.6},line:{wide:.2,off:.6,mid:1.5,leg:1.2}},
+ WY:{name:'Wide-yorker field',f:'point cover midon midwk tman dpoint dcover longoff longon',len:{Y:1.2,F:.9,G:.5,S:.4,B:.4},line:{wide:2,off:1.5,mid:.3,leg:.1},slow:1.5},
+ SY:{name:'Straight-yorker field',f:'point cover midoff midon fine dmid longon longoff dcover',len:{Y:1.4,F:.9,G:.5,S:.3,B:.5},line:{wide:.1,off:.8,mid:2,leg:.6},slow:1.3},
+ SL:{name:'Slower-ball field',f:'midoff midon cover point midwk sqleg dcover dmid longon',len:{Y:.6,F:1.3,G:1.5,S:.6,B:.3},line:{wide:.4,off:1.5,mid:1,leg:.3},slow:3},
+ OA:{name:'Attacking off-spin field',f:'slip shortleg point cover midoff midon midwk dmid longon',atk:1,len:{Y:.2,F:1,G:2,S:.3},line:{wide:.1,off:1,mid:2,leg:.4}},
+ OC:{name:'Off-spin containing field',f:'cover midoff third midon longon dmid dsq longoff dcover',len:{Y:.4,F:1.5,G:1.5,S:.4},line:{wide:.2,off:.8,mid:2,leg:.8}},
+ LA:{name:'Attacking wrist-spin field',f:'slip silly point cover midoff midon midwk dmid longoff',atk:1,len:{Y:.2,F:1,G:2,S:.4},line:{wide:.3,off:1.5,mid:1.5,leg:.3},wrong:2},
+ LC:{name:'Spin containing field',f:'point cover midoff midwk dcover longoff longon dmid dpoint',len:{Y:.3,F:1.5,G:1.3,S:.5},line:{wide:.7,off:2,mid:.7,leg:.2}},
+ CH:{name:'Field for the charge',f:'midon third cover point dcover dpoint longoff longon dmid',len:{Y:.5,F:.4,G:1,S:1.8,B:.8},line:{wide:2,off:1.5,mid:.4,leg:.3},flat:1}
+};
+for(const k in TPL)TPL[k].f=TPL[k].f.split(' ');
+// boundary riders (T20 templates): 0.9 x boundary; c widens their catching reach (they are set to take the catch, not save the single)
+const RIDER=0.9,RIDER_C=1.3;
+const phaseOf=o=>o<6?'pp':o<16?'mid':'death';
+const spot=(n,a,d,c)=>({x:d*Math.sin(a*D2R),z:d*Math.cos(a*D2R),n,a,d,c:c||1});
+function tplField(id){
+  const sc=BOUNDARY/65,f=TPL[id].f.map(n=>{const [a,d]=POS[n];return d==='deep'?spot(n,a,BOUNDARY*RIDER,RIDER_C):spot(n,a,d>17?d*sc:d);});
+  f.push({x:0.15,z:-1.8,n:'keeper'},{x:0.5,z:17.5,n:'bowler'});
+  return f;
+}
+// ICC T20I clause 28: outside the 30-yard circle max 2 in the powerplay, else 5; leg side max 5; max 2 behind square on the leg side
+function fieldOk(field,pp){
+  const rc=27.43*BOUNDARY/65;let out=0,leg=0,fine=0;
+  for(const f of field){
+    if(f.n==='keeper'||f.n==='bowler')continue;
+    const a=f.a!=null?f.a:Math.atan2(f.x,f.z)/D2R;
+    if(Math.hypot(f.x,f.z)>rc)out++;
+    if(a<0){leg++;if(a<-90)fine++;}
+  }
+  return out<=(pp?2:5)&&leg<=5&&fine<=2;
+}
+const zoneOf=a=>clamp(Math.floor((normAng(a)+180)/45),0,7);
+// scoring zones: runs per 45-degree sector, decaying per ball (half-life ~14 balls)
+function zoneAdd(Z,dir,runs){for(let i=0;i<8;i++)Z[i]*=0.95;if(runs>0&&dir!=null)Z[zoneOf(dir)]+=runs;return Z;}
+const CLOSE=['slip','gully','silly','shortleg'];
+// at most ctx.n (default 2) fielders go deep into the hottest uncovered sectors: an inner fielder if the quota allows, else a
+// deep fielder from a cold sector; every change must still pass fieldOk
+function adjust(field,Z,ctx){
+  const f=field.slice(),moved=[],deep=BOUNDARY*0.6,max=ctx.n==null?2:ctx.n,D=BOUNDARY*RIDER;
+  const hot=[0,1,2,3,4,5,6,7].filter(i=>Z[i]>=4).sort((x,y)=>Z[y]-Z[x]);
+  for(const s of hot){
+    if(moved.length>=max)break;
+    const ang=-157.5+s*45;
+    if(f.some(p=>p.a!=null&&p.d>deep&&Math.abs(angDiff(p.a,ang))<25))continue;
+    const idx=f.map((p,j)=>j).filter(j=>f[j].a!=null),
+      inner=idx.filter(j=>f[j].d<=deep&&!CLOSE.includes(f[j].n)).sort((x,y)=>Math.abs(angDiff(f[x].a,ang))-Math.abs(angDiff(f[y].a,ang))),
+      cold=idx.filter(j=>f[j].d>deep&&Z[zoneOf(f[j].a)]<Z[s]*0.5).sort((x,y)=>Z[zoneOf(f[x].a)]-Z[zoneOf(f[y].a)]);
+    let nk='',bd=1e9;for(const k in POS)if(POS[k][1]==='deep'&&Math.abs(angDiff(POS[k][0],ang))<bd){bd=Math.abs(angDiff(POS[k][0],ang));nk=k;}
+    for(const j of [...inner,...cold]){
+      const old=f[j];f[j]=spot(nk,ang,D,RIDER_C);
+      if(fieldOk(f,ctx.pp)){moved.push({from:old.n,to:nk});break;}
+      f[j]=old;
+    }
+  }
+  return {field:f,moved};
+}
+
+/* ---------- T20: bowlers ---------- */
+// pace: x DIFF pace range; v: spin speed m/s; sw: x DIFF swing, swDir: outswing bias; turn: spin metres, dir +1 turns to off
+// (leg-spin, left-arm orthodox), -1 off-spin, wrong: googly share; slow: x DIFF slower share; acc: line accuracy; wide: x DIFF wide;
+// len: length bias (yorker/bouncer share); role: suitability per phase; plans: preferred templates per phase
+const ARCH={
+ express:{type:'pace',name:'Express pace',pace:[1.04,1.1],sw:.7,swDir:0,slow:.6,acc:.6,wide:1.5,len:{Y:1,F:.8,G:.9,S:1.3,B:1.6},
+  role:{pp:.8,mid:.5,death:.7},plans:{pp:{PA:2,SB:1,PC:1},mid:{SB:2,OF:1.5,SL:.5},death:{SY:2,WY:1,SB:.6}}},
+ swing:{type:'pace',name:'Swing and seam',pace:[.95,1],sw:1.8,swDir:1,slow:.8,acc:.85,wide:1,len:{Y:.8,F:1.3,G:1.1,S:.7,B:.5},
+  role:{pp:1,mid:.45,death:.35},plans:{pp:{PA:3,PC:1},mid:{OF:2,SL:1},death:{WY:1.5,SY:1,SL:1}}},
+ cutter:{type:'pace',name:'Cutters',pace:[.92,.98],sw:.5,swDir:0,slow:2,acc:.8,wide:1,len:{Y:.8,F:.8,G:1.3,S:1.2,B:.9},
+  role:{pp:.5,mid:.9,death:.6},plans:{pp:{PC:2,SB:1},mid:{OF:2,SL:2,SB:1},death:{SL:2,WY:1}}},
+ death:{type:'pace',name:'Death specialist',pace:[.98,1.04],sw:.6,swDir:0,slow:1.6,acc:.9,wide:.8,len:{Y:1.4,F:1.1,G:.9,S:.8,B:.9},
+  role:{pp:.3,mid:.4,death:1},plans:{pp:{PC:2,PA:1},mid:{SL:1,OF:1},death:{WY:2,SY:2,SL:1}}},
+ off:{type:'spin',name:'Off-spin',v:[21.5,24.5],turn:[.18,.38],dir:-1,acc:.85,wide:.6,len:{Y:.8,F:1.1,G:1.1,S:.8},
+  role:{pp:.35,mid:1,death:.25},plans:{pp:{PS:2},mid:{OC:2,OA:1},death:{OC:1}}},
+ leg:{type:'spin',name:'Leg-spin',v:[20.5,23.5],turn:[.25,.5],dir:1,wrong:.15,acc:.7,wide:1,len:{Y:.7,F:1.1,G:1,S:1.2},
+  role:{pp:.2,mid:1,death:.35},plans:{pp:{LA:1,PS:1},mid:{LA:1.5,LC:1.5},death:{LC:1}}},
+ sla:{type:'spin',name:'Left-arm orthodox',v:[22,25],turn:[.15,.32],dir:1,acc:.9,wide:.6,len:{Y:1,F:1.1,G:1.1,S:.7},
+  role:{pp:.5,mid:.9,death:.3},plans:{pp:{PS:1,LA:1},mid:{LC:2,LA:1},death:{LC:1}}}
+};
+const NAMES={
+ earth:['Brox Cald Dorv Fenn Hask Kell Lorr Merr Pask Quill Rask Tolv Wend','by den holm ick mere ton wyn sett'],
+ moon:['Sel Lun Thal Cyn Ves Ori Aph Nox','ene ith ara ion uvis orn'],
+ mercury:['Sol Ign Pyr Cind Brim Hel Scor Vulc','ax ek ith orr yx ane'],
+ venus:['Vap Nim Mist Sulf Zeph Aur Cael Hal','ora iel esh una is ette'],
+ mars:['Rux Ferr Duss Kar Rast Ox Tark Vorr','ok an ek ul ax orn'],
+ jupiter:['Gor Thun Brom Krag Vast Mog Dral Zorr','dak gar um oth ax ung'],
+ saturn:['Ril Cass Hyp Lyr Enc Mim Pan Tet','ello ira eon ova ath is'],
+ neptune:['Tid Nere Cor Ond Pel Sal Thal Vey','ine ix ossa eth yn ora']
+};
+function wpick(items,weights,rng){const s=weights.reduce((a,b)=>a+b,0);let r=rng()*s;for(let i=0;i<items.length;i++){r-=weights[i];if(r<=0)return items[i];}return items[items.length-1];}
+// 5 bowlers: always a death specialist and a spinner, the rest weighted by the planet (swing air, gripping pitches)
+function makeAttack(pk,diffKey,rng){
+  rng=rng||Math.random;const P=PLANETS[pk]||PLANETS.earth,N=(NAMES[pk]||NAMES.earth).map(s=>s.split(' ')),one=a=>a[Math.floor(rng()*a.length)];
+  const ks=['death',one(['off','leg','sla'])],pool=['express','swing','cutter','off','leg','sla'];
+  const w={express:diffKey==='hard'?1.6:1,swing:.5+.5*P.swing,cutter:diffKey==='easy'?1.3:1,off:.4*P.spin,leg:.4*P.spin,sla:.4*P.spin};
+  while(ks.length<5){
+    const nSpin=ks.filter(k=>ARCH[k].type==='spin').length,ok=pool.filter(k=>ks.filter(x=>x===k).length<2&&(ARCH[k].type==='pace'||nSpin<2));
+    ks.push(wpick(ok,ok.map(k=>w[k]),rng));
+  }
+  ks.sort((a,b)=>(ARCH[a].type==='spin')-(ARCH[b].type==='spin'));
+  const names=new Set();
+  return ks.map((k,i)=>{
+    let sn;do sn=one(N[0])+one(N[1]);while(names.has(sn));names.add(sn);
+    return {...ARCH[k],i,arch:k,name:'ABCDEFGHJKLMNPRSTVWZ'[Math.floor(rng()*20)]+'. '+sn};
+  });
+}
+// greedy (most overs left first, never the previous bowler) is exact for "no two adjacent", so this is a true feasibility test
+function canFinish(q,last,R){
+  q=q.slice();
+  for(let k=0;k<R;k++){let b=-1;for(let i=0;i<q.length;i++)if(i!==last&&q[i]>0&&(b<0||q[i]>q[b]))b=i;if(b<0)return false;q[b]--;last=b;}
+  return true;
+}
+function newT20(attack,diffKey,target){
+  return {diff:diffKey,target,par:target/20,runs:0,balls:0,wkts:0,last:-1,bw:attack.map(()=>({o:0,b:0,r:0,w:0})),fow:[],ov:[],mem:{}};
+}
+// max 4 overs each, never two in a row, phase roles; a bowler going above par+3 an over (hard: +2) is rested unless the quotas
+// force him; on hard the best death bowler keeps 2 overs for overs 18-20
+function captainPick(attack,o,st){
+  const ph=phaseOf(o),hard=st.diff==='hard',q=attack.map((b,i)=>4-st.bw[i].o);
+  const legal=attack.map((b,i)=>i).filter(i=>i!==st.last&&q[i]>0&&canFinish(q.map((v,j)=>v-(j===i?1:0)),i,19-o));
+  if(!legal.length)return -1;
+  const lim=st.par+(hard?2:3),best=attack.reduce((m,b,i)=>b.role.death>attack[m].role.death?i:m,0);
+  const pref=legal.filter(i=>!(st.bw[i].o>0&&st.bw[i].r/st.bw[i].o>lim)&&!(hard&&o<17&&i===best&&q[i]<=2));
+  const pool=pref.length?pref:legal,k=st.diff==='easy'?1:hard?3:2;
+  return pick(pool,pool.map(i=>Math.pow(attack[i].role[ph],k)));
+}
+// needing well above par or losing wickets: attack; a set batter (30+ since the last wicket): contain; charging: CH vs spin, SB vs pace
+function planPick(bw,ph,st,ft){
+  const d=DIFF[st.diff],pp=ph==='pp',def=Object.keys(bw.plans[ph])[0],w={...bw.plans[ph]},fp=footPlan(ft),ck=bw.type==='spin'?'CH':'SB';
+  if(fp&&fp.ch>0)w[ck]=(w[ck]||0)+2.5*fp.ch;
+  const left=120-st.balls,rrr=left>0?(st.target-st.runs)/left*6:0,lw=st.fow.length?st.fow[st.fow.length-1]:{runs:0},
+    attack=rrr>st.par*1.25||st.fow.filter(f=>f.balls>st.balls-18).length>=2,set=st.runs-lw.runs>=30;
+  const ids=Object.keys(w).filter(id=>fieldOk(tplField(id),pp));
+  const id=st.diff==='easy'&&ids.includes(def)&&Math.random()<0.6?def:pick(ids,ids.map(id=>
+    w[id]*(attack?(TPL[id].atk?1.8:1):set?(TPL[id].atk?0.6:1.4):1)*Math.exp(-d.k*1.5*(bScore(st.mem,'b'+bw.i+':T:'+id)-1.2))));
+  return {id,mix:TPL[id]};
+}
+// the bowler's pressure deliveries (more yorkers, bouncers, slower balls): the death overs, or the chase running ahead of par
+function t20Pressure(st){const left=120-st.balls;return phaseOf(Math.floor(st.balls/6))==='death'||left>0&&(st.target-st.runs)/left>1.2*st.target/120;}
+// records one ball against bowler bi; returns true when it completed the over
+function t20Record(st,bi,res){
+  const f=st.bw[bi],o=Math.floor(st.balls/6);st.runs+=res.runs;f.r+=res.runs;st.ov[o]={b:bi,r:(st.ov[o]?st.ov[o].r:0)+res.runs};
+  if(res.out){st.wkts++;f.w++;st.fow.push({runs:st.runs,balls:st.balls+(res.wide?0:1),w:st.wkts});}
+  if(res.wide)return false;
+  st.balls++;if(++f.b<6)return false;
+  f.b=0;f.o++;st.last=bi;return true;
+}
+
 /* ---------- shot resolution ---------- */
 function windows(diffKey,early,m){const k=DIFF[diffKey].win*(m||1),b=early?EARLY:LATE;return {perfect:b.perfect*k,good:b.good*k,ok:b.ok*k,edge:b.edge*k};}
 function resolveDefend(b,clean){
@@ -226,7 +387,7 @@ function resolveDefend(b,clean){
   return {runs:0,label:'Inside edge',cls:'dot',dir:rnd(-170,-140),lofted:false,path:{air:false,s:6,a:5},shot:'Block'};
 }
 function resolveEdge(b,c,sw,field,d,mishit){
-  const keeper=field.findIndex(f=>f.n==='keeper'), slip=field.findIndex(f=>f.n==='slip');
+  const keeper=field.findIndex(f=>f.n==='keeper'), slip=field.findIndex(f=>f.n==='slip'), gully=field.findIndex(f=>f.n==='gully');
   if(mishit&&sw.lofted){
     const C=rnd(10,32),dir=normAng(sw.aim+gauss()*25),T=rnd(2.6,3.3);
     const L={x:c.x+Math.sin(dir*D2R)*C,z:c.z+Math.cos(dir*D2R)*C};
@@ -238,11 +399,11 @@ function resolveEdge(b,c,sw,field,d,mishit){
     return {runs:r,label:'Top edge',sub:'Lands safely',dir,lofted:true,path:{air:true,C,T,stop:true},cls:r?'runs':'dot'};
   }
   const off=c.x>-0.05;
-  let pc=(sw.lofted?0.36:0.22)+(off&&slip>=0?0.12:0);if(!off)pc*=0.5;pc*=d.catchMul;
+  let pc=(sw.lofted?0.36:0.22)+(off&&slip>=0?0.12:0)+(off&&gully>=0?0.06:0);if(!off)pc*=0.5;pc*=d.catchMul;
   if(Math.random()<pc){
-    const i=(off&&slip>=0&&Math.random()<0.5)?slip:keeper, f=field[i];
+    const ws=slip>=0?1:0,wg=gully>=0?0.5:0,r=off&&ws+wg>0?Math.random()*(1+ws+wg):9,i=r<ws?slip:r<ws+wg?gully:keeper, f=field[i], nm=fieldName(f);
     const dx=f.x-c.x,dz=f.z-c.z;
-    return {runs:0,out:true,outText:i===keeper?'Caught behind':'Caught at slip',label:'Out!',sub:i===keeper?'Edged and caught behind':'Edged to slip',
+    return {runs:0,out:true,outText:i===keeper?'Caught behind':'Caught at '+nm,label:'Out!',sub:i===keeper?'Edged and caught behind':'Edged to '+nm,
       dir:Math.atan2(dx,dz)/D2R,lofted:false,path:{air:true,C:Math.hypot(dx,dz),T:0.4,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out'};
   }
   const r=Math.random(),runs=r<0.5?0:r<0.8?1:4,dir=off?rnd(130,165):rnd(-165,-130);
@@ -292,7 +453,7 @@ function resolveAir(c,dir,q,power,field,d){
     return {runs:6,boundary:6,dir,lofted:true,path:{air:true,C:C+4,T},label:'Six!',dist:Math.round(Math.hypot(Lx,Lz)),cls:'six'};
   }
   const nf=nearestFielder(field,Lx,Lz,C<10);
-  const reach=(2+4.5*Math.max(0,T-0.6))*(d.fSpeed/6.3);
+  const reach=(2+4.5*Math.max(0,T-0.6))*(d.fSpeed/6.3)*(nf.f.c||1);
   let dropped=false;
   if(nf.dist<reach){
     const p=Math.min(0.97,(nf.dist<reach*0.45?0.95:0.68)*d.catchMul);
@@ -341,22 +502,26 @@ const FOOT_LEN={ch:{Y:.7,F:.7,S:1.8,B:1.5},bk:{Y:1.5,F:1.6,S:.7,B:.7},ac:{Y:1.7,
 const FOOT_LINE={ch:{wide:2.2,leg:.7},bk:{},ac:{mid:1.8,leg:1.3,wide:.6}};
 const FOOT_NOTE={ch:'shorter and wider, you keep coming down the pitch',bk:'fuller, you keep going back',ac:'straight at the stumps, you keep moving across'};
 const footMul=(fp,T,k)=>fp?['ch','bk','ac'].reduce((m,j)=>m*lerp(1,T[j][k]||1,fp[j]),1):1;
+// ctx.bw (bowler profile) and ctx.plan (planPick) are T20 only: the plan's mix replaces the base weights, mem keys are per bowler
 function planBall(mem,type,diffKey,ctx){
-  const d=DIFF[diffKey],lens=type==='pace'?['Y','F','G','S','B']:['Y','F','G','S'];
-  const base=type==='pace'?{Y:.7,F:1,G:1.6,S:.8,B:.45}:{Y:.3,F:1.3,G:1.7,S:.45};
+  const d=DIFF[diffKey],bw=ctx.bw,mix=ctx.plan&&ctx.plan.mix,mk=bw?'b'+bw.i+':':'',lens=type==='pace'?['Y','F','G','S','B']:['Y','F','G','S'];
+  const base=mix?mix.len:type==='pace'?{Y:.7,F:1,G:1.6,S:.8,B:.45}:{Y:.3,F:1.3,G:1.7,S:.45};
   const last=ctx.last||[],fp=footPlan(ctx.foot);
   const lw=lens.map(L=>{
-    let x=base[L]*Math.exp(-d.k*1.5*bScore(mem,type+':'+L))*footMul(fp,FOOT_LEN,L);
+    let x=(base[L]||0.1)*(bw?bw.len[L]:1)*Math.exp(-d.k*1.5*bScore(mem,mk+type+':'+L))*footMul(fp,FOOT_LEN,L);
     if(ctx.pressure&&L==='Y')x*=1.9;
     if(ctx.pressure&&L==='B')x*=1.3;
     if(d.k>0.3&&last.length>=2&&last[last.length-1]===L&&last[last.length-2]===L)x*=0.3;
     return x;});
-  const lines=['wide','off','mid','leg'],lb={wide:.45,off:1.5,mid:1,leg:.55};
-  return {type,len:pick(lens,lw),line:pick(lines,lines.map(l=>lb[l]*footMul(fp,FOOT_LINE,l)*Math.exp(-d.k*1.2*bScore(mem,'line:'+l)))),
-    slower:type==='pace'&&Math.random()<d.slower*(ctx.pressure?1.5:1)};
+  const lines=['wide','off','mid','leg'],lb=mix?mix.line:{wide:.45,off:1.5,mid:1,leg:.55};
+  const p={type,len:pick(lens,lw),line:pick(lines,lines.map(l=>lb[l]*footMul(fp,FOOT_LINE,l)*Math.exp(-d.k*1.2*bScore(mem,mk+'line:'+l)))),
+    slower:type==='pace'&&Math.random()<d.slower*(bw?bw.slow*(mix.slow||1):1)*(ctx.pressure?1.5:1)};
+  if(bw){p.mk=mk;p.pid=ctx.plan.id;p.sw=mix.sw;p.flat=mix.flat;p.dir=bw.dir*(bw.wrong&&Math.random()<bw.wrong*(mix.wrong||1)?-1:1);}
+  return p;
 }
 function brainLearn(mem,b,runs,out){
-  for(const k of [b.type+':'+b.len,'line:'+b.line]){
+  const mk=b.mk||'';
+  for(const k of b.pid?[mk+b.type+':'+b.len,mk+'line:'+b.line,mk+'T:'+b.pid]:[b.type+':'+b.len,'line:'+b.line]){
     const s=mem[k]||(mem[k]={r:0,n:0,w:0});
     s.r+=runs;s.n++;if(out)s.w++;
     if(s.n>40){s.r*=40/s.n;s.w*=40/s.n;s.n=40;}
@@ -370,10 +535,14 @@ function brainInsight(mem,type,ft){
   for(const L of lens){const s=mem[type+':'+L];if(!s||s.n<4)continue;const sc=bScore(mem,type+':'+L);if(sc<bs){bs=sc;best=L;}}
   return best&&bs<0.9?'Bowler\u2019s plan: more '+LEN_NAME[best]:'';
 }
+// T20 (overs===20): per-phase outcome weights, more boundaries and wickets in the powerplay and at the death
+const AI_T20={pp:{0:.36,1:.28,2:.07,4:.16,6:.07,W:.05},mid:{0:.3,1:.38,2:.12,4:.1,6:.06,W:.04},death:{0:.24,1:.27,2:.1,4:.18,6:.14,W:.08}};
 function simulateAI(overs,wkts,diffKey,mul){
-  const w=DIFF[diffKey].ai,keys=Object.keys(w);let runs=0,out=0,balls=0;
-  while(balls<overs*6&&out<wkts){const o=pick(keys,keys.map(k=>w[k]));balls++;if(o==='W')out++;else runs+=+o;}
-  return {runs:Math.round(runs*(mul||1)),wkts:out,balls};
+  const t20=overs===20,w0=DIFF[diffKey].ai,k0=Object.keys(w0);let runs=0,out=0,balls=0;
+  while(balls<overs*6&&out<wkts){
+    const w=t20?AI_T20[phaseOf(Math.floor(balls/6))]:w0,keys=t20?Object.keys(w):k0,o=pick(keys,keys.map(k=>w[k]));
+    balls++;if(o==='W')out++;else runs+=+o;}
+  return {runs:Math.round(runs*(mul||1)*(t20?DIFF[diffKey].t20:1)),wkts:out,balls};
 }
 function hitPos(h,t){
   let d,y=0;

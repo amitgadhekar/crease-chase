@@ -15,8 +15,8 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 ```bash
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
-npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet in headless Chromium, fails on page errors
+npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + 600 T20 chases per row (T20_N=) against src/logic.js; exits 1 if balance drifts
+npm run test:smoke               # builds, plays each planet + two T20 overs with save/reload/resume in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -26,6 +26,9 @@ Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub P
 test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
 Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/wicket; "always charges" and "always across" must not beat it.
+Its T20 checks: standard bot wins easy >=75%, medium 40-60%, hard <=25% on Earth; "always loft" wins fewer than it on medium and hard
+(both scored against the same pooled targets); mean targets never fall from easy to hard on any planet; each planet's `t20` within
+0.8-1.25 of its measured T20 scoring ratio; zero illegal fields, bowler picks or quota breaches (plus captain and field fuzzing).
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
 
 ## Layout
@@ -44,7 +47,7 @@ tools/blender/            Model scripts run headless in Blender: rig.py (skeleto
                           batter.py (the batter). tools/model.mjs runs Blender, then gltf-transform prune/dedup/quantize
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
-03 HUD/banner · 04 match flow + ball state machine + scoring · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
+03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
 2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
@@ -181,17 +184,41 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
   Crowd bed loops via `loopStart/loopEnd`. Only thunder is still synthesized. Clip sources/licences are listed in README.md.
 - **AI bowler brain:** per length/line stats of runs and wickets conceded (`mem`, persisted in localStorage `cc_mem`,
-  capped at 40 samples). Weights favour what has cost it least; hard mode avoids repeating a length 3 times; pressure
+  capped at 40 samples). Weights favour what has cost it least; medium and hard (`k>0.3`) avoid repeating a length 3 times; pressure
   situations add yorkers/bouncers; slower balls by difficulty. `brainInsight` produces the "Bowler's plan" text.
   Footwork tendency: `M.foot` is a moving average of `S.bpos` per ball (`footTrend`), passed as `ctx.foot`; `footPlan` turns
   it into charge/back/across weights that scale lengths and lines (`FOOT_LEN`, `FOOT_LINE`: shorter and wider vs chargers,
   fuller vs back-foot players, straighter and yorkers vs moving across), and the plan text then names it (`FOOT_NOTE`).
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
-- **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier.
+- **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier (T20: per-phase weights `AI_T20`,
+  times the planet's `t20` and `DIFF.t20`).
+- **T20 chase** (4th `LENGTHS` entry, `M.t20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
+  - `makeAttack`: 5 named bowlers per planet from `ARCH` archetypes (always a death specialist and a spinner); each carries a
+    profile (`pace` x DIFF range or spin `v`, swing, `turn`/`dir`, `wrong`, `slow`, `acc`, `wide`, `len` bias) that `makeDelivery` reads.
+  - Per over (`t20Over`): `captainPick` (max 4, never consecutive, phase roles, expensive bowlers rested, `canFinish` keeps the
+    quotas feasible) -> `planPick` (a `TPL` template = field + delivery mix; by phase, archetype, rate needed, wickets, footwork,
+    per-bowler `mem` keys `b<i>:...`) -> `adjust` (at most 2 fielders deep into hot `zoneAdd` sectors, decaying per ball).
+    After a mid-over boundary the captain may swap one more (`M.note`, shown at the next ball). Everything passes `fieldOk`
+    (ICC clause 28: 2 out in overs 1-6, else 5; leg side <=5; <=2 behind square on the leg side; circle 27.43 x BOUNDARY/65).
+  - `M.st` (`newT20`/`t20Record`): runs, balls, wickets, per-bowler figures, fall of wickets, runs per over, per-match `mem`
+    (T20 never writes `cc_mem`). Pressure is `t20Pressure` (death overs, or the rate running ahead of par). `M.bowlerType`/`spinDir`
+    follow the bowler's archetype, so the existing bowler visuals apply. The player is always on strike.
+  - Targets (option B, owner): never fall as difficulty rises (~200 / ~215 / ~230 on Earth; `DIFF.t20` 1.09 / 1.16 / 1.25), so
+    win rates spread (standard bot ~98% / ~50% / ~5%). Planet `t20` = measured T20 scoring vs Earth (the short-format `ai`
+    multipliers don't carry over to 20 overs). Re-measure both after any T20 logic change.
+  - Save/resume: `t20Save` writes `cc_t20` after every ball and after each over is picked (attack names + archetypes, `M.st`, zones,
+    foot trend, current bowler/plan/field, over chips). `overNo*6 > balls` means the saved over is under way (resume continues it),
+    else a new over is picked. "Resume T20" in the menu; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
+  - HUD: a full-width `#t20Slab` (phase chip, required vs current rate, bowler figures O-M-R-W and overs left, pace marker vs the
+    straight line to the target, i.e. half by over 10). Over-break banner: bowler change + field line (`fieldLine`). Radar: inner
+    circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard.
+  - Close catchers (slip, gully, short leg, silly point) are drawn; from the portrait batting camera they are out of frame, and
+    in landscape silly point/short leg stand clear of the batter and the ball's line, so none were moved.
+- **Records:** `records[diff][format]`, format `short` (1-5 overs and nets) or `t20`; old flat records migrate to `short` at load.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
   plus `vis` for the look. `setPlanet` derives `ENV.carry`, `ENV.acc` (ground deceleration), `ENV.run` (fielder speed).
   Wind is rolled per over and drifts lofted shots. 3D lighting and fog per planet live in `LOOK3D` (07-render3d.js).
-  If you change planet physics, re-run the balance test and update that planet's `ai` multiplier to the measured
+  If you change planet physics, re-run the balance test and update that planet's `ai` (and T20 `t20`) multiplier to the measured
   "scoring vs Earth" ratio (the test checks they stay within 0.8-1.25 of each other).
 - **Chase camera:** on fours and sixes the camera follows the ball (`updateCam`), and the banner and score reveal are
   deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
@@ -211,7 +238,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com and styles from fonts.googleapis.com.
   Build-time npm deps (three, esbuild, playwright, @gltf-transform/cli for the model pipeline) are devDependencies pinned to exact versions that were at least two weeks
   old when added; the lock file resolves from registry.npmjs.org. three r163+ needs WebGL2 (iOS 15+).
-- localStorage keys are prefixed `cc_` (settings, mem, records); every access is wrapped in try/catch.
+- localStorage keys are prefixed `cc_` (settings, mem, records, t20); every access is wrapped in try/catch.
 - Mobile first: portrait iPhone, safe-area insets, `touch-action:none` on the input canvas, 44px+ touch targets.
 - Keep `src/logic.js` free of DOM access so the balance test can run it in Node.
 
@@ -251,6 +278,10 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   right thumb is already busy with the slingshot and swipes would collide with it. Arrows/WASD on desktop.
 - Footwork payoff: a timing-window and shot-fit `gain` from leaving the good-length zone. Shot fit alone (1:1 effective
   length, also tried 2-3x) gave a length-reading bot under 3%, because drives tolerate length; with `gain` it gets ~+15%.
+- T20 targets: option B (owner), never falling with difficulty, over the original 70/50/30% win-rate calibration (which made
+  hard targets lower than easy ones). A per-planet `t20` multiplier, because the short-format `ai` ratios left Moon/Mercury/Mars
+  at >90% and Venus/Saturn/Neptune at ~20% over 20 overs.
+- T20 save after the over is picked too, not only after balls: otherwise a resume at an over boundary re-picks a different bowler.
 - LBW added with footwork, pads from the trigger-step feet. The always-swinging bot rarely misses, so its LBW share is ~4%;
   human-like play (90 ms timing spread, 15% leaves) gives ~15-20% of dismissals, close to real cricket.
 

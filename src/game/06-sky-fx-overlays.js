@@ -94,9 +94,11 @@ function drawRadar(bp){
   const P=(x,z)=>[cx+x*k,cy-z*k];
   ctx.save();ctx.fillStyle='rgba(18,52,30,.72)';ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();
   ctx.strokeStyle='rgba(244,239,225,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cx,cy,BOUNDARY*k,0,7);ctx.stroke();
-  ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(cx,cy,27*BOUNDARY/65*k,0,7);ctx.stroke();ctx.setLineDash([]);
+  const rc=27.43*BOUNDARY/65;ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.arc(cx,cy,rc*k,0,7);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#d8c08a';const [px,py]=P(-1.5,21);ctx.fillRect(px,py,3*k+1,22*k);
-  S.fpos.forEach((p,i)=>{const f=M.field[i];if(!f)return;const [x,y]=P(p.x,p.z);ctx.fillStyle=f.n==='keeper'||f.n==='bowler'?'rgba(239,232,210,.55)':'#efe8d2';ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();});
+  ctx.strokeStyle='#f2b134';ctx.lineWidth=1.2;
+  S.fpos.forEach((p,i)=>{const f=M.field[i];if(!f)return;const [x,y]=P(p.x,p.z),fx=f.n==='keeper'||f.n==='bowler';ctx.fillStyle=fx?'rgba(239,232,210,.55)':'#efe8d2';ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();
+    if(M.t20&&!fx&&Math.hypot(f.x,f.z)>rc){ctx.beginPath();ctx.arc(x,y,4.2,0,7);ctx.stroke();}});
   if(S.aim){const dx=S.aim.x-S.aim.x0,dy=S.aim.y-S.aim.y0,L=Math.hypot(dx,dy);if(L>=14){const a=aimDeg(dx,dy)*D2R,len=clamp(L/dragMax(),0.3,1)*BOUNDARY;
     ctx.strokeStyle=S.loft?'#ffb627':'#fff';ctx.lineWidth=2;const [x,y]=P(Math.sin(a)*len,Math.cos(a)*len);line(cx,cy,x,y);}}
   if(S.phase==='result'&&S.hit&&bp){S.trail.push(P(bp.x,bp.z));ctx.strokeStyle='rgba(255,120,100,.8)';ctx.lineWidth=1.5;ctx.beginPath();S.trail.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();
@@ -129,7 +131,7 @@ function drawInfo(){
   if(!M||S.aim)return;let txt='';
   const pace=M.bowlerType==='pace';
   if(S.phase==='ready')txt='Next ball in '+Math.max(1,Math.ceil(S.readyDur-S.t));
-  else if(S.phase!=='result')txt=pace?'Pace bowler':(M.spinDir>0?'Leg-spinner':'Off-spinner');
+  else if(S.phase!=='result')txt=bowlerLabel();
   else if(S.ball)txt=(pace?'Pace':'Spin')+', '+S.ball.kmh+' km/h';
   if(!txt)return;ctx.save();ctx.font='700 15px "Barlow",system-ui,sans-serif';ctx.textAlign='left';
   ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.strokeText(txt,12,hudBottom+22);ctx.fillStyle='#fff';ctx.fillText(txt,12,hudBottom+22);ctx.restore();

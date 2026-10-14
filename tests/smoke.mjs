@@ -99,9 +99,57 @@ if (planets.includes('earth')) {
     await page.screenshot({path: `${shots}earth-celebrate-${n}.png`});
     await camCheck('celebration ' + n);
   }
-  await page.mouse.click(195, 420);
-  await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 2000});
+  // a slow screenshot can outlast the celebration (6 s); a tap then would hit the end screen's buttons
+  if (await page.evaluate(() => __t.S.phase === 'celebrate')) await page.mouse.click(195, 420);
+  await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 10000, polling: 50})
+    .catch(async () => errors.push('celebration: no end screen, phase ' + await page.evaluate(() => __t.S.phase + ' ' + document.querySelector('.screen.on')?.id)));
   console.log(`earth    ok  celebration skipped to end screen: ${await page.textContent('#eTitle')}`);
+}
+if (planets.includes('earth')) {
+  // T20: two overs with forced swings (ready/break waits cut short), a bowler change and a field change, every field legal
+  // (fieldOk), then save, reload, resume and compare the match state.
+  await page.evaluate(() => localStorage.removeItem('cc_t20'));
+  await page.reload();
+  await page.click('.seg[data-key=mode] button[data-v=chase]');
+  await page.click('.seg[data-key=len] button[data-v="3"]');
+  await page.click('#planetGrid button[data-v=earth]');
+  await page.click('#startBtn');
+  await page.click('#chaseBtn');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  // a hot off-side scoring zone, so the captain has a reason to move a fielder (after a boundary, and for the next over)
+  await page.evaluate(() => { __t.getM().zones[5] = 20; });
+  const skip = () => { const S = __t.S; if (S.phase === 'ready') S.t = Math.max(S.t, S.readyDur - 0.1); if (S.phase === 'break') S.t = Math.max(S.t, S.breakDur - 0.1);
+    return S.phase === 'flight'; };
+  const seen = {bi: new Set(), field: new Set()}, kinds = ['drive', 'block', 'loft'];
+  let last = await page.evaluate(() => __t.t20());
+  for (let i = 0; last.balls < 12 || seen.bi.size < 2 || seen.field.size < 2; i++) {
+    if (i >= 24) { errors.push(`T20: after ${i} balls saw ${seen.bi.size} bowlers and ${seen.field.size} fields`); break; }
+    seen.bi.add(last.bi); seen.field.add(last.field);
+    if (!last.ok) errors.push(`T20: illegal field in over ${last.overNo}: ${last.field}`);
+    await page.waitForFunction(`(${skip})()`, null, {timeout: 30000, polling: 30});
+    await page.evaluate(kind => { const S = __t.S, f = footAt(S.ball, S.bpos), aim = f.full > 0.62 ? -85 : 30;
+      S.swing = {tc: f.t + 0.002, aim, power: 1, lofted: kind === 'loft', defend: kind === 'block', done: false};
+      S.bat = {mode: kind === 'block' ? 'block' : 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim}; }, kinds[i % 3]);
+    await page.waitForFunction(() => ['ready', 'break', 'replay'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+    if (await page.evaluate(() => __t.S.phase === 'replay')) { await page.waitForTimeout(400); await page.mouse.click(195, 500); }
+    await page.waitForFunction(() => ['ready', 'break'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+    last = await page.evaluate(() => __t.t20());
+  }
+  const bw = JSON.parse(last.bw);
+  if (bw.some(f => f.o > 4) || bw.filter(f => f.o > 0).length < 2) errors.push('T20 figures: ' + last.bw);
+  await page.screenshot({path: `${shots}earth-t20.png`});
+  await page.evaluate(() => { __t.S.paused = true; });
+  const saved = await page.evaluate(() => __t.t20());
+  await page.reload();
+  await page.waitForSelector('#resumeT20:not([hidden])', {timeout: 5000}).catch(() => errors.push('T20: no Resume button after reload'));
+  await page.click('#resumeT20');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  const back = await page.evaluate(() => __t.t20());
+  for (const k in saved) if (saved[k] !== back[k]) errors.push(`T20 resume: ${k} was ${saved[k]}, resumed ${back[k]}`);
+  console.log(`earth    ok  T20 ${back.runs}/${back.wkts} after ${back.balls} balls, ${seen.bi.size} bowlers, ${seen.field.size} fields, resumed after reload`);
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await page.waitForTimeout(100);
+  if (await page.evaluate(() => localStorage.getItem('cc_t20') === null || document.querySelector('#resumeT20').hidden)) errors.push('T20: save lost on quit (Resume must stay available)');
 }
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }

@@ -1,51 +1,60 @@
 /* ---------- match flow ---------- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
-function startMatch(){
-  sfx.amb(true);rpUI(false);
-  const L=LENGTHS[settings.len];
-  const P=setPlanet(settings.planet);applyPlanet(P);
-  M={mode:settings.mode,planet:P,diff:settings.diff,overs:L.overs,wktsMax:settings.mode==='nets'?(settings.netsW||Infinity):L.w,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
-     swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
+function newMatch(P,mode,diff,L){
+  sfx.amb(true);rpUI(false);applyPlanet(P);
   S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
+  return {mode,planet:P,pk:curPlanet,diff,overs:L.overs,wktsMax:mode==='nets'?(settings.netsW||Infinity):L.w,t20:mode==='chase'&&!!L.t20,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
+     swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
+}
+function startMatch(){
+  if(M&&M.saved)store.del('t20');
+  M=newMatch(setPlanet(settings.planet),settings.mode,settings.diff,LENGTHS[settings.len]);const P=M.planet;
+  if(M.t20){M.attack=makeAttack(M.pk,M.diff);M.zones=[0,0,0,0,0,0,0,0];}
   if(M.mode==='chase'){
-    M.ai=simulateAI(M.overs,M.wktsMax,M.diff,P.ai);M.target=M.ai.runs+1;
+    M.ai=simulateAI(M.overs,M.wktsMax,M.diff,M.t20?P.t20:P.ai);M.target=M.ai.runs+1;if(M.t20)M.st=newT20(M.attack,M.diff,M.target);
     $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
     $('#iText').textContent=P.name+'. '+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
     showScreen('intro');S.paused=true;
   }else beginPlay();
 }
-function beginPlay(){
-  showScreen(null);$('#hud').hidden=false;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver();
+function beginPlay(cont){
+  showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver(cont);
 }
-function newOver(){
-  M.overNo++;M.overBalls=[];
-  let type='pace';
-  if(M.overNo>1){
-    if(M.diff==='hard'){const p=M.typeStats.pace,s=M.typeStats.spin;
-      const rp=(p.r+2)/(p.n+2),rs=(s.r+2)/(s.n+2);type=rs<rp?'spin':rp<rs?'pace':(Math.random()<0.4?'spin':'pace');}
-    else type=Math.random()<0.4?'spin':'pace';
+// cont: a resumed T20 carries on with the saved over (bowler, plan, field)
+function newOver(cont){
+  if(!cont){M.overNo++;M.overBalls=[];}
+  let notes;
+  if(M.t20)notes=t20Over(cont);
+  else{
+    let type='pace';
+    if(M.overNo>1){
+      if(M.diff==='hard'){const p=M.typeStats.pace,s=M.typeStats.spin;
+        const rp=(p.r+2)/(p.n+2),rs=(s.r+2)/(s.n+2);type=rs<rp?'spin':rp<rs?'pace':(Math.random()<0.4?'spin':'pace');}
+      else type=Math.random()<0.4?'spin':'pace';
+    }
+    if(M.mode==='nets')type=M.overNo%2?'pace':'spin';
+    M.bowlerType=type;M.spinDir=Math.random()<0.5?1:-1;
+    const ff=fieldFor(M.shots,M.diff);M.field=ff.field;
+    notes=[bowlerLabel()];
+    const ins=brainInsight(mem,type,M.foot);if(ins)notes.push(ins);
+    if(ff.moved)notes.push(ff.moved===1?'One fielder moved deep':ff.moved+' fielders moved deep');
   }
-  if(M.mode==='nets')type=M.overNo%2?'pace':'spin';
-  M.bowlerType=type;M.spinDir=Math.random()<0.5?1:-1;
-  const ff=fieldFor(M.shots,M.diff);M.field=ff.field;
-  const notes=[type==='pace'?'Pace bowler':(M.spinDir>0?'Leg-spinner':'Off-spinner')];
-  const ins=brainInsight(mem,type,M.foot);if(ins)notes.push(ins);
-  if(ff.moved)notes.push(ff.moved===1?'One fielder moved deep':ff.moved+' fielders moved deep');
   const ws=rollWind(M.planet);if(ws>0.5)notes.push('Wind '+Math.round(ws*3.6)+' km/h');
-  if(M.overNo===1)notes.unshift(M.planet.name);
+  if(M.overNo===1||cont)notes.unshift(M.planet.name);
   updateHUD();
-  banner(M.mode==='chase'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join('. '),'small',1900);
-  S.phase='break';S.t=0;S.breakDur=1.6;resetFielders();
+  banner(M.mode==='chase'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join(M.t20?'\n':'. '),'small',M.t20?2900:1900);
+  S.phase='break';S.t=0;S.breakDur=M.t20?2.4:1.6;resetFielders();
   if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
 function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
 function nextBall(){
   S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  if(M.note){banner('Field change',M.note,'small',1600);M.note='';}
   resetFielders();
   const left=M.overs*6-M.balls,need=M.target-M.runs;
-  const pressure=M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
-  const plan=planBall(mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot});
-  S.pending=makeDelivery(plan,M.diff,M.spinDir);
+  const pressure=M.t20?t20Pressure(M.st):M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
+  const bw=M.t20?M.attack[M.bi]:null,plan=planBall(M.t20?M.st.mem:mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot,bw,plan:M.plan});
+  S.pending=makeDelivery(plan,M.diff,bw||M.spinDir);
   S.phase='ready';S.t=0;S.readyDur=BALL_GAP;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
 }
 function releaseBall(){S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
@@ -87,7 +96,7 @@ function doSwing(){
   if(res.path){const h=S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;
     if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}}
   if(res.catcher!=null){S.fanim={i:res.catcher,x:res.catchPt.x,z:res.catchPt.z,speed:Math.max(4,Math.hypot(M.field[res.catcher].x-res.catchPt.x,M.field[res.catcher].z-res.catchPt.z)/Math.max(0.25,res.path.T*0.92))};}
-  else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[M.diff].fSpeed};}
+  else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[M.diff].fSpeed*ENV.run};}
   let dur=1.2,tCross=0;
   if(S.hit)dur=(S.hit.air?Math.min(S.hit.T+(S.hit.stop?0.2:0.9),2.6):Math.min(S.hit.s/S.hit.a,2.2))+0.8;
   if(res.boundary&&S.hit){
@@ -105,10 +114,11 @@ function commit(res,dur,delay){
   if(res.boundary===4)M.fours++;if(res.boundary===6)M.sixes++;
   M.overBalls.push(res.out?{t:'W',cls:'cw'}:res.wide?{t:'wd',cls:'cwd'}:res.boundary===6?{t:'6',cls:'c6'}:res.boundary===4?{t:'4',cls:'c4'}:{t:res.runs?String(res.runs):'\u2022'});
   if(res.dir!=null&&!res.out)M.shots.push({a:res.dir,runs:res.runs,lofted:!!res.lofted});
-  brainLearn(mem,b,res.runs,!!res.out);store.set('mem',mem);footTrend(M.foot,S.bpos);
+  brainLearn(M.t20?M.st.mem:mem,b,res.runs,!!res.out);if(!M.t20)store.set('mem',mem);footTrend(M.foot,S.bpos);
   M.typeStats[b.type].r+=res.runs;M.typeStats[b.type].n++;
   M.lastLens.push(b.len);if(M.lastLens.length>6)M.lastLens.shift();
   if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
+  if(M.t20)t20Ball(res);
   if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
 }
 function showOutcome(res,b){
@@ -134,7 +144,8 @@ function afterResult(){
 }
 function endMatch(kind){
   sfx.end(kind);
-  const r=records[M.diff]||(records[M.diff]={w:0,p:0,hs:0});
+  if(M.saved)store.del('t20');
+  const fmt=M.t20?'t20':'short',rd=records[M.diff]||(records[M.diff]={}),r=rd[fmt]||(rd[fmt]={w:0,p:0,hs:0});
   if(M.mode==='chase'){r.p++;if(kind==='win')r.w++;}
   const isBest=M.runs>r.hs;if(isBest)r.hs=M.runs;store.set('records',records);
   let title,text;
@@ -148,7 +159,7 @@ function endMatch(kind){
   $('#eStats').innerHTML=[[M.runs+'',M.balls+' balls'],[sr+'','strike rate'],[M.fours+' / '+M.sixes,'fours / sixes'],
     [M.perfects+'','perfect timing'],[avg+' ms','avg timing error'],[M.wkts+'','wickets lost']]
     .map(([a,b])=>'<div class="stat"><b>'+a+'</b><span>'+b+'</span></div>').join('');
-  $('#eNote').textContent=isBest&&M.runs>0?'New highest score on '+M.diff+'.':'';
+  $('#eNote').textContent=isBest&&M.runs>0?'New highest '+(M.t20?'T20 ':'')+'score on '+M.diff+'.':'';
   if(kind==='win')celebrate();else showEnd();
 }
 function celebrate(){
@@ -159,5 +170,6 @@ function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.
 function quitToMenu(){rpUI(false);S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();showScreen('menu');}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
+  $('#pCard').innerHTML=M.t20?t20Card():'';
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}
 

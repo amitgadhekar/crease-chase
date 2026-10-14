@@ -10,15 +10,19 @@ function refreshMenu(){
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.key;seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(settings[k])===b.dataset.v)));});
   $('#lenOpt').style.display=settings.mode==='chase'?'':'none';$('#netsOpt').style.display=settings.mode==='nets'?'':'none';
   $('#optAssist').checked=settings.assist;$('#optSound').checked=settings.sound;
-  const r=records[settings.diff];
-  $('#recordLine').textContent=r&&(r.p||r.hs)?'On '+settings.diff+': '+r.w+' of '+r.p+' chases won.'+' Highest score '+r.hs+'.':'';
+  const fmt=recFmt(),r=(records[settings.diff]||{})[fmt],L=LENGTHS[settings.len]||LENGTHS[1];
+  $('#recordLine').textContent=r&&(r.p||r.hs)?'On '+settings.diff+(fmt==='t20'?', T20':'')+': '+r.w+' of '+r.p+' chases won.'+' Highest score '+r.hs+'.':'';
+  $('#lenBlurb').textContent=L.t20?'20 overs, 10 wickets, against a five-bowler attack with real fielding restrictions. Saved after every ball.':L.overs+(L.overs>1?' overs, ':' over, ')+L.w+' wickets.';
+  const sv=t20Saved(),rb=$('#resumeT20');rb.hidden=!sv;
+  if(sv)rb.textContent='Resume T20: '+PLANETS[sv.pk].name+', '+sv.st.runs+'/'+sv.st.wkts+' after '+oversText(sv.st.balls)+' overs';
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const k=seg.dataset.key;settings[k]=(k==='len'||k==='netsW')?+b.dataset.v:b.dataset.v;store.set('settings',settings);refreshMenu();}));
 $('#optAssist').addEventListener('change',e=>{settings.assist=e.target.checked;store.set('settings',settings);});
 $('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);if(settings.sound)audio();});
 $('#startBtn').addEventListener('click',startMatch);
-$('#chaseBtn').addEventListener('click',beginPlay);
+$('#resumeT20').addEventListener('click',resumeT20);
+$('#chaseBtn').addEventListener('click',()=>beginPlay());
 $('#introBack').addEventListener('click',quitToMenu);
 $('#pauseBtn').addEventListener('click',pause);
 $('#loftBtn').addEventListener('click',()=>{if(M&&!S.paused)setLoft(!S.loft);});
@@ -31,7 +35,8 @@ $('#rpSkip').addEventListener('click',()=>{if(S.phase==='replay'&&!S.paused)rpEn
 $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.target.textContent='Done. The bowler starts fresh.';});
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
-if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
+if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
+  ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw)}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();refreshMenu();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

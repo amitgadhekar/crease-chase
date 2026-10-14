@@ -1,13 +1,16 @@
 const $=s=>document.querySelector(s);
 const cvs=$('#scene'),ctx=cvs.getContext('2d');
 const store={get(k,d){try{const v=localStorage.getItem('cc_'+k);return v?JSON.parse(v):d;}catch(e){return d;}},
-             set(k,v){try{localStorage.setItem('cc_'+k,JSON.stringify(v));}catch(e){}}};
-const LENGTHS=[{overs:1,w:2},{overs:2,w:3},{overs:5,w:5}];
+             set(k,v){try{localStorage.setItem('cc_'+k,JSON.stringify(v));}catch(e){}},
+             del(k){try{localStorage.removeItem('cc_'+k);}catch(e){}}};
+const LENGTHS=[{overs:1,w:2},{overs:2,w:3},{overs:5,w:5},{overs:20,w:10,t20:1}];
 const settings=Object.assign({mode:'chase',diff:'medium',len:1,netsW:5,planet:'earth',assist:true,sound:true},store.get('settings',{}));
 if(settings.mode!=='chase'&&settings.mode!=='nets')settings.mode='chase';
 const BALL_GAP=2;
 let mem=store.get('mem',{});
 const records=store.get('records',{});
+try{for(const d in records)if(records[d]&&typeof records[d].p==='number')records[d]={short:records[d]};}catch(e){}
+const recFmt=()=>settings.mode==='chase'&&LENGTHS[settings.len]&&LENGTHS[settings.len].t20?'t20':'short';
 const KIT={you:{shirt:'#12606e',trim:'#f2b134',pants:'#e9edf0',helmet:'#15324d'},ai:{shirt:'#7a1f2b',pants:'#f1ece0',skin:'#b07a55'}};
 
 let VIS=PLANETS.earth.vis,STARS=[],PARTS=[],lastDpr=1,flash=0;

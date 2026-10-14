@@ -72,7 +72,7 @@ function rpCam(dt){
   setCam(lerp(cam.x,tx,k),lerp(cam.y,ty,k),lerp(cam.z,tz,k),cam.yaw);
   const dx=b.x-cam.x,dz=b.z-cam.z,d=Math.max(1,Math.hypot(dx,dz)),yaw=Math.atan2(dx,dz)/D2R;
   R.yaw=first?yaw:R.yaw+angDiff(yaw,R.yaw)*(1-Math.exp(-dt*8));setCam(cam.x,cam.y,cam.z,R.yaw);
-  F=baseF*1.1;HZ=clamp(H*.45+(b.y-cam.y)*F/d,H*.2,H*.6);
+  F=followF*1.1;HZ=clamp(H*.45+(b.y-cam.y)*F/d,H*.2,H*.6);
 }
 function rpGlow(b){
   const q=RP&&RP.t>=RP.s1&&b&&proj(b.x,b.y+.05,b.z);if(!q)return;

@@ -270,6 +270,30 @@ if (planets.includes('earth')) {
   console.log(`scen     ok  s5a -> "${lunch}" -> ${s2.id}, ${s2.target} to win with ${s2.lineup} batters`);
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
 }
+{
+  // Landscape phone: its own layout and camera framing. A run-up and a forced shot, with camera parity in both.
+  const land = await browser.newPage({viewport: {width: 844, height: 390}});
+  land.on('pageerror', e => errors.push('landscape: ' + (e.stack || String(e))));
+  await land.goto(url);
+  await land.click('.seg[data-key=mode] button[data-v=nets]');
+  await land.click('#planetGrid button[data-v=earth]');
+  await land.click('#startBtn');
+  await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
+  await land.screenshot({path: `${shots}landscape-runup.png`});
+  for (const [where, prep] of [['runup', null], ['shot', async () => {
+    await land.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 30});
+    await land.evaluate(() => { const S = __t.S; S.swing = {tc: footAt(S.ball, S.bpos).t + 0.002, aim: 30, power: 1, lofted: true, defend: false, done: false};
+      S.bat = {mode: 'swing', t0: __t.clk(), from: null, aim: 30}; });
+    await land.waitForTimeout(400);
+    await land.screenshot({path: `${shots}landscape-shot.png`});
+  }]]) {
+    if (prep) await prep();
+    const e = await land.evaluate(() => __t.cam3());
+    camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity landscape ${where}: ${e} px`);
+  }
+  console.log(`land     ok  844x390 run-up and shot: ${await land.evaluate(() => __t.S.res ? __t.S.res.label : __t.S.phase)}`);
+  await land.close();
+}
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }
 console.log(`\nNo page errors. Camera parity within ${camErr.toFixed(4)} px. Screenshots in tests/screenshots/`);

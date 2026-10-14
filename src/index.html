@@ -50,15 +50,17 @@
   <div id="rpTag" hidden><b>Replay</b><span>Tap to skip</span></div>
   <button id="rpSkip" hidden>Skip</button>
   <div id="stick" hidden aria-label="Footwork: drag to move your feet, or use the arrow keys"><i></i></div>
+  <div id="safe" aria-hidden="true"></div>
 
   <section id="menu" class="screen on" aria-label="Main menu">
-    <div class="card">
+    <div class="card split">
       <div class="board"><div class="seam" aria-hidden="true"></div>
         <h1>Crease<br>Chase</h1>
         <p>Bat against an AI bowler that studies your weak spots and moves its fielders to block your favourite shots.</p>
       </div>
       <div class="opt"><span class="lbl">Mode</span>
         <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="nets">Nets</button><button data-v="scen">Scenarios</button></div></div>
+      <div class="cbody">
       <div class="opt" id="scenOpt"><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
         <span class="lbl">Classics</span><div class="scgrid" id="scenClassics"></div></div>
       <div class="opt" id="venueOpt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
@@ -71,8 +73,8 @@
         <div class="seg" data-key="netsW"><button data-v="3">3 wickets</button><button data-v="5">5 wickets</button><button data-v="10">10 wickets</button><button data-v="0">No limit</button></div></div>
       <label class="tog"><input type="checkbox" id="optAssist"> Show where the ball will pitch</label>
       <label class="tog"><input type="checkbox" id="optSound"> Sound</label>
-      <button class="primary" id="startBtn">Play</button>
-      <button class="secondary" id="resumeT20" hidden>Resume T20</button>
+      <div class="cgo"><button class="primary" id="startBtn">Play</button>
+      <button class="secondary" id="resumeT20" hidden>Resume T20</button></div>
       <details class="how" open>
         <summary>How to bat</summary>
         <ul>
@@ -87,6 +89,7 @@
       </details>
       <p class="foot" id="recordLine"></p>
       <button class="link" id="resetBrain">Make the bowler forget what it has learned about you</button>
+      </div>
     </div>
   </section>
 
@@ -99,12 +102,12 @@
   </section>
 
   <section id="brief" class="screen" aria-label="Scenario briefing">
-    <div class="card">
+    <div class="card split">
       <div class="board"><p class="kick" id="gKick"></p><h2 id="gTitle"></h2><p id="gText"></p><p class="opp" id="gOpp"></p></div>
-      <div class="gcond" id="gCond"></div>
+      <div class="cbody"><div class="gcond" id="gCond"></div>
       <p class="gobj" id="gObj"></p>
       <ul class="gstars" id="gStars"></ul>
-      <div class="gpair" id="gPair"></div>
+      <div class="gpair" id="gPair"></div></div>
       <button class="primary" id="gPlay">Play</button>
       <button class="secondary" id="gBack">Back</button>
     </div>
@@ -113,7 +116,7 @@
   <section id="pause" class="screen" aria-label="Paused">
     <div class="card">
       <div class="board"><h2>Paused</h2><p id="pText"></p></div>
-      <div id="pCard"></div>
+      <div class="cbody" id="pCard"></div>
       <button class="primary" id="resumeBtn">Resume</button>
       <button class="secondary" id="restartBtn">Restart</button>
       <button class="secondary" id="quitBtn">Quit to menu</button>
@@ -121,11 +124,11 @@
   </section>
 
   <section id="end" class="screen" aria-label="Result">
-    <div class="card">
+    <div class="card split">
       <div class="board"><h2 id="eTitle"></h2><p id="eText"></p></div>
-      <div class="estars" id="eStars" hidden></div>
+      <div class="cbody"><div class="estars" id="eStars" hidden></div>
       <div class="stats" id="eStats"></div>
-      <p class="foot" id="eNote"></p>
+      <p class="foot" id="eNote"></p></div>
       <button class="primary" id="nextBtn" hidden>Next</button>
       <button class="primary" id="againBtn">Play again</button>
       <button class="secondary" id="menuBtn">Back to menu</button>

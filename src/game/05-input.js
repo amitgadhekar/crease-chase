@@ -58,5 +58,6 @@ function footUpdate(dt){
   if(t!==knobAt){knobAt=t;knob.style.transform=t;}
   stickEl.classList.toggle('locked',!free);
 }
-window.addEventListener('resize',resize);
+// rather than the window resize event: fires after layout whenever the canvas box changes (rotation, browser bars), so resize() reads settled sizes
+new ResizeObserver(()=>resize()).observe(cvs);
 

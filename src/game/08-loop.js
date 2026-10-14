@@ -14,7 +14,7 @@ function updateCam(dt){
     let tx=b.x-ux*9,tz=b.z-uz*9;const r=Math.hypot(tx,tz),lim=BOUNDARY-4;if(r>lim){tx*=lim/r;tz*=lim/r;}
     const ty=clamp(b.y*0.75+1.8,1.8,9),yaw=Math.atan2(ux,uz)/D2R,k=1-Math.exp(-dt*5);
     setCam(lerp(cam.x,tx,k),lerp(cam.y,ty,k),lerp(cam.z,tz,k),cam.yaw+angDiff(yaw,cam.yaw)*k);
-    HZ=lerp(HZ,H*0.5,k);
+    HZ=lerp(HZ,H*0.5,k);F=lerp(F,followF,k);
     S.trail3.push({x:b.x,y:b.y,z:b.z});if(S.trail3.length>14)S.trail3.shift();
   }else if(cam.x!==0||cam.y!==CAM_Y||cam.z!==CAM_Z||cam.yaw!==0||HZ!==baseHZ||F!==baseF){setCam(0,CAM_Y,CAM_Z,0);HZ=baseHZ;F=baseF;S.trail3=[];}
 }

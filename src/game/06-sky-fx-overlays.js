@@ -85,13 +85,13 @@ function drawAim(){
     const sh=shotOf(aimDeg(dx,dy),S.phase==='flight'?S.ball:null);label=loft?sh.loft:sh.name;
   }
   ctx.font='700 15px "Barlow",system-ui,sans-serif';ctx.textAlign='center';ctx.lineWidth=3.5;ctx.strokeStyle='rgba(0,0,0,.6)';
-  ctx.font='800 19px "Barlow",system-ui,sans-serif';const ty=hudBottom+26;
+  ctx.font='800 19px "Barlow",system-ui,sans-serif';const ty=LAND?26:hudBottom+26;
   ctx.strokeText(label,W/2,ty);ctx.fillStyle='#fff';ctx.fillText(label,W/2,ty);ctx.restore();
 }
 function drawRadar(bp){
   if(!M)return;
   // Tests: a square-root radial scale opens up the close catchers (slips, short leg, silly point) around the bat
-  const R=clamp(W*0.12,36,58),cx=W-R-10,cy=hudBottom+R+10,k=R/(BOUNDARY+3),tst=!!M.sc;
+  const R=LAND?clamp(H*0.14,36,58):clamp(W*0.12,36,58),cx=W-SAFE.r-R-10,cy=radarTop+R+10,k=R/(BOUNDARY+3),tst=!!M.sc;
   const P=tst?(x,z)=>{const d=Math.hypot(x,z),s=d>1e-3?R*Math.sqrt(d/(BOUNDARY+3))/d:0;return [cx+x*s,cy-z*s];}:(x,z)=>[cx+x*k,cy-z*k];
   ctx.save();ctx.fillStyle='rgba(18,52,30,.72)';ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();
   ctx.strokeStyle='rgba(244,239,225,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cx,cy,tst?R*Math.sqrt(BOUNDARY/(BOUNDARY+3)):BOUNDARY*k,0,7);ctx.stroke();
@@ -117,7 +117,7 @@ function drawRadar(bp){
 }
 function drawTimingBar(){
   const T=S.timing;if(!T||!M)return;
-  const we=windows(M.diff,true,T.win),wl=windows(M.diff,false,T.win),bw=Math.min(320,W*0.8),x0=(W-bw)/2,y=H-40,h=10;
+  const we=windows(M.diff,true,T.win),wl=windows(M.diff,false,T.win),bw=LAND?Math.min(300,W*0.34):Math.min(320,W*0.8),x0=(W-bw)/2,y=LAND?H-SAFE.b-22:H-40,h=10;
   const ppx=bw/(we.edge+wl.edge),c0=x0+we.edge*ppx,X=t=>c0+t*ppx;
   const zones=[[-we.edge,-we.ok,'#8b3a3a'],[-we.ok,-we.good,'#d99a2b'],[-we.good,-we.perfect,'#9bc53d'],[-we.perfect,wl.perfect,'#3ec46d'],
                [wl.perfect,wl.good,'#9bc53d'],[wl.good,wl.ok,'#d99a2b'],[wl.ok,wl.edge,'#8b3a3a']];
@@ -125,7 +125,8 @@ function drawTimingBar(){
   for(const [a,b,c] of zones){ctx.fillStyle=c;ctx.fillRect(X(a),y,X(b)-X(a),h);}
   const mx=clamp(X(T.dt),x0-2,x0+bw+2);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(mx,y-2);ctx.lineTo(mx-7,y-13);ctx.lineTo(mx+7,y-13);ctx.fill();
   ctx.font='600 12.5px "Barlow",system-ui,sans-serif';ctx.fillStyle='rgba(255,255,255,.85)';
-  ctx.textAlign='left';ctx.fillText('Early',x0,y+h+15);ctx.textAlign='right';ctx.fillText('Late',x0+bw,y+h+15);
+  if(LAND){ctx.textAlign='right';ctx.fillText('Early',x0-9,y+h-0.5);ctx.textAlign='left';ctx.fillText('Late',x0+bw+9,y+h-0.5);}
+  else{ctx.textAlign='left';ctx.fillText('Early',x0,y+h+15);ctx.textAlign='right';ctx.fillText('Late',x0+bw,y+h+15);}
   ctx.textAlign='center';ctx.font='700 15px "Barlow",system-ui,sans-serif';
   const ms=Math.round(Math.abs(T.dt)*1000),txt=T.label+(T.zone===3||T.mishit||T.label==='Out of reach'?'':', '+ms+' ms '+(T.early?'early':'late'));
   ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';ctx.strokeText(txt,W/2,y-18);ctx.fillStyle='#fff';ctx.fillText(txt,W/2,y-18);ctx.restore();
@@ -137,5 +138,5 @@ function drawInfo(){
   else if(S.phase!=='result')txt=bowlerLabel();
   else if(S.ball)txt=(pace?'Pace':'Spin')+', '+S.ball.kmh+' km/h';
   if(!txt)return;ctx.save();ctx.font='700 15px "Barlow",system-ui,sans-serif';ctx.textAlign='left';
-  ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.strokeText(txt,12,hudBottom+22);ctx.fillStyle='#fff';ctx.fillText(txt,12,hudBottom+22);ctx.restore();
+  ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.strokeText(txt,12+SAFE.l,hudBottom+22);ctx.fillStyle='#fff';ctx.fillText(txt,12+SAFE.l,hudBottom+22);ctx.restore();
 }

@@ -16,7 +16,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + 600 T20 chases per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, two T20 overs with save/reload/resume and three scenarios in headless Chromium, fails on page errors
+npm run test:smoke               # builds, plays each planet, two T20 overs with save/reload/resume, three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -69,6 +69,18 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   `setViewOffset` puts the principal point at (CX, HZ), so 2D overlays drawn with `proj()` line up with the 3D scene. If you
   change one, change both; the smoke test asserts they agree within 0.5 px (`__t.cam3()`).
   Field of view is changed only by setting `F` (reset to `baseF`, like `HZ`/`baseHZ`), so both stay in sync.
+- **Landscape** (`LAND` in `resize()`, the same `(orientation: landscape)` query as the CSS): the batting view uses a longer
+  lens, `F = 1.55*h`, `HZ = 0.235*h` with `h = H - SAFE.b` (portrait: `F = min(2.4W, 1.15H)`, `HZ = 0.31H`), so the bowler's
+  release to the stumps' base fills the short view above the timing bar; only a sliver of sky is left. `followF` (the portrait
+  formula) is the lens for the chase camera (`F` eases to it) and the spider-cam; side-on replay and celebration derive their
+  framing from W and H already. Layout: scene full-bleed (the root drops its bottom padding), HUD as a grid in the top
+  corners (score + T20/Scenarios slab in a left column, target + pause top right, radar under the target via `radarTop`),
+  stick/Loft/Hold in the bottom corners, timing bar bottom centre with Early/Late beside it, hint above it, aim label top
+  centre. Phones (`max-height: 520px`) get a 224 px left column with the T20/Scenarios rows stacked. Edge UI adds
+  `--sa-l/r/b` (env safe-area insets); `#safe` carries them as padding so `resize()` reads them into `SAFE` for the canvas
+  overlays. Cards with a body (`.card.split`: menu, briefing, result, pause with the T20 scorecard) become two columns: board
+  (+ buttons) left, `.cbody` scrolling right; the menu's Play/Resume (`.cgo`) stick to the bottom of that column. `.cbody`
+  and `.cgo` are `display:contents` in portrait, so portrait is unchanged. `resize()` runs from a ResizeObserver on `#scene`.
 - **Rendering layers:** `#sky` 2D canvas (gradient, stars, sun/moons with yaw shift, Jupiter bands, Venus clouds, Saturn rings)
   → `#gl` three WebGLRenderer (WebGL2, transparent clear) → `#scene` 2D overlay canvas, which also receives all pointer input.
 - **Three scene graph** (07-render3d): `buildScene` creates every mesh once at boot (12 fielder rigs + bowler, batter rig,
@@ -271,7 +283,9 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   Build-time npm deps (three, esbuild, playwright, @gltf-transform/cli for the model pipeline) are devDependencies pinned to exact versions that were at least two weeks
   old when added; the lock file resolves from registry.npmjs.org. three r163+ needs WebGL2 (iOS 15+).
 - localStorage keys are prefixed `cc_` (settings, mem, records, t20, scen); every access is wrapped in try/catch.
-- Mobile first: portrait iPhone, safe-area insets, `touch-action:none` on the input canvas, 44px+ touch targets.
+- Mobile first, portrait primary, landscape supported (see Landscape above): safe-area insets on every edge (left/right/bottom
+  in landscape), `touch-action:none` on the input canvas, 44px+ touch targets. Portrait must not change when landscape does:
+  landscape rules live only in the `(orientation: landscape)` media blocks and `LAND` branches.
 - Keep `src/logic.js` free of DOM access so the balance test can run it in Node.
 
 ## Decision log
@@ -305,6 +319,9 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   full-res HalfFloat target (~24 MB at 1170x2532, ~4x with MSAA, else the scene loses antialiasing), fog then mixes in linear
   space before tone mapping so it no longer matches the 2D sky, and its cost is fill rate, which headless swiftshader (CPU,
   vertex-bound here) cannot show: tried at full res, frame time was within noise there. Sprites cost one draw call each set.
+- Landscape: a responsive layout of the same game (CSS media queries + `LAND` in `resize()`) over an orientation lock (iPhone Safari
+  can't lock orientation from a web page: `screen.orientation.lock()` needs fullscreen, which iPhone gives only to video) or a separate landscape UI (two UIs to
+  keep in step). The batting view gets its own lens; follow cameras keep the portrait one so high balls stay in frame.
 - Pause between balls: `ready` phase with a countdown, fixed at 2 s (`BALL_GAP`; the time-between-balls option was removed by owner decision), plus longer run-ups.
 - Footwork control: a bottom-left joystick (velocity, own pointer) over swipe gestures or dragging the batter, because the
   right thumb is already busy with the slingshot and swipes would collide with it. Arrows/WASD on desktop.

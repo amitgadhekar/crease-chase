@@ -3,6 +3,7 @@
   --ball:#c0392b; --gold:#f2b134;
   --panel:#f7f4ec; --ink:#16241c; --ink-dim:#4f6155; --veil:rgba(8,20,13,.55);
   --seg:#e4e0d2; --seg-on:#1d3a2b; --seg-on-ink:#efe8d2; --star:#a86b12;
+  --sa-l:env(safe-area-inset-left,0px); --sa-r:env(safe-area-inset-right,0px); --sa-b:env(safe-area-inset-bottom,0px);
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
@@ -154,3 +155,53 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
 .gpair .tier,.estars .tier{background:var(--seg);color:var(--ink)}.gpair .tier.tD,.gpair .tier.tE{background:rgba(224,128,111,.35)}
 .estars{text-align:center;margin:0 0 10px}.estars .big3{font-size:38px;line-height:1.1;letter-spacing:4px;color:var(--star)}.estars .big3.none{color:var(--ink-dim)}
 .estars>span{font-size:13.5px;color:var(--ink-dim)}.estars ul{text-align:left;margin:8px 0 0}
+/* layout wrappers for the landscape two-column cards; no boxes of their own in portrait */
+.cbody,.cgo{display:contents}
+#safe{position:absolute;left:0;top:0;visibility:hidden;pointer-events:none}
+
+/* ---------- landscape: the scene is full-bleed, edge-anchored UI keeps clear of the notch and home indicator
+   (#safe carries the insets for the canvas overlays). HUD in the top corners, controls in the bottom corners ---------- */
+@media (orientation: landscape){
+  :root{padding-bottom:0}
+  #safe{padding:0 var(--sa-r) var(--sa-b) var(--sa-l)}
+  #hud{left:calc(8px + var(--sa-l));right:calc(8px + var(--sa-r));display:grid;grid-template-columns:minmax(0,380px) 1fr auto 44px;column-gap:6px}
+  #scoreSlab,#t20Slab,#scenSlab{grid-column:1}
+  #targetSlab{grid-column:3;grid-row:1}
+  #pauseBtn{grid-column:4;grid-row:1}
+  #stick{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b))}
+  #loftBtn,#rpSkip{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}
+  #rpSkip{bottom:calc(29px + var(--sa-b))}
+  #holdBtn{right:calc(100px + var(--sa-r));bottom:calc(29px + var(--sa-b))}
+  #rpTag{left:calc(12px + var(--sa-l))}
+  #hint{left:calc(150px + var(--sa-l));right:calc(150px + var(--sa-r));bottom:calc(58px + var(--sa-b))}
+  #banner{top:24%;left:var(--sa-l);right:var(--sa-r)}
+  .screen{padding:12px calc(14px + var(--sa-r)) calc(12px + var(--sa-b)) calc(14px + var(--sa-l))}
+  /* cards with a body: board (and buttons) on the left, the body scrolls on the right */
+  .card.split{width:min(880px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-rows:auto auto auto auto 1fr;column-gap:16px;align-items:start}
+  .split>*{grid-column:1}
+  .split>.board{margin-bottom:8px}
+  .split>.cbody{display:block;grid-column:2;grid-row:1/-1;align-self:stretch;max-height:calc(100vh - 58px - var(--sa-b));max-height:calc(100dvh - 58px - var(--sa-b));overflow:auto;overscroll-behavior:contain}
+  .split .cgo{display:block;position:sticky;bottom:0;padding-bottom:2px;background:var(--panel)}
+}
+/* phones in landscape: compact HUD, the T20 and Scenarios rows stacked in a narrow left column */
+@media (orientation: landscape) and (max-height: 520px){
+  #hud{top:6px;grid-template-columns:minmax(0,224px) 1fr auto 44px;row-gap:5px}
+  .slab{padding:4px 9px 5px}
+  .big{font-size:29px}
+  .mid{font-size:22px}
+  #chips{margin-top:3px}
+  #targetSlab{min-width:96px}
+  #t20Slab .trow,#scenSlab .trow{flex-direction:column;align-items:flex-start;gap:1px;min-height:0}
+  #t20Slab .trow span,#scenSlab .trow span{max-width:100%}
+  .trow.pair span{flex:none;width:100%}
+  #banner{top:12%;left:calc(var(--sa-l) + 244px);right:calc(var(--sa-r) + 176px)}
+  #bMain{font-size:clamp(40px,14vh,68px)}
+  #banner.small #bMain{font-size:clamp(28px,9vh,44px)}
+  #bSub{font-size:14px;padding:0 8px}
+  .card{padding:12px 14px 14px}
+  .board{padding:11px 14px 12px}
+  .board h1{font-size:44px}
+  .board h2{font-size:32px}
+  .board p{font-size:14px}
+  .split>.cbody{max-height:calc(100vh - 50px - var(--sa-b));max-height:calc(100dvh - 50px - var(--sa-b))}
+}

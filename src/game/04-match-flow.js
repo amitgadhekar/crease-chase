@@ -180,6 +180,6 @@ function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.
 function quitToMenu(){rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();buildScenList();showScreen('menu');}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
-  $('#pCard').innerHTML=M.t20?t20Card():'';
+  $('#pCard').innerHTML=M.t20?t20Card():'';$('#pause .card').classList.toggle('split',!!M.t20);
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}
 

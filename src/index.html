@@ -36,11 +36,17 @@
       <div class="trow"><span id="tBowler" class="small"></span><span id="tPace" class="small"></span></div>
       <div id="tBar" aria-hidden="true"><i id="tFill"></i><b id="tTick"></b></div>
     </div>
+    <div class="slab" id="scenSlab" hidden>
+      <div class="trow"><span id="cObj"></span><span id="cCond" class="tchip"></span></div>
+      <div class="trow pair"><span id="cBat0"></span><span id="cBat1"></span></div>
+      <div class="trow"><span id="cBowl" class="small"></span><span id="cPlan" class="small"></span></div>
+    </div>
   </div>
 
   <div id="banner" aria-live="polite"><span id="bMain"></span><span id="bSub"></span></div>
   <div id="hint"></div>
   <button id="loftBtn" aria-pressed="false" hidden>Loft</button>
+  <button id="holdBtn" hidden>Hold</button>
   <div id="rpTag" hidden><b>Replay</b><span>Tap to skip</span></div>
   <button id="rpSkip" hidden>Skip</button>
   <div id="stick" hidden aria-label="Footwork: drag to move your feet, or use the arrow keys"><i></i></div>
@@ -52,9 +58,11 @@
         <p>Bat against an AI bowler that studies your weak spots and moves its fielders to block your favourite shots.</p>
       </div>
       <div class="opt"><span class="lbl">Mode</span>
-        <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="nets">Nets</button></div></div>
-      <div class="opt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
-      <div class="opt"><span class="lbl">Bowler</span>
+        <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="nets">Nets</button><button data-v="scen">Scenarios</button></div></div>
+      <div class="opt" id="scenOpt"><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
+        <span class="lbl">Classics</span><div class="scgrid" id="scenClassics"></div></div>
+      <div class="opt" id="venueOpt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
+      <div class="opt" id="diffOpt"><span class="lbl">Bowler</span>
         <div class="seg" data-key="diff"><button data-v="easy">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button></div></div>
       <div class="opt" id="lenOpt"><span class="lbl">Match length</span>
         <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button><button data-v="3">T20</button></div>
@@ -74,6 +82,7 @@
           <li>Tap without dragging to block. Don't touch the screen to leave the ball.</li>
           <li>Move your feet with the stick at the bottom left (or the arrow keys) until the ball pitches: down the pitch to turn a good-length ball into a half-volley, back to give yourself time against short ones. Miss it out of your crease and you can be stumped; miss it with your pads in front of the stumps and you can be out LBW.</li>
           <li>Early swings go squarer to the leg side, late ones to the off side. Drive full balls, cut and pull short ones.</li>
+          <li>Scenarios: you bat both batters, whoever is on strike, and tail-enders time the ball worse. Tap Hold just after a ground shot to turn down an odd run and keep the strike. Against spin, aim fine on the leg side to sweep a full ball, or fine on the off side to reverse-sweep it. Pull the stick back once a short ball pitches to duck under it.</li>
         </ul>
       </details>
       <p class="foot" id="recordLine"></p>
@@ -86,6 +95,18 @@
       <div class="board"><h2 id="iTitle"></h2><p id="iText"></p></div>
       <button class="primary" id="chaseBtn">Start the chase</button>
       <button class="secondary" id="introBack">Back to menu</button>
+    </div>
+  </section>
+
+  <section id="brief" class="screen" aria-label="Scenario briefing">
+    <div class="card">
+      <div class="board"><p class="kick" id="gKick"></p><h2 id="gTitle"></h2><p id="gText"></p><p class="opp" id="gOpp"></p></div>
+      <div class="gcond" id="gCond"></div>
+      <p class="gobj" id="gObj"></p>
+      <ul class="gstars" id="gStars"></ul>
+      <div class="gpair" id="gPair"></div>
+      <button class="primary" id="gPlay">Play</button>
+      <button class="secondary" id="gBack">Back</button>
     </div>
   </section>
 
@@ -102,8 +123,10 @@
   <section id="end" class="screen" aria-label="Result">
     <div class="card">
       <div class="board"><h2 id="eTitle"></h2><p id="eText"></p></div>
+      <div class="estars" id="eStars" hidden></div>
       <div class="stats" id="eStats"></div>
       <p class="foot" id="eNote"></p>
+      <button class="primary" id="nextBtn" hidden>Next</button>
       <button class="primary" id="againBtn">Play again</button>
       <button class="secondary" id="menuBtn">Back to menu</button>
     </div>

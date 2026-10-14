@@ -7,6 +7,7 @@
    The bat stays the procedural one (batsman3D), so contact targeting is unchanged. If the model can't be loaded the
    procedural batter stays. ---------- */
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {clone as skClone} from 'three/examples/jsm/utils/SkeletonUtils.js';
 const SKN={on:false,root:null,b:[],qL:[],qP:[],par:[],err:null};
 const SKB=['pelvis','spine','chest','neck','head','clavicle_L','upperarm_L','forearm_L','hand_L','clavicle_R','upperarm_R','forearm_R','hand_R',
   'thigh_L','shin_L','foot_L','thigh_R','shin_R','foot_R'];
@@ -29,9 +30,10 @@ function skinInit(gl){
     const la=v.fromArray(x.aim).applyQuaternion(rq).toArray(),lr=u.fromArray(x.ref).applyQuaternion(rq).toArray();
     SKN.b[i]=b;SKN.qL[i]=skBasis(la,lr,new THREE.Quaternion()).invert();SKN.par[i]=SKB.indexOf(b.parent.name);
     SKN.qP[i]=b.parent.getWorldQuaternion(new THREE.Quaternion());});
-  const B=G3.bat;for(const p of ['shoe','thigh','pad','uarm','sleeve','farm','glove'])B[p].forEach(m=>m.visible=false);
-  for(const p of ['pelvis','torso','neck','head','helmet','grille'])B[p].visible=false;
-  B.g.add(root);SKN.root=root;SKN.on=true;
+  for(const B of [G3.bat,G3.ns]){for(const p of ['shoe','thigh','pad','uarm','sleeve','farm','glove'])B[p].forEach(m=>m.visible=false);
+    for(const p of ['pelvis','torso','neck','head','helmet','grille'])B[p].visible=false;}
+  const r2=skClone(root);SKN.b2=SKB.map(n=>r2.getObjectByName(n));G3.ns.g.add(r2);
+  G3.bat.g.add(root);SKN.root=root;SKN.on=true;
 }
 function skinLoad(){
   if(!glOK||typeof MODEL_DATA==='undefined'||!MODEL_DATA.batter)return;
@@ -60,13 +62,13 @@ function skinVecs(J){
 // Each hand bone is turned so the glove's handle lies exactly on the bat axis at its grip point, with the back of the hand
 // as batJoints sets it (GA, GF); the glove's forearm-skinned cuff absorbs the remaining wrist bend.
 const SKP=['hand_L','hand_R','foot_L','foot_R'].map(n=>SKB.indexOf(n));
-function skin3D(J){
+function skin3D(J,BB=SKN.b){
   const [A,R,P]=skinVecs(J),W=SKQ.w;
   for(let i=0;i<SKB.length;i++){
     skBasis(A[i],R[i],W[i]).multiply(SKN.qL[i]);
-    const b=SKN.b[i],p=SKN.par[i];b.quaternion.copy(p<0?SKN.qP[i]:W[p]).invert().multiply(W[i]);}
-  SKN.b[0].position.set(J.hip[0],J.hip[1],J.hip[2]);
-  for(const [i,t,o] of P)SKN.b[i].position.set(t[0]-o[0],t[1]-o[1],t[2]-o[2]).applyQuaternion(SKQ.q.copy(W[SKN.par[i]]).invert());
+    const b=BB[i],p=SKN.par[i];b.quaternion.copy(p<0?SKN.qP[i]:W[p]).invert().multiply(W[i]);}
+  BB[0].position.set(J.hip[0],J.hip[1],J.hip[2]);
+  for(const [i,t,o] of P)BB[i].position.set(t[0]-o[0],t[1]-o[1],t[2]-o[2]).applyQuaternion(SKQ.q.copy(W[SKN.par[i]]).invert());
 }
 skinLoad();
 if(location.hash==='#test')Object.assign(window.__r,{

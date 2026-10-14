@@ -5,7 +5,8 @@ function updateHUD(){
   $('#sRuns').textContent=M.runs+'/'+M.wkts;
   const chips=$('#chips');chips.innerHTML='';
   for(const c of M.overBalls){const e=document.createElement('span');e.className='chip '+(c.cls||'');e.textContent=c.t;chips.appendChild(e);}
-  if(M.mode==='chase'){
+  if(M.sc)scenHUD();
+  else if(M.mode==='chase'){
     $('#sOvers').textContent=oversText(M.balls)+' of '+M.overs+' overs';
     $('#sTargetLbl').textContent='Target';$('#sTarget').textContent=M.target;
     const need=Math.max(0,M.target-M.runs),left=M.overs*6-M.balls;

@@ -20,6 +20,7 @@ function updateCam(dt){
 }
 function update(dt){
   updateCam(dt);updateFx(dt);footUpdate(dt);
+  if(S.hold&&clock>=S.hold.until)holdEnd(false);
   if(S.deferred&&clock>=S.deferred.at){showOutcome(S.deferred.res,S.deferred.b);S.deferred=null;}
   switch(S.phase){
     case 'break':S.t+=dt;if(S.t>=S.breakDur)nextBall();break;

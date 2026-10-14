@@ -151,6 +151,125 @@ if (planets.includes('earth')) {
   await page.waitForTimeout(100);
   if (await page.evaluate(() => localStorage.getItem('cc_t20') === null || document.querySelector('#resumeT20').hidden)) errors.push('T20: save lost on quit (Resume must stay available)');
 }
+if (planets.includes('earth')) {
+  // Scenarios: the list, a briefing, a survive scenario (forced duck under a bouncer, forced swings, then a forced end: result card
+  // with stars), a last pair against spin (forced sweep, a Hold, a strike change, legal Test fields), and a staged scenario
+  // carried into its next session after the interstitial.
+  await page.evaluate(() => { localStorage.removeItem('cc_scen'); localStorage.removeItem('cc_t20'); });
+  await page.reload();
+  await page.click('.seg[data-key=mode] button[data-v=scen]');
+  await page.screenshot({path: `${shots}scen-menu.png`});
+  const skipS = () => { const S = __t.S; if (S.phase === 'ready') S.t = Math.max(S.t, S.readyDur - 0.1); if (S.phase === 'break') S.t = Math.max(S.t, S.breakDur - 0.1);
+    return S.phase === 'flight'; };
+  const settle = async () => { await page.waitForFunction(() => ['ready', 'break', 'replay', 'celebrate', 'idle'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+    if (await page.evaluate(() => __t.S.phase === 'replay')) { await page.waitForTimeout(400); await page.mouse.click(195, 500); }
+    await page.waitForFunction(() => ['ready', 'break', 'celebrate', 'idle'].includes(__t.S.phase), null, {timeout: 30000, polling: 30}); };
+  // in the ready phase: the next ball from the current bowler, re-rolled until it fits (b => bool)
+  const force = (len, line, pred) => page.evaluate(([len, line, pred]) => { const M = __t.getM(), bw = M.attack[M.bi], f = new Function('b', 'return ' + pred);
+    for (let i = 0; i < 300; i++) { const b = makeDelivery({...planBall({}, bw.type, M.diff, {bw, plan: {id: M.pid, mix: TPL[M.pid]}, cond: M.st.cond}), len, line}, M.diff, bw, M.st.cond);
+      if (f(b)) { __t.S.pending = b; return true; } } return false; }, [len, line, pred]);
+  const bat = (aim, opt = {}) => page.evaluate(([aim, o]) => { const S = __t.S, f = footAt(S.ball, S.bpos), def = aim === 'block';
+    S.swing = {tc: f.t + 0.002, aim: def ? 0 : aim, power: o.power || 0.8, lofted: !!o.loft, defend: def, done: false};
+    S.bat = {mode: def ? 'block' : 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim: S.swing.aim}; }, [aim, opt]);
+  const fieldCheck = async where => { const c = await page.evaluate(() => __t.scen()); if (!c.ok || c.viol) errors.push(`Scenario ${c.id} ${where}: field legal ${c.ok}, rule breaches ${c.viol}`); return c; };
+
+  await page.click('#scenSeries .sctile');
+  if (!await page.isVisible('#brief') || (await page.textContent('#gTitle')) !== await page.evaluate(() => scenById('s1a').title)) errors.push('Scenarios: no briefing for the first Test');
+  await page.screenshot({path: `${shots}scen-brief.png`});
+  await page.click('#gPlay');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+  if (!await force('B', 'mid', '(k=>k&&k.y>1.35)(bodyHit(b,BP0))')) errors.push('Scenarios: no bouncer at the body to duck');
+  await page.waitForFunction(`(${skipS})()`, null, {timeout: 30000, polling: 30});
+  await page.waitForFunction(() => __t.S.phase === 'flight' && __t.clk() - __t.S.ball.start >= __t.S.ball.t1 + 0.02, null, {timeout: 30000, polling: 10});
+  await page.evaluate(() => { __t.S.stick = {id: 999, v: [0, 1]}; });
+  await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 30});
+  const dk = await page.evaluate(() => ({duck: !!__t.S.ball.duck, label: __t.S.res.label, sub: __t.S.res.sub}));
+  await page.evaluate(() => { __t.S.stick = null; });
+  if (!dk.duck) errors.push('Scenarios: stick back under a bouncer did not duck: ' + JSON.stringify(dk));
+  console.log(`scen     ok  s1a duck: ${dk.label}${dk.sub ? ', ' + dk.sub : ''}`);
+  await settle();
+  for (const k of [10, 'block']) { await page.waitForFunction(`(${skipS})()`, null, {timeout: 30000, polling: 30}); await bat(k); await settle(); await fieldCheck('s1a'); }
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+  await page.screenshot({path: `${shots}scen-hud-survive.png`});
+  // one ball from the end: the next one meets the objective, then celebration and the result card
+  await page.evaluate(() => { const M = __t.getM(); M.st.balls = M.sc.obj.balls - 1; });
+  await page.waitForFunction(`(${skipS})()`, null, {timeout: 30000, polling: 30}); await bat('block');
+  await page.waitForFunction(() => ['celebrate', 'idle'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+  if (await page.evaluate(() => __t.S.phase === 'celebrate')) { await page.waitForTimeout(800); await page.mouse.click(195, 420); }
+  await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 10000, polling: 50})
+    .catch(async () => errors.push('Scenarios: no result card, phase ' + await page.evaluate(() => __t.S.phase)));
+  const card = await page.evaluate(() => ({t: document.querySelector('#eTitle').textContent, st: document.querySelector('#eStars').hidden ? '' : document.querySelector('#eStars .big3').textContent,
+    rec: JSON.parse(localStorage.getItem('cc_scen') || '{}'), next: !document.querySelector('#nextBtn').hidden}));
+  if (!card.st || !(card.rec.stars && card.rec.stars.s1a >= 1) || !card.next) errors.push('Scenarios: result card ' + JSON.stringify(card));
+  await page.screenshot({path: `${shots}scen-result.png`});
+  console.log(`scen     ok  s1a result card: ${card.t} ${card.st}, saved ${JSON.stringify(card.rec.stars)}`);
+
+  // last pairs: a sweep against two spinners (c4), then a Hold and a strike change against the single-on-offer field (c1). A
+  // wicket ends a last-pair scenario, so it is retried from the result card.
+  const seen = {sweep: '', hold: false, swap: false};
+  const lastPair = async (tile, id, done, n) => {
+    if (await page.isVisible('#end')) await page.click('#menuBtn');
+    await page.click(`#scenClassics .sctile:nth-child(${tile})`);
+    await page.click('#gPlay');
+    await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+    for (let i = 0; i < n && !done(); i++) {
+      await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+      const before = await fieldCheck(id);
+      const sweepNow = !seen.sweep && await page.evaluate(() => { const M = __t.getM(); return M.attack[M.bi].type === 'spin'; });
+      if (sweepNow) await force('F', 'off', 'footAt(b,BP0).full<=0.45');
+      await page.waitForFunction(`(${skipS})()`, null, {timeout: 30000, polling: 30});
+      await bat(sweepNow ? -130 : [25, -40, 0, 60, -70][i % 5], {power: sweepNow ? 0.8 : [0.45, 0.3, 0.6][i % 3]});
+      await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 30});
+      if (sweepNow) {
+        const r = await page.evaluate(() => { const S = __t.S; return {sweep: shotForBall(-130, S.ball, footAt(S.ball, S.bpos).full).name, label: S.res.label}; });
+        if (!/sweep/i.test(r.sweep)) errors.push('Scenarios: forced sweep played ' + JSON.stringify(r));
+        seen.sweep = r.sweep + ': ' + r.label;
+      }
+      // the Hold window is 0.6 s of game time, so the tap goes in the same evaluate that sees it
+      if (await page.evaluate(() => { if (!__t.scen().hold || document.querySelector('#holdBtn').hidden) return false; document.querySelector('#holdBtn').click(); return true; })) {
+        const a = await page.evaluate(() => __t.scen()), exp = a.ob === 0 ? before.ns : before.s;
+        if (a.hold || a.s !== exp || a.runs % 2 !== before.runs % 2) errors.push('Scenarios: Hold did not keep the strike ' + JSON.stringify([before, a]));
+        seen.hold = true;
+      }
+      await settle();
+      if ((await page.evaluate(() => __t.scen())).s !== before.s) seen.swap = true;
+      if (await page.evaluate(() => ['celebrate', 'idle'].includes(__t.S.phase))) {
+        if (await page.evaluate(() => __t.S.phase === 'celebrate')) { await page.waitForTimeout(800); await page.mouse.click(195, 420); }
+        await page.waitForFunction(() => document.querySelector('#end').classList.contains('on'), null, {timeout: 10000, polling: 50});
+        await page.click('#againBtn');
+        await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+      }
+    }
+  };
+  await lastPair(4, 'c4', () => seen.sweep, 6);
+  if (!await page.evaluate(() => __r.skin().on ? __t.scen() && __t.scen().ns3d : true)) errors.push('Scenarios: no non-striker');
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await lastPair(1, 'c1', () => seen.hold && seen.swap, 40);
+  await page.screenshot({path: `${shots}scen-hud-lastpair.png`});
+  if (!seen.sweep || !seen.hold || !seen.swap) errors.push('Scenarios: last pairs saw ' + JSON.stringify(seen));
+  else console.log(`scen     ok  c4 ${seen.sweep}; c1 Hold kept the strike, strike changed`);
+
+  // the staged final day: session one ends level with the par, the interstitial shows, and session two starts from that state
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await page.evaluate(() => localStorage.setItem('cc_scen', JSON.stringify({stars: Object.fromEntries(SCEN.filter(s => s.set === 'series' && !s.stage).map(s => [s.id, 1]))})));
+  await page.reload();
+  await page.click('#scenSeries .screw:nth-child(5) .sctile');
+  await page.click('#gPlay');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  await page.evaluate(() => { const M = __t.getM(); M.st.balls = M.sc.obj.balls - 1; M.st.runs = M.sc.obj.par; });
+  await page.waitForFunction(`(${skipS})()`, null, {timeout: 30000, polling: 30}); await bat('block');
+  await page.waitForFunction(() => document.querySelector('#brief').classList.contains('on'), null, {timeout: 30000, polling: 50})
+    .catch(() => errors.push('Scenarios: no interstitial after the first session'));
+  const lunch = await page.textContent('#gTitle');
+  await page.screenshot({path: `${shots}scen-stage.png`});
+  await page.click('#gPlay');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  const s2 = await page.evaluate(() => { const M = __t.getM(); return {id: M.sc.id, target: M.sc.obj.target, lineup: M.sc.lineup.length}; });
+  if (s2.id !== 's5b' || s2.target > 100 || s2.target < 94) errors.push('Scenarios: next session ' + JSON.stringify(s2));
+  console.log(`scen     ok  s5a -> "${lunch}" -> ${s2.id}, ${s2.target} to win with ${s2.lineup} batters`);
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+}
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }
 console.log(`\nNo page errors. Camera parity within ${camErr.toFixed(4)} px. Screenshots in tests/screenshots/`);

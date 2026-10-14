@@ -1,5 +1,5 @@
 // Balance simulator: plays thousands of balls with a bot batter against the real game logic (src/logic.js).
-// Usage: node tests/balance.mjs [balls]   (default 20000 per row; footwork rows play 5x that)
+// Usage: node tests/balance.mjs [balls]   (default 20000 per row; footwork rows play 5x that; T20_N and SCEN_N scale those sections)
 // Exits with code 1 if a key number drifts outside its expected band, so it can guard balance changes.
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -17,12 +17,12 @@ const FOOTBOTS={
   charges:()=>({x:0,z:1.5}),
   across:()=>({x:0.4,z:0})
 };
-function botBall(b,bp,diff,sigma,loftP,field){
+function botBall(b,bp,diff,sigma,loftP,field,bat){
   const f=footAt(b,bp);let aim;    // bot picks a sensible shot for the ball as it meets it
   if(f.full>0.65)aim=Math.random()<.5?-85:85;else if(f.xc>0.2)aim=40+Math.random()*40;else if(f.xc<-0.05)aim=-40;else aim=(Math.random()-.5)*30;
   aim+=gauss()*12;const lofted=Math.random()<loftP;
   const sw={tc:f.t-0.005+gauss()*sigma,aim,power:lofted?0.85:0.65,lofted,defend:false,bp};
-  const r=evalSwing(b,sw,diff,field);return r.miss?beaten(b,bp,true):r.res;
+  const r=evalSwing(b,sw,diff,field,bat);return r.miss?beaten(b,r.bp||bp,true,bat):r.res;
 }
 function bot(pk,diff,sigma,loftP,n,fb){
   const P=setPlanet(pk),mem={},ft={x:0,z:0},foot=FOOTBOTS[fb||'stationary'],how={};let runs=0,outs=0,balls=0,fours=0,sixes=0;
@@ -77,6 +77,101 @@ function t20Run(pk,diff,loftP,n){
   for(let i=0;i<n;i++)t20Chase(pk,diff,loftP===1?LOFT_ALL:LOFT_STD,A);
   return A;
 }
+// Scenario bots. std: the short-format bot (swings at everything; lofts 30% when surviving, more as the asking rate climbs; in a
+// session of a staged chase the rate is the session's par).
+// farm: std plus strike farming: with a tail-ender at the other end, the set batter keeps the ball on the ground (unless the
+// asking rate is above a run a ball), holds odd runs on balls 1-4 (the tail-ender would face the rest of the over) and takes a
+// single at the end of it; a tail-ender with a set partner blocks (quick singles
+// welcome) unless the last over or the asking rate forces him to swing (along the ground, for a single), and holds a last-ball single.
+// careful: survival play: ducks bouncers at the body, leaves outside off (judged with noise), blocks the rest. slog: always lofts.
+function scenShot(st,b,field,kind){
+  const o=st.sc.obj,bat={tier:st.bat[st.s].tier},left=Math.max(1,o.balls-st.balls),need=o.type==='session'?o.par-st.runs:o.target!=null?o.target-st.runs:0,
+    surv=o.type==='survive',rr=surv?0:need/left,last=st.ob===5,tS=isTail(st,st.s),tN=isTail(st,st.ns),sig=0.045;
+  const block=()=>{const f=footAt(b,null),r=evalSwing(b,{tc:f.t-0.005+gauss()*sig,aim:0,power:0.3,lofted:false,defend:true,bp:null},st.diff,field,bat);return r.miss?beaten(b,null,true,bat):r.res;};
+  if(kind==='careful'){
+    const k=bodyHit(b,null);
+    if(k&&k.y>1.15+gauss()*0.1){b.duck=true;return {res:beaten(b,null,false,bat)};}
+    if(ballPos(b,b.tStumps).x+gauss()*0.06>0.24)return {res:beaten(b,null,false,bat)};
+    return {res:block()};
+  }
+  const farm=kind==='farm'&&tS!==tN,loftP=kind==='slog'?1:farm&&(tS||rr<=1)?0:surv?0.3:clamp(0.1+0.3*rr,0.1,0.8);
+  if(farm&&tS&&(surv||rr<1.2&&left>6)){const r=block();return {res:r,hold:last};}
+  const res=botBall(b,null,st.diff,sig,loftP,field,bat);
+  return {res,hold:farm&&(tS?last:st.ob<4)&&(surv||res.runs<need)};
+}
+// plays one scenario (and, for a staged chase, the sessions after it, carrying the state) to its result
+function scenPlay(sc,kind,A){
+  let cur=sc,st=newTest(sc),e;
+  for(;;){
+    const P=setPlanet(cur.planet);
+    while(!(e=scenEnd(st))){
+      if(st.bi<0)rollWind(P);
+      if(A&&st.bi<0){const o=st.ovs;testOver(st);if(o>0&&st.bi===A.prevB)A.consec++;A.prevB=st.bi;}
+      const {b,field}=testBall(st),{res,hold}=scenShot(st,b,field,kind);
+      testRecord(st,b,res,hold,null);
+    }
+    if(A){A.vb+=st.viol.bouncer;A.vf+=st.viol.field;A.balls+=st.balls;A.newBall+=st.newBall;}
+    const nx=A&&A.chain&&e.result==='draw'&&stageNext(cur,st);
+    if(!nx)break;
+    cur=nx;st=newTest(nx);if(A)A.prevB=-1;
+  }
+  return {e,st};
+}
+function scenRun(sc,kind,n,chain){
+  const A={n,met:0,res:{win:0,draw:0,tie:0,loss:0},stars:0,runs:0,balls:0,vb:0,vf:0,newBall:0,consec:0,prevB:-1,chain};
+  for(let i=0;i<n;i++){A.prevB=-1;const {e,st}=scenPlay(sc,kind,A);A.met+=e.met?1:0;A.res[e.result]++;A.stars+=scenStars(st,e);A.runs+=st.runs;}
+  return A;
+}
+// delivery statistics under Test conditions: one archetype at a given day and ball age
+function condStats(arch,day,age,n){
+  setPlanet('earth');const bw={...ARCH[arch],...TARCH[arch],i:0,arch},C={day,ballAge:age},S={sw:0,rev:0,revN:0,seam:0,turn:0,e:[],n};
+  for(let i=0;i<n;i++){
+    const p=planBall({},bw.type,'medium',{bw,plan:{id:bw.type==='pace'?'SC':'SR',mix:TPL[bw.type==='pace'?'SC':'SR']},cond:C}),b=makeDelivery(p,'medium',bw,C);
+    S.sw+=Math.abs(b.swC);if(b.swR){S.revN++;S.rev+=Math.abs(b.swR);}S.seam+=Math.abs(b.seam);S.turn+=Math.abs(b.turn);S.e.push(b.eK);
+  }
+  const m=S.e.reduce((a,x)=>a+x,0)/n;
+  return {sw:S.sw/n,rev:S.rev/n,revShare:S.revN/n,seam:S.seam/n,turn:S.turn/n,bsd:Math.sqrt(S.e.reduce((a,x)=>a+(x-m)*(x-m),0)/n)};
+}
+// around the wicket (express, good length at the stumps): share pitching outside leg (no LBW) and LBW-eligible pad hits
+function arStats(ar,n){
+  setPlanet('earth');const bw={...ARCH.express,i:0,arch:'express'},C={day:2,ballAge:30};let leg=0,lbw=0;
+  for(let i=0;i<n;i++){const b=makeDelivery({type:'pace',len:'G',line:'mid',ar,fat:0},'medium',bw,C),h=padHit(b,null);if(b.xb<-STUMP_HALF)leg++;if(h&&padResult(b,h,false).out)lbw++;}
+  return {leg:leg/n,lbw:lbw/n};
+}
+// fatigue: mean speed and line spread of an express bowler, fresh or spent
+function fatStats(fat,n){
+  setPlanet('earth');const bw={...ARCH.express,i:0,arch:'express'},C={day:2,ballAge:30};let v=0,x=0,x2=0;
+  for(let i=0;i<n;i++){const b=makeDelivery({type:'pace',len:'G',line:'off',fat},'medium',bw,C);v+=b.kmh;x+=b.xt;x2+=b.xt*b.xt;}
+  return {kmh:v/n,sd:Math.sqrt(x2/n-(x/n)*(x/n))};
+}
+// the captain takes the new ball when it is due at 80 overs
+function newBallCheck(){
+  const sc={...SCEN[0],ballAge:79,obj:{type:'survive',balls:24,wkts:1}},st=newTest(sc);setPlanet(sc.planet);
+  while(!scenEnd(st)){const {b}=testBall(st);testRecord(st,b,{runs:0,label:'Blocked',cls:'dot'},false,null);}
+  return {taken:st.newBall,age:st.cond.ballAge};
+}
+// sweeps against an off-spinner (A tier, day 4): aim null = the standard bot; otherwise every full ball is swept at that aim
+function sweepRow(aim,loft,fid,n){
+  setPlanet('earth');const bw={...ARCH.off,i:0,arch:'off'},C={day:4,ballAge:30},field=tplField(fid),bat={tier:'A'};let runs=0,balls=0,outs=0,lbw=0;
+  for(let i=0;i<n;i++){
+    const b=makeDelivery(planBall({},'spin','medium',{bw,plan:{id:'SR',mix:TPL.SR},cond:C}),'medium',bw,C),f=footAt(b,null);let r;
+    if(aim!=null&&f.full<=SWEEP_FULL){const e=evalSwing(b,{tc:f.t-0.005+gauss()*0.045,aim:aim+gauss()*8,power:0.65,lofted:loft,defend:false,bp:null},'medium',field,bat);r=e.miss?beaten(b,e.bp||null,true,bat):e.res;}
+    else r=botBall(b,null,'medium',0.045,0.3,field,bat);
+    runs+=r.runs;if(!r.wide)balls++;if(r.out){outs++;if(r.outText==='LBW')lbw++;}
+  }
+  return {rpb:runs/balls,bpo:balls/Math.max(1,outs),lbw:lbw/Math.max(1,outs)};
+}
+// Test fields: every template legal, and the captain's adjustments keep them legal on every planet
+function testFieldFuzz(n){
+  let bad=0;const ids=Object.keys(TPL).filter(k=>TPL[k].test);
+  for(const id of ids)for(const pk of PLANET_ORDER){setPlanet(pk);if(!fieldOkTest(tplField(id)))bad++;}
+  for(let k=0;k<n;k++){setPlanet(PLANET_ORDER[k%8]);let f=tplField(ids[k%ids.length]);
+    for(let j=0;j<6;j++){f=adjust(f,Array.from({length:8},()=>Math.random()<.4?Math.random()*20:0),{ok:fieldOkTest,n:1+j%2}).field;if(!fieldOkTest(f))bad++;}}
+  return bad;
+}
+// the band is measured with the play the objective asks for: careful for survive, the standard bot otherwise
+const bandBot=sc=>sc.obj.type==='survive'?'careful':'std';
+globalThis.SCEN=SCEN;globalThis.TPL=TPL;globalThis.TIER=TIER;globalThis.NEW_BALL=NEW_BALL;globalThis.bandBot=bandBot;
 // random attacks, pars and per-over economies: the captain must always find a legal bowler for all 20 overs
 function captainFuzz(n){
   let bad=0;const ds=['easy','medium','hard'];
@@ -183,5 +278,100 @@ console.log(`  restrictions in simulated play: ${bad.field} illegal fields, ${ba
 check('captain fuzz failures', cf, 0, 0); check('field fuzz failures', ff, 0, 0);
 for (const k in bad) check(`T20 ${k} violations`, bad[k], 0, 0);
 console.log(`  T20 section took ${((Date.now() - t0) / 1000).toFixed(1)} s (T20_N=${T20N}; set T20_N to change)`);
+
+// ---------- Tests: conditions, rules, shots and scenarios ----------
+const t1 = Date.now();
+// Short formats and T20 must not change when Test code is added: the same seeded rows hash the same as before the Test code.
+// Update FP only when short-format or T20 balance is changed on purpose.
+const FP = 'e249b80';
+{
+  const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const SM = Object.create(Math); SM.random = mulberry(20261014);
+  const c = {console, Math: SM}; vm.createContext(c); vm.runInContext(logic + harness, c);
+  const out = [];
+  for (const d of ['easy', 'medium', 'hard']) out.push(c.bot('earth', d, 0.045, 0.3, 4000));
+  out.push(c.bot('earth', 'medium', 0.045, 0.3, 4000, 'reads'), c.bot('mars', 'medium', 0.045, 0.3, 3000));
+  for (const [pk, d, l, n] of [['earth', 'medium', 0.3, 12], ['venus', 'hard', 1, 6]]) { const t = c.t20Run(pk, d, l, n); out.push({r: t.runs, w: t.wk, b: t.balls, tg: t.tg, win: t.win}); }
+  const js = JSON.stringify(out, (k, v) => typeof v === 'number' ? +v.toFixed(9) : v);
+  let h = 0x811c9dc5; for (let i = 0; i < js.length; i++) { h ^= js.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const fp = (h >>> 0).toString(16);
+  console.log(`\nShort formats and T20 unchanged by Test code: seeded fingerprint ${fp} (expected ${FP})`);
+  if (fp !== FP) { failures++; console.log('  !! short-format or T20 numbers changed'); }
+}
+
+const f3 = v => v.toFixed(3);
+console.log('\nTest conditions (Earth, medium, 20000 deliveries each):');
+const ages = [0, 10, 20, 30, 40, 60, 79].map(a => ({a, s: ctx.condStats('swing', 2, a, 20000), x: ctx.condStats('express', 2, a, 20000)}));
+console.log('  ball age   ' + ages.map(r => String(r.a).padStart(6)).join(''));
+console.log('  swing |m|  ' + ages.map(r => f3(r.s.sw).padStart(6)).join('') + '   (swing bowler, conventional)');
+console.log('  reverse    ' + ages.map(r => f3(r.x.rev).padStart(6)).join('') + '   (express, mean over all balls)');
+console.log('  rev share  ' + ages.map(r => r.x.revShare.toFixed(2).padStart(6)).join(''));
+console.log('  seam |m|   ' + ages.map(r => f3(r.s.seam).padStart(6)).join(''));
+for (let i = 1; i < 4; i++) check(`swing falls with ball age (${ages[i].a} vs ${ages[i - 1].a} overs)`, ages[i - 1].s.sw - ages[i].s.sw, 1e-3, 9);
+check('swing at 30 overs vs new ball', ages[3].s.sw / ages[0].s.sw, 0, 0.3);
+check('no reverse swing before 35 overs', ages[3].x.revShare, 0, 0);
+check('reverse swing at 60 overs (m)', ages[5].x.rev, 0.04, 1);
+check('reverse grows from 40 to 60 overs', ages[5].x.rev - ages[4].x.rev, 1e-3, 9);
+const days = [1, 2, 3, 4, 5].map(d => ({d, o: ctx.condStats('off', d, 30, 20000), l: ctx.condStats('leg', d, 30, 20000), p: ctx.condStats('swing', d, 30, 20000)}));
+console.log('  day        ' + days.map(r => String(r.d).padStart(6)).join(''));
+console.log('  turn |m|   ' + days.map(r => f3(r.o.turn).padStart(6)).join('') + '   (off-spin)');
+console.log('  turn |m|   ' + days.map(r => f3(r.l.turn).padStart(6)).join('') + '   (leg-spin)');
+console.log('  bounce sd  ' + days.map(r => f3(r.o.bsd).padStart(6)).join('') + '   (spin, x bounce)');
+console.log('  bounce sd  ' + days.map(r => f3(r.p.bsd).padStart(6)).join('') + '   (pace)');
+const ar = [false, true].map(a => ctx.arStats(a, 20000)), fs = [0, 1].map(f => ctx.fatStats(f, 20000)), nb = ctx.newBallCheck();
+console.log(`  around the wicket: pitched outside leg ${(ar[1].leg * 100).toFixed(0)}% (over ${(ar[0].leg * 100).toFixed(0)}%), LBW if padded ${(ar[1].lbw * 100).toFixed(1)}% (over ${(ar[0].lbw * 100).toFixed(1)}%)`);
+console.log(`  fatigue (express): ${fs[0].kmh.toFixed(0)} km/h, line sd ${f3(fs[0].sd)} fresh; ${fs[1].kmh.toFixed(0)} km/h, line sd ${f3(fs[1].sd)} spent`);
+console.log(`  new ball: due at ${ctx.NEW_BALL} overs, taken ${nb.taken}x in a scenario starting at 79 (ball age now ${nb.age})`);
+check('around the wicket pitches outside leg more often', ar[1].leg - ar[0].leg, 0.05, 1);
+check('fatigue costs pace (km/h)', fs[0].kmh - fs[1].kmh, 1, 20);
+check('fatigue costs accuracy (line sd)', fs[1].sd - fs[0].sd, 0.005, 1);
+check('new ball taken at 80 overs', nb.taken, 1, 1);
+for (let i = 1; i < 5; i++) {
+  check(`turn rises with the day (day ${i + 1} vs ${i})`, days[i].o.turn - days[i - 1].o.turn, 1e-3, 9);
+  check(`bounce variance rises with the day (day ${i + 1} vs ${i})`, days[i].o.bsd - days[i - 1].o.bsd, 1e-3, 9);
+}
+
+const SN = +process.env.SCEN_N || 300, pc = (A) => (A.met / A.n * 100);
+const ff2 = ctx.testFieldFuzz(3000);
+console.log(`\nTest fields: ${Object.keys(ctx.TPL).filter(k => ctx.TPL[k].test).length} templates on 8 planets plus 18000 captain adjustments, ${ff2} breaking Law 28.4 (max 2 behind square on the leg side)`);
+check('Test field legality failures', ff2, 0, 0);
+
+const sw = {std: ctx.sweepRow(null, false, 'SR', 30000), sweep: ctx.sweepRow(-130, false, 'SR', 30000), stdDF: ctx.sweepRow(null, false, 'DF', 30000),
+  slog: ctx.sweepRow(-130, true, 'DF', 30000), rev: ctx.sweepRow(135, false, 'DF', 30000)};
+const swf = r => `${r.rpb.toFixed(2)} rpb ${r.bpo.toFixed(1).padStart(5)} balls/out  LBW ${(r.lbw * 100).toFixed(0)}% of outs`;
+console.log('\nSweeps vs off-spin, day 4 (A tier; every full ball swept):');
+console.log(`  standard bot, spin-attack field    ${swf(sw.std)}`);
+console.log(`  sweep fine, spin-attack field      ${swf(sw.sweep)}   (no fine leg: sweeping pays)`);
+console.log(`  standard bot, defensive field      ${swf(sw.stdDF)}`);
+console.log(`  slog-sweep, defensive field        ${swf(sw.slog)}   (deep fine leg and square leg wait for it)`);
+console.log(`  reverse sweep, defensive field     ${swf(sw.rev)}`);
+check('sweep beats the standard bot into an open fine leg (rpb)', sw.sweep.rpb - sw.std.rpb, 0.01, 9);
+check('slog-sweep into a deep leg-side field is out sooner than the standard bot (balls/out)', sw.stdDF.bpo - sw.slog.bpo, 0.01, 99);
+check('missed sweeps bring LBW (share of outs vs the standard bot)', sw.sweep.lbw - sw.std.lbw, 0.02, 1);
+
+console.log(`\nScenarios, ${SN} plays per bot (SCEN_N to change); met % for the standard, farming, careful and slogging bots:`);
+console.log('  id   objective  band     std  farm  care  slog   ref  stars  balls');
+const sBad = {bouncer: 0, field: 0, consec: 0};
+for (const sc of ctx.SCEN) {
+  const o = sc.obj, ids = ctx.SCEN.filter(x => x.id === sc.id).length;
+  const ok = ids === 1 && o.wkts >= 1 && o.wkts <= sc.lineup.length - 1 && sc.attack.length >= 2 && sc.striker !== sc.nonStriker &&
+    Math.max(sc.striker, sc.nonStriker) < sc.lineup.length && sc.stars.length === 3 && sc.band && (!sc.stage || sc.stage.n === 1 || ctx.SCEN.some(x => x.stage && x.stage.g === sc.stage.g && x.stage.n === sc.stage.n - 1));
+  if (!ok) { failures++; console.log(`  !! ${sc.id}: malformed scenario data`); continue; }
+  const R = {}; for (const k of ['std', 'farm', 'careful', 'slog']) { R[k] = ctx.scenRun(sc, k, SN); sBad.bouncer += R[k].vb; sBad.field += R[k].vf; sBad.consec += R[k].consec; }
+  const ref = ctx.bandBot(sc), v = pc(R[ref]);
+  console.log(`  ${sc.id.padEnd(4)} ${o.type.padEnd(9)}  ${('[' + sc.band + ']').padEnd(8)}${[R.std, R.farm, R.careful, R.slog].map(A => pc(A).toFixed(0).padStart(5)).join(' ')}  ${ref.padStart(4)}  ${(R[ref].stars / SN).toFixed(2)}  ${(R.std.balls / SN).toFixed(0).padStart(5)}`);
+  check(`${sc.id} ${ref} win rate (%)`, v, ...sc.band);
+  const tS = ctx.TIER[sc.lineup[sc.striker].tier].tail, tN = ctx.TIER[sc.lineup[sc.nonStriker].tier].tail;
+  if (o.wkts === 1 && tS !== tN) {
+    const s3 = ctx.scenRun(sc, 'std', 3 * SN), f3r = ctx.scenRun(sc, 'farm', 3 * SN);
+    console.log(`       last pair, ${3 * SN} plays: farming ${pc(f3r).toFixed(1)}% vs standard ${pc(s3).toFixed(1)}%`);
+    check(`${sc.id} farming minus standard (last pair, %)`, pc(f3r) - pc(s3), 0.01, 100);
+  }
+  if (o.type === 'survive') check(`${sc.id} careful minus slogging (survive, %)`, pc(R.careful) - pc(R.slog), 0.01, 100);
+  if (sc.stage && sc.stage.n === 1) { const C = ctx.scenRun(sc, 'std', SN, true); sBad.bouncer += C.vb; sBad.field += C.vf; console.log(`       all ${sc.stage.of} sessions in a row (state carried): standard bot ${pc(C).toFixed(0)}%`); }
+}
+console.log(`  rules in simulated play: ${sBad.bouncer} overs with a third bouncer, ${sBad.field} illegal Test fields, ${sBad.consec} consecutive overs by one bowler`);
+check('bouncer limit breaches', sBad.bouncer, 0, 0); check('Test leg-side field breaches', sBad.field, 0, 0); check('consecutive overs', sBad.consec, 0, 0);
+console.log(`  Test section took ${((Date.now() - t1) / 1000).toFixed(1)} s`);
 console.log(failures ? `\n${failures} balance check(s) failed.` : '\nAll balance checks passed.');
 process.exit(failures ? 1 : 0);

@@ -96,9 +96,23 @@ const SHOTS=[
   {lo:118, hi:181, name:'Late cut',loft:'Ramp',full:.55,line:.42}
 ];
 const shotFor=a=>SHOTS.find(s=>a>=s.lo&&a<s.hi)||SHOTS[3];
+// Tests only, against spin pitched up (met length <= SWEEP_FULL): the slingshot aim picks a sweep instead of the glance/late cut.
+// kf/kl: length/line tolerance (sweeps forgive line, not length); tw: timing window x (cross-bat); risk raises the mishit
+// threshold; te: mishits balloon (top edge, glove)
+const SWEEP_FULL=0.6;
+const SWEEPS=[
+  {lo:-165,hi:-100,name:'Sweep',loft:'Slog-sweep',full:.3,line:.05,kf:2.2,kl:.8,tw:.85,risk:.12,te:1,sweep:1},
+  {lo:110, hi:165, name:'Reverse sweep',loft:'Lofted reverse sweep',full:.32,line:.3,kf:2.4,kl:1,tw:.75,risk:.2,te:1,sweep:1}
+];
+function shotForBall(a,b,full){if(b.type==='spin'&&full<=SWEEP_FULL){const s=SWEEPS.find(s=>a>=s.lo&&a<s.hi);if(s)return s;}return shotFor(a);}
+// the lunge of a sweep: front pad further down the pitch and across, so a missed sweep is often LBW
+const sweepBp=bp=>({x:(bp?bp.x:0)+0.12,z:(bp?bp.z:0)+0.35});
+// batting tiers (Tests): timing window x, power x, edge/mishit x, xe = chance a shot timed short of perfect finds the edge anyway
+const TIER={A:{n:'Top order',win:1,pow:1,edge:1,xe:0},B:{n:'Batter',win:.88,pow:.95,edge:1.3,xe:.03},C:{n:'All-rounder',win:.72,pow:.85,edge:1.8,xe:.07},
+  D:{n:'Tail',win:.55,pow:.72,edge:2.6,xe:.14,tail:1},E:{n:'Number eleven',win:.4,pow:.6,edge:3.5,xe:.22,tail:1}};
 function shotFit(shot,full,xc){
-  const lf=clamp(1-Math.abs(full-shot.full)*1.5,0.15,1);
-  const nf=clamp(1-Math.abs(xc-shot.line)*1.4,0.15,1);
+  const lf=clamp(1-Math.abs(full-shot.full)*(shot.kf||1.5),0.15,1);
+  const nf=clamp(1-Math.abs(xc-shot.line)*(shot.kl||1.4),0.15,1);
   return lf*0.55+nf*0.45;
 }
 
@@ -114,26 +128,62 @@ function ballPos(b,t){
   if(y<0){const u1=2*b.vyB/G,v2=b.vyB*0.4,w=u-u1;y=Math.max(0,v2*w-0.5*G*w*w);}
   return {x:b.xb+(b.xt-b.xb)*(b.zb-z)/b.zb,y,z};
 }
-function makeDelivery(plan,diffKey,sd){
-  const d=DIFF[diffKey], pace=plan.type==='pace', bw=typeof sd==='object'?sd:null;
+function makeDelivery(plan,diffKey,sd,cond){
+  const d=DIFF[diffKey], pace=plan.type==='pace', bw=typeof sd==='object'?sd:null, fat=cond&&plan.fat||0;
   let v=(bw?(pace?rnd(d.pace[0]*bw.pace[0],d.pace[1]*bw.pace[1]):rnd(...bw.v)*d.spd*(plan.flat?1.08:1)):pace?rnd(d.pace[0],d.pace[1]):rnd(21.5,25))*ENV.pace;
   if(plan.slower)v*=rnd(0.74,0.8);
-  const zr=pace?19.0:19.3, yr=pace?2.15:1.95, xr=pace?0.3:0.22;
-  const zb=rnd(...LENS[plan.len]);
-  let xt=rnd(...LINES[plan.line]);
-  if(bw)xt+=gauss()*0.14*(1-bw.acc*d.acc);
-  if(Math.random()<d.wide*(bw?bw.wide:1))xt=(Math.random()<0.7?1:-1)*rnd(1.0,1.2);
-  const dev=clamp(pace?(bw?(bw.swDir*0.5+gauss())*bw.sw*(plan.sw||1):gauss())*d.swing*ENV.swing:(bw?(plan.dir||bw.dir)*rnd(...bw.turn)*d.turn:sd*rnd(0.18,0.42))*ENV.spin,-0.65,0.65);
-  const x0=xt-dev, xb=xr+(x0-xr)*(zr-zb)/zr;
+  if(cond)v*=(1-0.07*fat)*(SPINV[plan.var]||1);
+  const zr=pace?19.0:19.3, yr=pace?2.15:1.95, xr=(pace?0.3:0.22)*(cond&&plan.ar?-1.8:1), rough=cond&&plan.line==='rough';
+  let zb=rnd(...LENS[plan.len]);
+  if(fat)zb=clamp(zb+gauss()*0.6*fat,1.1,11);
+  let xt=rough?0:rnd(...LINES[plan.line]);
+  if(bw)xt+=gauss()*0.14*(1-bw.acc*d.acc*(1-0.4*fat));
+  if(Math.random()<d.wide*(bw?bw.wide:1)*(1+fat))xt=(Math.random()<0.7?1:-1)*rnd(1.0,1.2);
+  const T=cond?testDev(plan,d,bw,pace,v,cond,sd):null;
+  let dev=T?T.dev:clamp(pace?(bw?(bw.swDir*0.5+gauss())*bw.sw*(plan.sw||1):gauss())*d.swing*ENV.swing:(bw?(plan.dir||bw.dir)*rnd(...bw.turn)*d.turn:sd*rnd(0.18,0.42))*ENV.spin,-0.65,0.65);
+  let x0=xt-dev, xb=xr+(x0-xr)*(zr-zb)/zr, eK=1;
+  if(T){
+    // footmarks outside both stumps from day 3: a spinner who lands in them gets more turn and less even bounce
+    const px=Math.abs(rough?T.rx:xb),inR=cond.day>=3&&zb>3&&zb<7.5&&px>0.22&&px<0.62,rk=inR?0.25*(cond.day-2):0;
+    if(rough)xb=T.rx;
+    if(!pace&&rk)dev=clamp(dev+T.turn*rk,-0.8,0.8);
+    if(rough){x0=xr+(xb-xr)*zr/(zr-zb);xt=x0+dev;}else{x0=xt-dev;xb=xr+(x0-xr)*(zr-zb)/zr;}
+    eK=clamp(1+gauss()*BOUNCE_VAR[cond.day-1]*(inR?1.6:1),0.6,1.45)*(plan.var==='top'?1.15:plan.var==='arm'?0.92:1);
+    T.rough=inR;
+  }
   const t1=(zr-zb)/v, vy0=(0.5*G*t1*t1-yr)/t1, vImpact=vy0-G*t1;
   const full=clamp((zb-1)/10,0,1);
-  const e=(pace?0.55+0.15*full:0.48+0.1*full)*ENV.bounce;
+  const e=(pace?0.55+0.15*full:0.48+0.1*full)*ENV.bounce*eK;
   const b={...plan,v,kmh:Math.round(v*3.6),zr,yr,xr,zb,xb,xt,dev,vz1:v,t1,vy0,vyB:-vImpact*e,vz2:v*(pace?0.88:0.8),full};
   b.tIdeal=tAt(b,CONTACT_Z); b.tStumps=tAt(b,0); b.tEnd=tAt(b,-2.2);
   const ps=ballPos(b,b.tStumps);
   b.onStumps=Math.abs(ps.x)<STUMP_HALF&&ps.y<STUMP_H;
   b.wide=Math.abs(xt)>0.92;
+  if(T){b.swC=T.swC;b.swR=T.swR;b.seam=T.seam;b.turn=T.turn;b.rough=T.rough;b.eK=eK;b.bouncer=ballPos(b,tAt(b,POPPING)).y>SHOULDER;}
   return b;
+}
+/* ---------- Test conditions: cond = {day 1-5, ballAge overs since the new ball, planet} ---------- */
+const SHOULDER=1.45, NEW_BALL=80;
+const DAY_TURN=[.75,.9,1.05,1.25,1.45], BOUNCE_VAR=[.03,.045,.07,.1,.14], DAY_SEAM=[1,.8,.6,.5,.45];
+const SPINV={arm:1.07,carrom:1.05,top:.97};
+// swing fades over ~25 overs of ball age; reverse builds from ~35 overs and needs pace (opposite way to the seam's conventional
+// swing); seam movement off the pitch is greenest on day 1 and with a hard new ball; turn grows with the day
+function testDev(plan,d,bw,pace,v,cond,sd){
+  const a=cond.ballAge,r={swC:0,swR:0,seam:0,turn:0,dev:0,rx:0};
+  if(pace){
+    const s0=bw?bw.swDir*0.5+gauss():gauss(),k=(bw?bw.sw*(plan.sw||1):1)*d.swing*ENV.swing,
+      conv=lerp(1.35,0.15,clamp(a/25,0,1)),rev=clamp((a-35)/20,0,1)*clamp((v-30.5)/6,0,1);
+    r.swC=s0*conv*k;r.swR=rev?-Math.sign(s0)*rev*rnd(0.6,1.2)*k:0;
+    r.seam=gauss()*0.07*DAY_SEAM[cond.day-1]*(1-0.5*clamp(a/40,0,1))*(bw&&TARCH[bw.arch]?TARCH[bw.arch].seam:1);
+    r.dev=clamp(r.swC+r.swR+r.seam,-0.75,0.75);
+  }else{
+    const sd0=bw?bw.dir:sd,dir=plan.dir===0||plan.dir===1||plan.dir===-1?plan.dir:sd0,
+      t=(bw?rnd(...bw.turn)*d.turn:rnd(0.18,0.42))*DAY_TURN[cond.day-1]*ENV.spin;
+    r.turn=plan.var==='arm'?-sd0*rnd(0.02,0.08):plan.var==='top'?sd0*rnd(0,0.05):dir*t*(plan.var==='carrom'?0.6:plan.var==='doosra'?0.85:1);
+    r.dev=clamp(r.turn,-0.75,0.75);
+    if(plan.line==='rough')r.rx=sd0>0?rnd(-0.55,-0.26):rnd(0.26,0.58);
+  }
+  return r;
 }
 
 /* ---------- footwork: bp = batter offset from guard in metres (+z down the pitch, +x across to off) ---------- */
@@ -171,8 +221,20 @@ function stumpedResult(b,bp){
   if(!outOfCrease(b,bp)||Math.random()>=(b.type==='spin'?0.88:0.3))return null;
   return {runs:b.wide?1:0,wide:!!b.wide,out:true,outText:'Stumped',label:'Stumped!',sub:b.type==='spin'?'Down the pitch and beaten':'Out of the crease, keeper threw it in',cls:'out',stumped:true};
 }
-function beaten(b,bp,offered){
+// a short ball reaching the batter at body or head height, inside his body line
+function bodyHit(b,bp){
+  bp=bp||BP0;const z=BATS_Z+0.3+bp.z,t=tAt(b,z),p=ballPos(b,t),x=p.x-bp.x;
+  return p.y>0.95&&p.y<2&&x>-0.62&&x<-0.05?{t,x:p.x,y:p.y,z,head:p.y>1.5}:null;
+}
+// bat (Tests): a ball at the body that was not ducked (b.duck) or played hits the batter (no run, no injury); a duck under a ball
+// that keeps low is hit on the helmet
+function beaten(b,bp,offered,bat){
   const h=padHit(b,bp);if(h)return padResult(b,h,offered);
+  if(bat){
+    const k=bodyHit(b,bp);
+    if(k&&!(b.duck&&k.y>1.15))return {runs:0,label:k.head?'Hit on the helmet':'Hit on the body',sub:b.duck?'Ducked into it':offered?'Beaten by the bounce':'Could not get out of the way',cls:'dot',body:k};
+    if(b.duck&&!b.onStumps)return b.wide?{runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'}:{runs:0,label:'Ducked',sub:'Under the bouncer',cls:'dot'};
+  }
   if(b.onStumps)return {runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:offered?'Missed it':'Left it, and it hit the stumps',cls:'out',stumps:true};
   return stumpedResult(b,bp)||(b.wide?{runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'}:{runs:0,label:offered?'Beaten':'Left alone',cls:'dot'});
 }
@@ -226,7 +288,9 @@ const POS={slip:[150,17,'slip'],gully:[125,14,'gully'],third:[140,20,'short thir
  cover:[52,26,'cover'],midoff:[16,26,'mid-off'],midon:[-16,26,'mid-on'],midwk:[-55,26,'midwicket'],sqleg:[-96,24,'square leg'],
  shortleg:[-75,4,'short leg'],sfine:[-140,14,'short fine leg'],longoff:[12,'deep','long-off'],longon:[-12,'deep','long-on'],
  dcover:[50,'deep','deep cover'],dpoint:[95,'deep','deep point'],tman:[150,'deep','third man'],dmid:[-50,'deep','deep midwicket'],
- dsq:[-90,'deep','deep square leg'],fine:[-150,'deep','fine leg']};
+ dsq:[-90,'deep','deep square leg'],fine:[-150,'deep','fine leg'],
+ slip2:[143,17,'second slip',1],slip3:[136,17,'third slip',1],slip4:[129,17,'fourth slip',1],lslip:[-150,17,'leg slip',1],
+ fshort:[-60,4.5,'short leg',1],dbsq:[-125,'deep','deep backward square',1]};
 // each template pairs a field with a delivery mix: len/line base weights, sw swing x, slow slower-ball x, wrong googly x, flat quicker spin
 const TPL={
  PA:{name:'Attacking pace field',f:'slip gully point cover midoff midon midwk tman fine',atk:1,len:{Y:.5,F:1.4,G:1.6,S:.5,B:.3},line:{wide:.3,off:2,mid:1,leg:.3},sw:1.3},
@@ -241,7 +305,16 @@ const TPL={
  OC:{name:'Off-spin containing field',f:'cover midoff third midon longon dmid dsq longoff dcover',len:{Y:.4,F:1.5,G:1.5,S:.4},line:{wide:.2,off:.8,mid:2,leg:.8}},
  LA:{name:'Attacking wrist-spin field',f:'slip silly point cover midoff midon midwk dmid longoff',atk:1,len:{Y:.2,F:1,G:2,S:.4},line:{wide:.3,off:1.5,mid:1.5,leg:.3},wrong:2},
  LC:{name:'Spin containing field',f:'point cover midoff midwk dcover longoff longon dmid dpoint',len:{Y:.3,F:1.5,G:1.3,S:.5},line:{wide:.7,off:2,mid:.7,leg:.2}},
- CH:{name:'Field for the charge',f:'midon third cover point dcover dpoint longoff longon dmid',len:{Y:.5,F:.4,G:1,S:1.8,B:.8},line:{wide:2,off:1.5,mid:.4,leg:.3},flat:1}
+ CH:{name:'Field for the charge',f:'midon third cover point dcover dpoint longoff longon dmid',len:{Y:.5,F:.4,G:1,S:1.8,B:.8},line:{wide:2,off:1.5,mid:.4,leg:.3},flat:1},
+ // Tests (test:1): ar = around-the-wicket share, rough = line into the footmarks (day 4-5)
+ SC:{test:1,name:'Slip cordon',f:'slip slip2 slip3 gully point cover midoff midon fine',atk:1,len:{Y:.4,F:1.5,G:1.8,S:.5,B:.3},line:{wide:.4,off:2.2,mid:.8,leg:.15},sw:1.3},
+ UM:{test:1,name:'Umbrella field',f:'slip slip2 slip3 slip4 gully silly fshort midon fine',atk:1,len:{Y:1.6,F:1.2,G:1,S:.5,B:1},line:{wide:.1,off:1.2,mid:2,leg:.6}},
+ LT:{test:1,name:'Leg trap',f:'lslip fshort dbsq midwk dmid midon slip gully cover',atk:1,len:{Y:.5,F:.3,G:.5,S:1.8,B:2.2},line:{wide:.05,off:.3,mid:1,leg:2},ar:.6},
+ TF:{test:1,name:'Single on offer',f:'slip dpoint dcover longoff longon dmid dsq fine tman',len:{Y:.8,F:1.1,G:1.5,S:.6,B:.4},line:{wide:.5,off:1.6,mid:1,leg:.3}},
+ SV:{test:1,name:'Saving the single',f:'slip gully point cover midoff midon midwk sqleg fine',len:{Y:1,F:1,G:1.5,S:.5,B:.4},line:{wide:.3,off:1.4,mid:1.4,leg:.3}},
+ SR:{test:1,name:'Spin into the rough',f:'slip fshort silly cover midoff midon midwk dmid longon',atk:1,len:{Y:.2,F:1.2,G:2,S:.3},line:{wide:.1,off:1,mid:1,leg:.3,rough:2.5},ar:.25},
+ DF:{test:1,name:'Defensive field',f:'point cover midoff midon midwk sqleg dcover dmid fine',len:{Y:.5,F:.9,G:1.8,S:.8,B:.3},line:{wide:.5,off:1.8,mid:.9,leg:.4}},
+ RV:{test:1,name:'Reverse-swing field',f:'slip point cover midoff midon midwk sqleg fine longon',atk:1,len:{Y:1.6,F:1.3,G:1.2,S:.5,B:.4},line:{wide:.1,off:.8,mid:2,leg:.6}}
 };
 for(const k in TPL)TPL[k].f=TPL[k].f.split(' ');
 // boundary riders (T20 templates): 0.9 x boundary; c widens their catching reach (they are set to take the catch, not save the single)
@@ -264,14 +337,16 @@ function fieldOk(field,pp){
   }
   return out<=(pp?2:5)&&leg<=5&&fine<=2;
 }
+// Law 28.4 (Tests): at most 2 fielders, keeper excluded, behind the popping crease on the on side; no circle, no powerplay
+function fieldOkTest(field){let n=0;for(const f of field)if(f.n!=='keeper'&&f.n!=='bowler'&&f.x<0&&f.z<POPPING)n++;return n<=2;}
 const zoneOf=a=>clamp(Math.floor((normAng(a)+180)/45),0,7);
 // scoring zones: runs per 45-degree sector, decaying per ball (half-life ~14 balls)
 function zoneAdd(Z,dir,runs){for(let i=0;i<8;i++)Z[i]*=0.95;if(runs>0&&dir!=null)Z[zoneOf(dir)]+=runs;return Z;}
-const CLOSE=['slip','gully','silly','shortleg'];
+const CLOSE=['slip','slip2','slip3','slip4','lslip','gully','silly','shortleg','fshort'];
 // at most ctx.n (default 2) fielders go deep into the hottest uncovered sectors: an inner fielder if the quota allows, else a
 // deep fielder from a cold sector; every change must still pass fieldOk
 function adjust(field,Z,ctx){
-  const f=field.slice(),moved=[],deep=BOUNDARY*0.6,max=ctx.n==null?2:ctx.n,D=BOUNDARY*RIDER;
+  const f=field.slice(),moved=[],deep=BOUNDARY*0.6,max=ctx.n==null?2:ctx.n,D=BOUNDARY*RIDER,ok=ctx.ok||(g=>fieldOk(g,ctx.pp));
   const hot=[0,1,2,3,4,5,6,7].filter(i=>Z[i]>=4).sort((x,y)=>Z[y]-Z[x]);
   for(const s of hot){
     if(moved.length>=max)break;
@@ -280,10 +355,10 @@ function adjust(field,Z,ctx){
     const idx=f.map((p,j)=>j).filter(j=>f[j].a!=null),
       inner=idx.filter(j=>f[j].d<=deep&&!CLOSE.includes(f[j].n)).sort((x,y)=>Math.abs(angDiff(f[x].a,ang))-Math.abs(angDiff(f[y].a,ang))),
       cold=idx.filter(j=>f[j].d>deep&&Z[zoneOf(f[j].a)]<Z[s]*0.5).sort((x,y)=>Z[zoneOf(f[x].a)]-Z[zoneOf(f[y].a)]);
-    let nk='',bd=1e9;for(const k in POS)if(POS[k][1]==='deep'&&Math.abs(angDiff(POS[k][0],ang))<bd){bd=Math.abs(angDiff(POS[k][0],ang));nk=k;}
+    let nk='',bd=1e9;for(const k in POS)if(POS[k][1]==='deep'&&!POS[k][3]&&Math.abs(angDiff(POS[k][0],ang))<bd){bd=Math.abs(angDiff(POS[k][0],ang));nk=k;}
     for(const j of [...inner,...cold]){
       const old=f[j];f[j]=spot(nk,ang,D,RIDER_C);
-      if(fieldOk(f,ctx.pp)){moved.push({from:old.n,to:nk});break;}
+      if(ok(f)){moved.push({from:old.n,to:nk});break;}
       f[j]=old;
     }
   }
@@ -379,15 +454,164 @@ function t20Record(st,bi,res){
   f.b=0;f.o++;st.last=bi;return true;
 }
 
+/* ---------- Tests: attack, spells, captain, plans, strike rotation, objectives ---------- */
+// per archetype in Tests: seam movement x, tire = fatigue per over in a spell, var = spin variation shares per ball
+const TARCH={express:{seam:.8,tire:.15},swing:{seam:1.3,tire:.11},cutter:{seam:1.2,tire:.09},death:{seam:.9,tire:.12},
+ off:{tire:.04,var:{doosra:.07,carrom:.05,arm:.1}},leg:{tire:.05,var:{top:.12}},sla:{tire:.04,var:{arm:.12}}};
+const SPELL={pace:6,spin:12};
+const hashStr=s=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;};
+const seeded=a=>()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+// names are fixed per team and archetype (sc.team, else the scenario), so a series rival keeps the same bowlers in every Test
+function testAttack(sc){
+  const team=sc.team||sc.id,N=(NAMES[sc.team?'earth':sc.planet]||NAMES.earth).map(s=>s.split(' ')),seen={},names=new Set();
+  return sc.attack.map((a,i)=>{
+    const rng=seeded(hashStr(team+a.arch+(seen[a.arch]=(seen[a.arch]||0)+1))),one=x=>x[Math.floor(rng()*x.length)];let sn;
+    do sn=one(N[0])+one(N[1]);while(names.has(sn));names.add(sn);
+    return {...ARCH[a.arch],i,arch:a.arch,name:'ABCDEFGHJKLMNPRSTVWZ'[Math.floor(rng()*20)]+'. '+sn};
+  });
+}
+// bowlers given oversLeft are on at the start (first two take the ends); fatigue 0..1 cuts pace and accuracy
+function newTest(sc){
+  const A=testAttack(sc),on=sc.attack.map((a,i)=>a.oversLeft!=null?i:-1).filter(i=>i>=0);
+  return {sc,A,diff:sc.diff,cond:{day:sc.day,ballAge:sc.ballAge,planet:sc.planet},runs:0,balls:0,wkts:0,ovs:0,ob:0,ovB:0,bi:-1,
+    ends:[on.length?on[0]:-1,on.length>1?on[1]:-1],pid:null,fc:{},
+    bat:sc.lineup.map(p=>({name:p.name,tier:p.tier,runs:p.runs||0,balls:p.balls||0,out:false})),s:sc.striker,ns:sc.nonStriker,
+    bw:sc.attack.map(a=>({o:0,b:0,r:0,w:0,sp:0,sr:0,cap:a.oversLeft!=null?a.oversLeft:SPELL[ARCH[a.arch].type],rest:a.oversLeft!=null?0:9,fat:a.fatigue||0})),
+    mem:{},Z:[0,0,0,0,0,0,0,0],foot:{x:0,z:0},last:[],fow:[],tailB:0,fours:0,sixes:0,newBall:0,viol:{bouncer:0,field:0}};
+}
+const isTail=(st,i)=>!!TIER[st.bat[i].tier].tail;
+// new ball: swing; old ball: reverse (express, death) or spin, more so as the pitch wears; tail on strike: express
+function suitTest(bw,st){
+  const C=st.cond,a=C.ballAge,k=bw.arch,P=st.sc.plan;
+  let x=bw.type==='spin'?[.5,.6,.9,1.3,1.6][C.day-1]*(a<15?0.5:1):a<15?(k==='swing'?2:k==='express'?1.5:1):a>=35?(k==='express'?1.5:k==='death'?1.3:1):1;
+  if(P!=='contain'&&isTail(st,st.s)&&(k==='express'||k==='death'))x*=1.6;
+  if(P==='contain'&&(bw.type==='spin'||k==='cutter'))x*=1.3;
+  return x;
+}
+// a bowler stays on at his end until his spell is over (cap overs), he tires or he is expensive; never two overs in a row; the
+// replacement is picked by suitability and freshness (pace needs 2 overs' rest, spin 1)
+function captainPickTest(st){
+  const e=st.ovs%2,cur=st.ends[e],other=st.ends[1-e],B=st.bw,k=st.diff==='easy'?1:st.diff==='hard'?3:2,lim=st.diff==='hard'?13:16;
+  if(cur>=0&&cur!==other&&B[cur].sp<B[cur].cap&&B[cur].fat<0.8&&!(B[cur].sp>=2&&B[cur].sr/B[cur].sp>lim))return cur;
+  const all=st.A.map((b,i)=>i).filter(i=>i!==other),ok=all.filter(i=>i!==cur&&B[i].fat<0.6&&B[i].rest>=(st.A[i].type==='spin'?1:2)),pool=ok.length?ok:all;
+  const i=pick(pool,pool.map(i=>Math.pow(suitTest(st.A[i],st)*(1-B[i].fat),k)));
+  B[i].sp=0;B[i].sr=0;B[i].cap=SPELL[st.A[i].type];
+  return i;
+}
+// the over's stock plan, weighted by conditions and what has worked against this batter (per-bowler mem)
+function testStock(bw,st){
+  const a=st.cond.ballAge,P=st.sc.plan,w={};
+  if(bw.type==='spin'){w.SR=st.cond.day>=3?2:1;w.DF=P==='contain'?2:.5;}
+  else{w.SC=a<25?2.5:.6;w.RV=a>=35?2:0;w.DF=P==='contain'?2:.6;w.LT=bw.arch==='express'?.6:.2;}
+  if(P==='attack')for(const k in w)if(TPL[k].atk)w[k]*=1.5;
+  const ids=Object.keys(w).filter(k=>w[k]>0),d=DIFF[st.diff];
+  return pick(ids,ids.map(id=>w[id]*Math.exp(-d.k*1.5*(bScore(st.mem,'b'+bw.i+':T:'+id)-1.2))));
+}
+function testOver(st){
+  const notes=[];
+  if(st.cond.ballAge>=NEW_BALL){st.cond.ballAge=0;st.newBall++;notes.push('New ball taken');}
+  st.bi=captainPickTest(st);st.ends[st.ovs%2]=st.bi;st.pid=testStock(st.A[st.bi],st);st.ob=0;st.ovB=0;st.fc={};
+  return notes;
+}
+// tail plans per ball. 'tail': offer the set batter a single early in the over (a single puts the tail-ender on strike for the
+// rest of it), save the single on the last two balls (a single then keeps him on strike); 'tail' and 'attack': attack a tail-ender
+// with the umbrella or the leg trap (bouncers while the limit allows), spin into the rough
+function testPlanId(st){
+  const bw=st.A[st.bi],P=st.sc.plan,ts=isTail(st,st.s);
+  if(P==='tail'&&!ts&&isTail(st,st.ns))return st.ob<4?'TF':'SV';
+  if(P!=='contain'&&ts)return bw.type==='spin'?(st.cond.day>=3?'SR':'UM'):st.ovB<2&&bw.arch!=='swing'?'LT':'UM';
+  return st.pid;
+}
+// at most 2 balls an over above shoulder height (ICC Test clause 41.6): S and B are not planned after two, and a ball that still
+// bounces above the shoulder is re-planned
+function testBall(st){
+  const notes=st.bi<0?testOver(st):[],bw=st.A[st.bi],id=testPlanId(st),B=st.bw[st.bi];
+  const field=st.fc[id]||(st.fc[id]=id===st.pid?adjust(tplField(id),st.Z,{ok:fieldOkTest,n:Math.min(2,DIFF[st.diff].deep)}).field:tplField(id));
+  const ctx={last:st.last,foot:st.foot,bw,plan:{id,mix:TPL[id]},cond:st.cond,bouncers:st.ovB,tail:st.sc.plan!=='contain'&&isTail(st,st.s),fat:B.fat};
+  let p,b;
+  for(let k=0;k<6;k++){p=planBall(st.mem,bw.type,st.diff,ctx);b=makeDelivery(p,st.diff,bw,st.cond);if(!(b.bouncer&&st.ovB>=2))break;}
+  if(b.bouncer&&st.ovB>=2)b=makeDelivery({...p,len:'Y'},st.diff,bw,st.cond);
+  if(!fieldOkTest(field))st.viol.field++;
+  return {b,field,id,notes};
+}
+// one ball: runs, strike (odd runs swap; the new batter takes strike, Law 18.11; ends swap at the over), bowler figures, fatigue,
+// ball age; hold refuses the odd run. Returns true when the over is complete
+function testRecord(st,b,res,hold,bp){
+  if(hold)res=applyHold(res);
+  const B=st.bw[st.bi],bt=st.bat[st.s];
+  st.runs+=res.runs;B.r+=res.runs;B.sr+=res.runs;
+  if(b.bouncer&&++st.ovB>2)st.viol.bouncer++;
+  if(res.boundary===4)st.fours++;if(res.boundary===6)st.sixes++;
+  zoneAdd(st.Z,res.out?null:res.dir,res.wide?0:res.runs);st.last.push(b.len);if(st.last.length>3)st.last.shift();
+  brainLearn(st.mem,b,res.runs,!!res.out);footTrend(st.foot,bp);
+  if(!res.wide){st.balls++;st.ob++;B.b++;bt.balls++;bt.runs+=res.runs;if(isTail(st,st.s))st.tailB++;}
+  if(res.out){
+    st.wkts++;B.w++;bt.out=true;st.fow.push({runs:st.runs,balls:st.balls,w:st.wkts});
+    const nx=st.bat.findIndex((p,i)=>!p.out&&i!==st.s&&i!==st.ns);if(nx>=0)st.s=nx;
+  }else if(!res.wide&&!res.boundary&&res.runs%2){const t=st.s;st.s=st.ns;st.ns=t;}
+  if(st.ob<6)return false;
+  const t=st.s;st.s=st.ns;st.ns=t;st.ovs++;st.ob=0;st.ovB=0;st.cond.ballAge++;
+  B.o++;B.b=0;B.sp++;B.fat=Math.min(1,B.fat+TARCH[st.A[st.bi].arch].tire);
+  st.bw.forEach((x,i)=>{if(i===st.bi)x.rest=0;else{x.rest++;x.fat=Math.max(0,x.fat-0.05);}});
+  st.bi=-1;
+  return true;
+}
+// obj.wkts = wickets the side can lose (all out, or the collapse that ends a survive); obj.balls = the time left. A draw is a real
+// result: surviving meets 'survive'; a tie needs the scores level with the side all out
+function scenEnd(st){
+  const o=st.sc.obj,need=o.target!=null?o.target-st.runs:1,out=st.wkts>=o.wkts,time=st.balls>=o.balls,
+    R=(result,met)=>({result,met,need,left:o.balls-st.balls});
+  switch(o.type){
+    case 'chase':case 'scoreBy':if(need<=0)return R('win',true);if(out)return R('loss',false);if(time)return R('draw',false);break;
+    case 'session':if(need<=0)return R('win',true);if(out)return R('loss',false);if(time)return R('draw',st.runs>=o.par);break;
+    case 'survive':if(out)return R('loss',false);if(time)return R('draw',true);break;
+    case 'avoidFO':if(need<=0)return R('draw',true);if(out)return R('loss',false);if(time)return R('draw',false);break;
+    case 'tieOrWin':if(need<=0)return R('win',true);if(out)return need===1?R('tie',true):R('loss',false);if(time)return R('draw',false);break;
+  }
+  return null;
+}
+// stars: 1 = objective met; +1 margin ({balls} to spare, {runs} beyond the target or par, or scored while surviving, {wkts} in hand, {win}
+// not a tie); +1 bonus ({noWkt}, {tail: max balls faced by tail-enders}, {bat:{i,runs}}, {sixes}, {inBalls})
+function starOk(s,st,e){
+  const o=st.sc.obj;
+  return s.balls!=null?e.left>=s.balls:s.runs!=null?st.runs-(o.type==='survive'?0:o.type==='session'?o.par:o.target||0)>=s.runs:s.wkts!=null?o.wkts-st.wkts>=s.wkts:s.win?e.result==='win':
+    s.noWkt?st.wkts===0:s.tail!=null?st.tailB<=s.tail:s.bat?st.bat[s.bat.i].runs>=s.bat.runs:s.sixes!=null?st.sixes>=s.sixes:s.inBalls!=null?st.balls<=s.inBalls:false;
+}
+function scenStars(st,e){if(!e.met)return 0;let n=1;for(const s of st.sc.stars)if(s.t!=='win'&&starOk(s,st,e))n++;return Math.min(3,n);}
+// staged chases carry the state into the next session: runs still needed, wickets in hand, batters in and to come, ball age
+function stageNext(sc,st){
+  const nx=sc.stage&&SCEN.find(s=>s.stage&&s.stage.g===sc.stage.g&&s.stage.n===sc.stage.n+1);
+  if(!nx)return null;
+  const keep=st.bat.map((p,i)=>i).filter(i=>!st.bat[i].out),lineup=keep.map(i=>({...st.bat[i]}));
+  return {...nx,ballAge:st.cond.ballAge,lineup,striker:keep.indexOf(st.s),nonStriker:keep.indexOf(st.ns),
+    obj:{...nx.obj,target:sc.obj.target-st.runs,wkts:sc.obj.wkts-st.wkts}};
+}
+
 /* ---------- shot resolution ---------- */
 function windows(diffKey,early,m){const k=DIFF[diffKey].win*(m||1),b=early?EARLY:LATE;return {perfect:b.perfect*k,good:b.good*k,ok:b.ok*k,edge:b.edge*k};}
-function resolveDefend(b,clean){
+// Tests (x = {field,c,T}): a block at chest height or above is a fend off the gloves; an inside edge can go to the close leg catchers
+function resolveDefend(b,clean,x){
+  if(x&&x.c.y>1.2&&Math.random()<clamp((x.c.y-1.2)/0.6,0,1)*(clean?0.12:0.35)*Math.sqrt(x.T.edge)){
+    const F=x.field,ks=(x.c.x<-0.1?['fshort','shortleg','lslip','gully','slip']:['gully','slip','silly','fshort']).map(n=>F.findIndex(f=>f.n===n)).filter(i=>i>=0),
+      i=ks.length&&Math.random()<0.75?ks[0]:Math.random()<0.25?F.findIndex(f=>f.n==='keeper'):-1;
+    if(i>=0){const f=F[i];return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:'Fended off the gloves to '+fieldName(f),dir:Math.atan2(f.x,f.z)/D2R,lofted:true,
+      path:{air:true,C:Math.hypot(f.x,f.z-x.c.z),T:0.7,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out',shot:'Fend'};}
+    return {runs:0,label:'Fended away',sub:'Off the gloves, safe',cls:'dot',dir:rnd(-60,60),lofted:false,path:{air:false,s:6,a:5},shot:'Fend'};
+  }
+  const po=!clean&&b.onStumps&&Math.random()<0.35;
+  if(po)return {runs:0,out:true,outText:'Played on',label:'Out!',sub:'Inside edge onto the stumps',cls:'out',stumps:true,shot:'Block'};
+  if(x&&!clean){
+    const i=x.field.findIndex(f=>f.n==='fshort'||f.n==='shortleg');
+    if(i>=0&&Math.random()<0.2){const f=x.field[i];return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:'Bat-pad to '+fieldName(f),dir:-60,lofted:true,
+      path:{air:true,C:4.5,T:0.5,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out',shot:'Block'};}
+    return {runs:0,label:'Inside edge',cls:'dot',dir:rnd(-170,-140),lofted:false,path:{air:false,s:6,a:5},shot:'Block'};
+  }
   if(clean){const r=Math.random()<0.12?1:0;return {runs:r,label:r?'Quick single':'Blocked',cls:r?'runs':'dot',dir:rnd(-25,25),lofted:false,path:{air:false,s:r?8:4,a:4},shot:'Block'};}
-  if(b.onStumps&&Math.random()<0.35)return {runs:0,out:true,outText:'Played on',label:'Out!',sub:'Inside edge onto the stumps',cls:'out',stumps:true,shot:'Block'};
   return {runs:0,label:'Inside edge',cls:'dot',dir:rnd(-170,-140),lofted:false,path:{air:false,s:6,a:5},shot:'Block'};
 }
 function resolveEdge(b,c,sw,field,d,mishit){
-  const keeper=field.findIndex(f=>f.n==='keeper'), slip=field.findIndex(f=>f.n==='slip'), gully=field.findIndex(f=>f.n==='gully');
+  const keeper=field.findIndex(f=>f.n==='keeper'), slips=field.reduce((a,f,i)=>(/^slip/.test(f.n)&&a.push(i),a),[]), slip=slips.length?slips[0]:-1,
+    gully=field.findIndex(f=>f.n==='gully'), ls=field.findIndex(f=>f.n==='lslip');
   if(mishit&&sw.lofted){
     const C=rnd(10,32),dir=normAng(sw.aim+gauss()*25),T=rnd(2.6,3.3);
     const L={x:c.x+Math.sin(dir*D2R)*C,z:c.z+Math.cos(dir*D2R)*C};
@@ -399,9 +623,10 @@ function resolveEdge(b,c,sw,field,d,mishit){
     return {runs:r,label:'Top edge',sub:'Lands safely',dir,lofted:true,path:{air:true,C,T,stop:true},cls:r?'runs':'dot'};
   }
   const off=c.x>-0.05;
-  let pc=(sw.lofted?0.36:0.22)+(off&&slip>=0?0.12:0)+(off&&gully>=0?0.06:0);if(!off)pc*=0.5;pc*=d.catchMul;
+  let pc=(sw.lofted?0.36:0.22)+(off&&slip>=0?0.12:0)+(off&&gully>=0?0.06:0)+(off?0.05*Math.max(0,slips.length-1):0);if(!off)pc*=ls>=0?0.8:0.5;pc*=d.catchMul;
   if(Math.random()<pc){
-    const ws=slip>=0?1:0,wg=gully>=0?0.5:0,r=off&&ws+wg>0?Math.random()*(1+ws+wg):9,i=r<ws?slip:r<ws+wg?gully:keeper, f=field[i], nm=fieldName(f);
+    const ws=slips.length,wg=gully>=0?0.5:0,r=off&&ws+wg>0?Math.random()*(1+ws+wg):9,
+      i=r<ws?slips[Math.floor(r)]:r<ws+wg?gully:!off&&ls>=0&&Math.random()<0.5?ls:keeper, f=field[i], nm=fieldName(f);
     const dx=f.x-c.x,dz=f.z-c.z;
     return {runs:0,out:true,outText:i===keeper?'Caught behind':'Caught at '+nm,label:'Out!',sub:i===keeper?'Edged and caught behind':'Edged to '+nm,
       dir:Math.atan2(dx,dz)/D2R,lofted:false,path:{air:true,C:Math.hypot(dx,dz),T:0.4,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out'};
@@ -469,28 +694,38 @@ function resolveAir(c,dir,q,power,field,d){
   return {runs,dir,lofted:true,path:{air:true,C,T,roll},fielderTo:{i:nf2.i,x:sx,z:sz},
     label:dropped?'Dropped!':runs?runLabel(runs):'No run',sub:dropped?'Put down at '+fieldName(nf.f):'Lands safely',cls:runs?'runs':'dot'};
 }
-function evalSwing(b,sw,diffKey,field){
-  const fa=footAt(b,sw.bp),d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),w=windows(diffKey,early,1+0.35*fa.gain);
-  const c=fa.c;
-  const timing={dt,early,win:1+0.35*fa.gain,
+// bat (Tests): {tier}; scales the timing window (less for a block: a tail-ender can defend, not score), power and edges, and enables
+// sweeps, fends and hooking risk. Without it: short formats and T20
+function evalSwing(b,sw,diffKey,field,bat){
+  const T=bat?TIER[bat.tier]||TIER.A:null,fa=footAt(b,sw.bp),d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),
+    c=fa.c,shot=T?shotForBall(sw.aim,b,fa.full):shotFor(sw.aim),mb=T&&shot.sweep&&!sw.defend?{bp:sweepBp(sw.bp)}:null,
+    wm=(1+0.35*fa.gain)*(T?sw.defend?Math.pow(T.win,0.3):T.win*(mb?shot.tw:1):1),w=windows(diffKey,early,wm);
+  const timing={dt,early,win:wm,
     label:a<=w.perfect?'Perfect':a<=w.good?'Good':a<=w.ok?(early?'Early':'Late'):a<=w.edge?(early?'Very early':'Very late'):(early?'Too early':'Too late'),
     zone:a<=w.perfect?3:a<=w.good?2:a<=w.ok?1:a<=w.edge?0:-1};
-  if(!(fa.xc<0.98&&fa.xc>REACH_LEG&&c.y<2.05)){timing.label='Out of reach';timing.zone=-1;return {miss:true,timing};}
-  if(a>w.edge)return {miss:true,timing};
-  if(sw.defend)return {timing,res:resolveDefend(b,a<=w.ok)};
-  const shot=shotFor(sw.aim),match=clamp(shotFit(shot,fa.full,fa.xc)*(1-0.5*fa.awk)+0.25*fa.gain,0.1,1),name=sw.lofted?shot.loft:shot.name;
+  if(!(fa.xc<0.98&&fa.xc>REACH_LEG&&c.y<2.05)){timing.label='Out of reach';timing.zone=-1;return {miss:true,timing,...mb};}
+  if(a>w.edge)return {miss:true,timing,...mb};
+  if(sw.defend)return {timing,res:resolveDefend(b,a<=w.ok,T&&{field,c,T})};
+  const match=clamp(shotFit(shot,fa.full,fa.xc)*(1-0.5*fa.awk)*(mb?clamp(1-(c.y-0.75)*1.5,0.3,1):1)+0.25*fa.gain,0.1,1),name=sw.lofted?shot.loft:shot.name;
   let edge=a>w.ok,mishit=false;
-  const mt=sw.lofted?0.55:0.42;
-  if(!edge&&match<mt&&Math.random()<(mt-match)*1.7){edge=true;mishit=true;}
-  if(!edge&&sw.lofted&&a>w.good&&Math.random()<0.18*DIFF[diffKey].catchMul){edge=true;mishit=true;}
-  if(edge){const r=resolveEdge(b,c,sw,field,d,mishit);r.shot=name;timing.mishit=mishit;if(mishit)timing.label+=' timing, wrong shot for that ball';return {timing,res:r};}
+  const mt=(sw.lofted?0.55:0.42)+(shot.risk||0),em=T?T.edge:1,hook=T&&shot===SHOTS[1]&&c.y>1.5;
+  if(!edge&&match<mt&&Math.random()<(mt-match)*1.7*em){edge=true;mishit=true;}
+  if(!edge&&sw.lofted&&a>w.good&&Math.random()<0.18*DIFF[diffKey].catchMul*em){edge=true;mishit=true;}
+  if(T&&!edge&&T.xe&&a>w.perfect&&Math.random()<T.xe)edge=true;
+  if(hook&&!edge&&Math.random()<0.12*em){edge=true;mishit=true;}
+  if(edge){const r=resolveEdge(b,c,T&&mishit&&(shot.te||hook)?{...sw,lofted:true}:sw,field,d,mishit);r.shot=name;timing.mishit=mishit;if(mishit)timing.label+=' timing, wrong shot for that ball';return {timing,res:r};}
   const tq=a<=w.perfect?1:1-0.45*clamp((a-w.perfect)/(w.ok-w.perfect),0,1);
-  const q=tq*(0.35+0.65*match);
+  const q=tq*(0.35+0.65*match),pw=sw.power*(T?T.pow:1);
   const dir=normAng(sw.aim+dt*300+gauss()*(1-q)*16);
-  const r=sw.lofted?resolveAir(c,dir,q,sw.power,field,d):resolveGround(c,dir,q,sw.power,field,d);
+  const r=sw.lofted?resolveAir(c,dir,q,pw,field,d):resolveGround(c,dir,q,pw,field,d);
   r.shot=name;r.q=q;r.match=match;
   if(r.boundary&&!r.sub)r.sub=name+(r.dist?', '+r.dist+' m':'')+(r.misfield?', misfield':'');
   return {timing,res:r};
+}
+// Hold (Tests): refuse the last run of an odd number, so the striker keeps the strike
+function applyHold(res){
+  if(res.boundary||res.out||res.wide||!(res.runs%2))return res;
+  return {...res,runs:res.runs-1,held:true,label:res.runs>1?runLabel(res.runs-1):'Held',sub:'Kept the strike',cls:res.runs>1?'runs':'dot'};
 }
 
 /* ---------- AI bowler brain: remembers what each length and line costs it ---------- */
@@ -502,9 +737,10 @@ const FOOT_LEN={ch:{Y:.7,F:.7,S:1.8,B:1.5},bk:{Y:1.5,F:1.6,S:.7,B:.7},ac:{Y:1.7,
 const FOOT_LINE={ch:{wide:2.2,leg:.7},bk:{},ac:{mid:1.8,leg:1.3,wide:.6}};
 const FOOT_NOTE={ch:'shorter and wider, you keep coming down the pitch',bk:'fuller, you keep going back',ac:'straight at the stumps, you keep moving across'};
 const footMul=(fp,T,k)=>fp?['ch','bk','ac'].reduce((m,j)=>m*lerp(1,T[j][k]||1,fp[j]),1):1;
-// ctx.bw (bowler profile) and ctx.plan (planPick) are T20 only: the plan's mix replaces the base weights, mem keys are per bowler
+// ctx.bw (bowler profile) and ctx.plan (planPick) are T20 and Tests; ctx.cond (Tests) adds the bouncer limit (ctx.bouncers this
+// over), the tail plan (ctx.tail: yorkers and bouncers), the rough line on day 4-5, spin variations, around the wicket and fatigue
 function planBall(mem,type,diffKey,ctx){
-  const d=DIFF[diffKey],bw=ctx.bw,mix=ctx.plan&&ctx.plan.mix,mk=bw?'b'+bw.i+':':'',lens=type==='pace'?['Y','F','G','S','B']:['Y','F','G','S'];
+  const d=DIFF[diffKey],bw=ctx.bw,mix=ctx.plan&&ctx.plan.mix,mk=bw?'b'+bw.i+':':'',lens=type==='pace'?['Y','F','G','S','B']:['Y','F','G','S'],C=ctx.cond;
   const base=mix?mix.len:type==='pace'?{Y:.7,F:1,G:1.6,S:.8,B:.45}:{Y:.3,F:1.3,G:1.7,S:.45};
   const last=ctx.last||[],fp=footPlan(ctx.foot);
   const lw=lens.map(L=>{
@@ -512,11 +748,20 @@ function planBall(mem,type,diffKey,ctx){
     if(ctx.pressure&&L==='Y')x*=1.9;
     if(ctx.pressure&&L==='B')x*=1.3;
     if(d.k>0.3&&last.length>=2&&last[last.length-1]===L&&last[last.length-2]===L)x*=0.3;
+    if(C){if(ctx.tail)x*=L==='Y'?2.2:L==='B'?1.8:1;if(ctx.bouncers>=2&&type==='pace'&&(L==='B'||L==='S'))x=0;}
     return x;});
-  const lines=['wide','off','mid','leg'],lb=mix?mix.line:{wide:.45,off:1.5,mid:1,leg:.55};
-  const p={type,len:pick(lens,lw),line:pick(lines,lines.map(l=>lb[l]*footMul(fp,FOOT_LINE,l)*Math.exp(-d.k*1.2*bScore(mem,mk+'line:'+l)))),
+  const lines=C&&type==='spin'&&C.day>=4?['wide','off','mid','leg','rough']:['wide','off','mid','leg'],lb=mix?mix.line:{wide:.45,off:1.5,mid:1,leg:.55};
+  const p={type,len:pick(lens,lw),line:pick(lines,lines.map(l=>(l==='rough'?(lb.rough||.6)*(C.day-3):lb[l])*footMul(fp,FOOT_LINE,l)*Math.exp(-d.k*1.2*bScore(mem,mk+'line:'+l)))),
     slower:type==='pace'&&Math.random()<d.slower*(bw?bw.slow*(mix.slow||1):1)*(ctx.pressure?1.5:1)};
   if(bw){p.mk=mk;p.pid=ctx.plan.id;p.sw=mix.sw;p.flat=mix.flat;p.dir=bw.dir*(bw.wrong&&Math.random()<bw.wrong*(mix.wrong||1)?-1:1);}
+  if(C&&bw){
+    p.fat=ctx.fat||0;p.ar=Math.random()<(mix.ar||0)+(ctx.tail&&type==='pace'?0.2:0);
+    const V=TARCH[bw.arch]&&TARCH[bw.arch].var;
+    if(type==='spin'&&p.dir!==bw.dir)p.var='googly';
+    else if(V){let r=Math.random();for(const k in V)if((r-=V[k])<0){p.var=k;break;}}
+    if(p.var==='doosra'||p.var==='carrom')p.dir=-bw.dir;
+    if(p.var==='arm'||p.var==='top')p.dir=0;
+  }
   return p;
 }
 function brainLearn(mem,b,runs,out){
@@ -559,3 +804,114 @@ function preparePath(p,start,dir){
   if(h.air){h.sh=h.C/h.T;h.vy=(0.5*G*h.T*h.T-h.y0)/h.T;}
   return h;
 }
+
+/* ---------- Scenarios: Test situations as data (all teams and names fictional) ---------- */
+// lineup string: 'Name;tier;runs;balls|...' in batting order; band = intended win-rate band (%) for the standard balance bot
+const lu=s=>s.split('|').map(p=>{const [name,tier,runs,balls]=p.split(';');return {name,tier,runs:+runs||0,balls:+balls||0};});
+const atk=s=>s.split(' ').map(p=>{const [arch,f,o]=p.split(':');return {arch,fatigue:+f||0,oversLeft:o===''||o==null?null:+o};});
+const MER='Meridian XI';
+const SCEN=[
+ // ---- Series: a five-Test series against the Meridian XI; three moments per Test ----
+ {id:'s1a',set:'series',test:1,team:MER,title:'The new ball',brief:'Meridian made 412. Your reply starts under cloud on day two. Ten overs without losing a wicket.',
+  planet:'earth',diff:'easy',day:2,ballAge:0,oppText:'Meridian XI 412. You 0/0.',obj:{type:'survive',balls:60,wkts:1},
+  lineup:lu('A. Brennick;A|T. Voss;A|M. Calvane;A|D. Imrie;A|S. Pellow;B|K. Lathan;B'),striker:0,nonStriker:1,
+  attack:atk('swing:0:6 express:0:5 cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:25},{t:'bonus',bat:{i:0,runs:20}}],band:[55,90]},
+ {id:'s1b',set:'series',test:1,team:MER,title:'Save the follow-on',brief:'Fifty more and Meridian must bat again. Quarry is set; the tail is not.',
+  planet:'earth',diff:'easy',day:3,ballAge:55,oppText:'Meridian XI 412. You 163/6.',obj:{type:'avoidFO',target:50,balls:120,wkts:4},
+  lineup:lu('R. Quarry;C;31;58|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('express:.3:3 death:0:4 swing off'),plan:'tail',stars:[{t:'win'},{t:'margin',wkts:2},{t:'bonus',tail:12}],band:[50,85]},
+ {id:'s1c',set:'series',test:1,team:MER,title:'Sprint to stumps',brief:'Day four, chasing 360. Eight overs to stumps: a hundred and twenty of them tonight and the last day is yours.',
+  planet:'earth',diff:'easy',day:4,ballAge:30,oppText:'Meridian XI 412 & 211. You 264 & 120/2.',obj:{type:'scoreBy',target:120,balls:48,wkts:6},
+  lineup:lu('M. Calvane;A;44;61|D. Imrie;A;12;20|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
+  attack:atk('cutter off sla:0:5 death:0:4'),plan:'contain',stars:[{t:'win'},{t:'margin',balls:6},{t:'bonus',sixes:4}],band:[50,85]},
+ {id:'s2a',set:'series',test:2,team:MER,title:'Nightwatchman',brief:'Late on day two in thick, swinging air. Marlow goes in to shield Calvane until stumps. Lose both and the day is undone.',
+  planet:'venus',diff:'medium',day:2,ballAge:22,oppText:'Meridian XI 301. You 188/3.',obj:{type:'survive',balls:54,wkts:2},
+  lineup:lu('F. Marlow;D;0;0|M. Calvane;A;64;121|S. Pellow;B|K. Lathan;B|R. Quarry;C'),striker:0,nonStriker:1,
+  attack:atk('swing:.3:3 express:0:4 cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:12},{t:'bonus',noWkt:1}],band:[45,85]},
+ {id:'s2b',set:'series',test:2,team:MER,title:'Reverse at the death',brief:'Day five. An old, scuffed ball and a fast bowler who knows how to hide it. Eighty-five to win in twenty overs.',
+  planet:'venus',diff:'medium',day:5,ballAge:45,oppText:'Meridian XI 301 & 198. You 233 & 182/3.',obj:{type:'chase',target:85,balls:120,wkts:7},
+  lineup:lu('M. Calvane;A;41;77|D. Imrie;A;6;15|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('express:0:4 death:0:3 swing cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',wkts:4},{t:'bonus',bat:{i:0,runs:80}}],band:[35,70]},
+ {id:'s2c',set:'series',test:2,team:MER,title:'Last pair',brief:'Nine down, twelve to win. Imrie is set and Gage can barely hold a bat. Keep Gage away from the strike.',
+  planet:'venus',diff:'medium',day:5,ballAge:62,oppText:'Meridian XI 301 & 198. You 233 & 255/9.',obj:{type:'chase',target:12,balls:90,wkts:1},
+  lineup:lu('D. Imrie;A;71;133|O. Gage;E;0;0'),striker:0,nonStriker:1,
+  attack:atk('express:.2:3 death:0:4 swing off'),plan:'tail',stars:[{t:'win'},{t:'margin',balls:66},{t:'bonus',tail:4}],band:[25,60]},
+ {id:'s3a',set:'series',test:3,team:MER,title:'Sweep your way',brief:'Day three on a dust bowl, two spinners and a straight field. A hundred and thirty by stumps keeps you in this Test. Sweep for them.',
+  planet:'mercury',diff:'medium',day:3,ballAge:40,oppText:'Meridian XI 388. You 131/3.',obj:{type:'scoreBy',target:130,balls:36,wkts:5},
+  lineup:lu('D. Imrie;A;35;50|S. Pellow;B;20;31|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
+  attack:atk('off:0:10 sla:0:10 leg cutter'),plan:'contain',stars:[{t:'win'},{t:'margin',runs:15},{t:'bonus',sixes:3}],band:[35,70]},
+ {id:'s3b',set:'series',test:3,team:MER,title:'Session in the rough',brief:'Day four, last session. Meridian set 300 and spin into the footmarks from both ends. Lose no more than one wicket.',
+  planet:'mercury',diff:'medium',day:4,ballAge:20,oppText:'Meridian XI 388 & 172/8d. You 261 & 41/2.',obj:{type:'survive',balls:90,wkts:2},
+  lineup:lu('M. Calvane;A;18;37|D. Imrie;A;9;22|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
+  attack:atk('off:0:8 leg:0:6 sla express'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:20},{t:'bonus',noWkt:1}],band:[30,70]},
+ {id:'s3c',set:'series',test:3,team:MER,title:'The final-day chase',brief:'Day five. The rough is wider, the turn sharper. A hundred and ninety to win in twenty overs with four wickets to lose.',
+  planet:'mercury',diff:'medium',day:5,ballAge:30,oppText:'Meridian XI 388 & 172/8d. You 261 & 110/2.',obj:{type:'chase',target:190,balls:120,wkts:4},
+  lineup:lu('M. Calvane;A;30;61|D. Imrie;A;24;40|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
+  attack:atk('off:0:8 leg:0:6 sla express swing'),plan:'attack',stars:[{t:'win'},{t:'margin',balls:12},{t:'bonus',wkts:2}],band:[35,70]},
+ {id:'s4a',set:'series',test:4,team:MER,title:'Short-ball barrage',brief:'A bouncy deck, two quicks round the wicket and a leg trap. Duck, sway or play: eight overs without losing a wicket.',
+  planet:'mars',diff:'medium',day:2,ballAge:12,oppText:'Meridian XI 355. You 120/4.',obj:{type:'survive',balls:48,wkts:1},
+  lineup:lu('D. Imrie;A;33;70|S. Pellow;B;14;29|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
+  attack:atk('express:0:5 express:0:4 death swing'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:20},{t:'bonus',bat:{i:0,runs:50}}],band:[35,80]},
+ {id:'s4b',set:'series',test:4,team:MER,title:'Lead with the tail',brief:'Ashby and the tail want a first-innings lead before the new ball is due. Thirty-eight more in six overs.',
+  planet:'mars',diff:'medium',day:3,ballAge:74,oppText:'Meridian XI 355. You 318/7.',obj:{type:'scoreBy',target:38,balls:36,wkts:3},
+  lineup:lu('J. Ashby;C;27;40|F. Marlow;D;2;6|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('express:.2:3 death:0:4 swing cutter'),plan:'tail',stars:[{t:'win'},{t:'margin',balls:6},{t:'bonus',tail:14}],band:[30,65]},
+ {id:'s4c',set:'series',test:4,team:MER,title:'Win or tie',brief:'The last over of the match. Twelve to win, eleven to tie, two wickets left.',
+  planet:'mars',diff:'medium',day:5,ballAge:70,oppText:'Meridian XI 355 & 230. You 357 & 217/8.',obj:{type:'tieOrWin',target:12,balls:6,wkts:2},
+  lineup:lu('R. Quarry;C;48;81|L. Tenby;E;3;11|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('death:.2:1 express'),plan:'tail',stars:[{t:'win'},{t:'margin',win:1},{t:'bonus',noWkt:1}],band:[30,65]},
+ {id:'s5a',set:'series',test:5,team:MER,stage:{g:'s5',n:1,of:3},title:'Final day: morning',brief:'The decider. Two hundred to win on the last day, in three sessions. First, a hundred by lunch with wickets in hand.',
+  planet:'saturn',diff:'medium',day:5,ballAge:8,oppText:'Meridian XI 302 & 241. You 344 & 0/0.',obj:{type:'session',target:200,par:100,balls:60,wkts:10},
+  lineup:lu('A. Brennick;A|T. Voss;A|M. Calvane;A|D. Imrie;A|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('swing:0:6 express:0:5 cutter off leg'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:15},{t:'bonus',noWkt:1}],band:[40,85]},
+ {id:'s5b',set:'series',test:5,team:MER,stage:{g:'s5',n:2,of:3},title:'Final day: afternoon',brief:'After lunch: spin from both ends and an older ball. Fifty-five more by tea and keep the tail out of it.',
+  planet:'saturn',diff:'medium',day:5,ballAge:18,oppText:'Meridian XI 302 & 241. You 344 & 100/2.',obj:{type:'session',target:100,par:55,balls:60,wkts:7},
+  lineup:lu('M. Calvane;A;30;45|D. Imrie;A;12;20|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('off:0:8 leg:0:6 cutter swing express'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:15},{t:'bonus',wkts:5}],band:[30,70]},
+ {id:'s5c',set:'series',test:5,team:MER,stage:{g:'s5',n:3,of:3},title:'Final day: evening',brief:'The last session. Reverse swing, tired bowlers and the series on the line.',
+  planet:'saturn',diff:'medium',day:5,ballAge:28,oppText:'Meridian XI 302 & 241. You 344 & 155/4.',obj:{type:'chase',target:45,balls:60,wkts:4},
+  lineup:lu('S. Pellow;B;25;40|K. Lathan;B;10;18|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
+  attack:atk('express:.3:4 death:.2:3 swing:.4 off leg'),plan:'attack',stars:[{t:'win'},{t:'margin',balls:12},{t:'bonus',wkts:3}],band:[35,70]},
+ // ---- Classics: one-off finishes. Numbers are inspired by famous Tests (docs/scenarios-mode.md); teams and names are invented ----
+ {id:'c1',set:'classic',title:'Last-wicket heist',brief:'The last man walks out with twenty still needed. Strand is set at the other end. The number eleven must not face.',
+  planet:'earth',diff:'medium',day:4,ballAge:52,oppText:'Northgate XI 179 & 246. You 67 & 339/9.',obj:{type:'chase',target:20,balls:150,wkts:1},
+  lineup:lu('H. Strand;A;61;160|B. Quill;E;0;0'),striker:0,nonStriker:1,attack:atk('express:.2:4 swing:0:3 death off'),plan:'tail',
+  stars:[{t:'win'},{t:'margin',balls:120},{t:'bonus',tail:6}],band:[10,45]},
+ {id:'c2',set:'classic',title:'Two short',brief:'Thirty to win with two wickets left on the final morning. The ball is reversing and the quicks are fresh.',
+  planet:'earth',diff:'medium',day:4,ballAge:58,oppText:'Harbour XI 407 & 182. You 308 & 252/8.',obj:{type:'chase',target:30,balls:150,wkts:2},
+  lineup:lu('C. Durran;B;20;35|Y. Holt;D;4;12|Z. Arden;E'),striker:0,nonStriker:1,attack:atk('express:0:5 death:0:4 swing off'),plan:'tail',
+  stars:[{t:'win'},{t:'margin',wkts:1},{t:'bonus',tail:10}],band:[15,50]},
+ {id:'c3',set:'classic',title:'Hold out',brief:'Four overs left. Last pair. A ring of slips and a bowler steaming in.',
+  planet:'earth',diff:'medium',day:5,ballAge:30,oppText:'Westmere XI 444 & 280/6d. You 302 & 371/9.',obj:{type:'survive',balls:24,wkts:1},
+  lineup:lu('Y. Holt;D;9;30|Z. Arden;E;2;8'),striker:0,nonStriker:1,attack:atk('express:.2:2 swing:0:2 off'),plan:'attack',
+  stars:[{t:'win'},{t:'margin',runs:4},{t:'bonus',sixes:1}],band:[15,55]},
+ {id:'c4',set:'classic',title:'The long stand',brief:'Nine down and still behind. Sixty-nine balls to the close against spin and an old ball.',
+  planet:'earth',diff:'easy',day:5,ballAge:65,oppText:'Valemouth XI 674/6d. You 435 & 233/9.',obj:{type:'survive',balls:69,wkts:1},
+  lineup:lu('E. Fallow;C;12;40|B. Quill;E;0;0'),striker:0,nonStriker:1,attack:atk('off:0:8 leg:0:6 express swing'),plan:'attack',
+  stars:[{t:'win'},{t:'margin',runs:12},{t:'bonus',tail:30}],band:[15,55]},
+ {id:'c5',set:'classic',title:'Follow-on turnaround',brief:'Following on, three wickets left and barely ahead. Durran and the tail swing for a lead worth bowling at.',
+  planet:'earth',diff:'medium',day:4,ballAge:40,oppText:'Fairhaven XI 401/9d. You 174 & 232/7.',obj:{type:'scoreBy',target:50,balls:150,wkts:3},
+  lineup:lu('C. Durran;A;39;54|G. Rook;C;1;4|Y. Holt;D|Z. Arden;E'),striker:0,nonStriker:1,attack:atk('express:.3:3 swing:0:4 cutter off'),plan:'attack',
+  stars:[{t:'win'},{t:'margin',runs:20},{t:'bonus',bat:{i:0,runs:100}}],band:[15,50]},
+ {id:'c6',set:'classic',title:'Pace the chase',brief:'The last thirty overs of a long fourth-innings chase on a bouncy deck. Wickets in hand, but the rate is climbing.',
+  planet:'mars',diff:'medium',day:5,ballAge:68,oppText:'Southreach XI 369 & 294. You 336 & 178/4.',obj:{type:'chase',target:150,balls:180,wkts:6},
+  lineup:lu('N. Ellery;A;56;140|W. Pask;B;22;35|C. Durran;B|E. Fallow;C|G. Rook;C|Y. Holt;D|Z. Arden;E'),striker:0,nonStriker:1,
+  attack:atk('express:.4:3 swing:.2:4 death cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',balls:24},{t:'bonus',wkts:4}],band:[30,70]},
+ {id:'c7',set:'classic',title:'Level or win',brief:'The final over, against a spinner. Four to win, three to tie, one wicket left. Mender has the strike; Quill must not face.',
+  planet:'earth',diff:'medium',day:5,ballAge:50,oppText:'Ashgrove XI 574/7d & 170/5d. You 397 & 344/9.',obj:{type:'tieOrWin',target:4,balls:6,wkts:1},
+  lineup:lu('I. Mender;C;39;60|B. Quill;E;0;0'),striker:0,nonStriker:1,attack:atk('sla:0:1 off'),plan:'tail',
+  stars:[{t:'win'},{t:'margin',win:1},{t:'bonus',inBalls:3}],band:[50,85]},
+ {id:'c8',set:'classic',title:'One-run thriller',brief:'Last pair, seven to win, and the quicks bang it in at the body with a leg trap set.',
+  planet:'neptune',diff:'medium',day:5,ballAge:75,oppText:'Tidewater XI 435/8d & 256. You 209 & 476/9.',obj:{type:'chase',target:7,balls:30,wkts:1},
+  lineup:lu('V. Corrie;B;34;61|Z. Arden;E;0;0'),striker:0,nonStriker:1,attack:atk('express:.2:3 express:0:4 death'),plan:'tail',
+  stars:[{t:'win'},{t:'margin',balls:18},{t:'bonus',tail:2}],band:[30,70]},
+ {id:'c9',set:'classic',title:'Tail with the master',brief:'Thirty to win, eight down. Mender is in and in form; the two left with him are not.',
+  planet:'earth',diff:'medium',day:5,ballAge:35,oppText:'Kestrel XI 428 & 192. You 405 & 186/8.',obj:{type:'chase',target:30,balls:150,wkts:2},
+  lineup:lu('I. Mender;A;50;77|Y. Holt;D;0;0|B. Quill;E'),striker:0,nonStriker:1,attack:atk('express:0:4 swing:0:3 off leg'),plan:'tail',
+  stars:[{t:'win'},{t:'margin',wkts:1},{t:'bonus',bat:{i:0,runs:75}}],band:[15,50]},
+ {id:'c10',set:'classic',title:'Day-five collapse',brief:'Survive to tea on a wearing pitch. A leg-spinner is landing it in the rough. Two more wickets and it is lost.',
+  planet:'mercury',diff:'medium',day:5,ballAge:42,oppText:'Brightwater XI 513 & 168/4d. You 551/6d & 69/4.',obj:{type:'survive',balls:90,wkts:2},
+  lineup:lu('W. Pask;B;14;48|N. Ellery;A;21;62|C. Durran;B|E. Fallow;C|G. Rook;C|Y. Holt;D|Z. Arden;E'),striker:0,nonStriker:1,
+  attack:atk('leg:0:10 off:0:8 express swing'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:20},{t:'bonus',noWkt:1}],band:[25,65]}
+];
+const scenById=id=>SCEN.find(s=>s.id===id);

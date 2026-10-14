@@ -13,7 +13,7 @@ cvs.addEventListener('pointerdown',e=>{
 });
 cvs.addEventListener('pointermove',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const r=cvs.getBoundingClientRect();S.aim.x=e.clientX-r.left;S.aim.y=e.clientY-r.top;});
 function release(ts,a){
-  if(S.phase!=='flight'||S.swing){S.bat={mode:'stance',t0:clock,from:null,aim:0};if(S.phase==='ready'||S.phase==='runup'||S.phase==='break')hint('Too soon. Let go as the ball reaches you.');return;}
+  if(S.phase!=='flight'||S.swing||S.ball.duck){S.bat={mode:'stance',t0:clock,from:null,aim:0};if(S.phase==='ready'||S.phase==='runup'||S.phase==='break')hint('Too soon. Let go as the ball reaches you.');return;}
   const dx=a.x-a.x0,dy=a.y-a.y0,L=Math.hypot(dx,dy),Lm=dragMax(),defend=L<14;
   const aim=defend?0:aimDeg(dx,dy);
   S.swing={tc:gameTimeAt(ts)-S.ball.start+SWING_DELAY,aim,power:clamp(L/Lm,0.3,1),lofted:!defend&&S.loft,defend,done:false};if(!defend)sfx.swing(S.swing.power);
@@ -51,6 +51,8 @@ function footUpdate(dt){
   if(S.stick&&Math.hypot(...S.stick.v)>0.15){vx=S.stick.v[0];vz=-S.stick.v[1];}
   for(const k in KEYS){vx+=FW_KEYS[k][0];vz+=FW_KEYS[k][1];}
   const L=Math.hypot(vx,vz);if(L>1){vx/=L;vz/=L;}
+  // Tests: the stick pulled back after a short ball has pitched ducks under it (or sways out of its way); already held back at the pitch is footwork
+  if(M&&M.sc&&S.phase==='flight'&&!S.swing&&clock-S.ball.start>=S.ball.t1){const b=S.ball;if(b.noDuck==null)b.noDuck=vz<-0.5;if(vz<-0.5&&!b.noDuck&&!b.duck&&/[SB]/.test(b.len))b.duck=clock-b.start;}
   if(free){p.x=clamp(p.x+vx*FOOT_V.side*dt,-0.6,0.6);p.z=clamp(p.z+vz*(vz>0?FOOT_V.fwd:FOOT_V.back)*dt,-0.5,1.8);}
   const k=S.stick?S.stick.v:[vx,-vz],t='translate('+Math.round(k[0]*33)+'px,'+Math.round(k[1]*33)+'px)';
   if(t!==knobAt){knobAt=t;knob.style.transform=t;}

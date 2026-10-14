@@ -1,6 +1,6 @@
 /* ---------- T20 chase: attack, captain, plans and fields per over, save and resume ---------- */
 function bowlerLabel(){
-  if(M.t20){const bw=M.attack[M.bi];return bw?ARCH[bw.arch].name:'';}
+  if(M.t20||M.sc){const bw=M.attack[M.bi];return bw?ARCH[bw.arch].name:'';}
   return M.bowlerType==='pace'?'Pace bowler':M.spinDir>0?'Leg-spinner':'Off-spinner';
 }
 const quotaText=n=>n===1?'last over':n+' overs left';

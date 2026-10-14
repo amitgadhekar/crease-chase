@@ -100,8 +100,8 @@ function camParity(){
 
 /* --- batter pose: feet, hips, spine, shoulders, hands (relative to hip), bat direction. Every change of target
    blends from the pose actually shown, so nothing snaps. Knees and elbows come from 2-bone IK at draw time. --- */
-const PN=25,qFX=0,qFZ=1,qFR=2,qBX=3,qBZ=4,qBR=5,qHL=6,qHX=7,qHY=8,qHZ=9,qHR=10,qLX=11,qLZ=12,qSR=13,qAX=14,qAY=15,qAZ=16,qDX=17,qDY=18,qDZ=19,qNOD=20,qFLY=21,qBLY=22,qHDY=23,qFC=24;
-const PK=[['heel',qHL],['hr',qHR],['lx',qLX],['lz',qLZ],['sr',qSR],['nod',qNOD],['ffr',qFR],['fbr',qBR],['hd',qHDY],['fc',qFC]];
+const PN=26,qFX=0,qFZ=1,qFR=2,qBX=3,qBZ=4,qBR=5,qHL=6,qHX=7,qHY=8,qHZ=9,qHR=10,qLX=11,qLZ=12,qSR=13,qAX=14,qAY=15,qAZ=16,qDX=17,qDY=18,qDZ=19,qNOD=20,qFLY=21,qBLY=22,qHDY=23,qFC=24,qKN=25;
+const PK=[['heel',qHL],['hr',qHR],['lx',qLX],['lz',qLZ],['sr',qSR],['nod',qNOD],['ffr',qFR],['fbr',qBR],['hd',qHDY],['fc',qFC],['kn',qKN]];
 function poseSet(p,o){
   const v=(i,a)=>{if(a)for(let k=0;k<a.length;k++)p[i+k]=a[k];};
   v(qFX,o.ff);v(qBX,o.fb);v(qHX,o.hip);v(qAX,o.h);if(o.d)v(qDX,V3.norm(o.d));
@@ -115,7 +115,11 @@ BP.tr=poseSet(new Float32Array(BP.st),{ff:[-.43,1.46,.2],fb:[-.38,.76,0],hip:[-.
 const UP={bl:{h:[.1,.5,-.18],d:[-.15,.8,-.6],sr:.08,fc:1.3},
   block:{dh:[0,-.03,.04],h:[.2,.12,.19],d:[.1,-1,-.25],sr:.3,lx:.34,lz:.18,nod:1,fc:0},
   leave:{h:[.02,.775,-.08],d:[-.1,.75,-.65],sr:.15,lx:.2,nod:.35,fc:1.1},
-  cel:{h:[0,.82,0],d:[.1,1,.2],sr:-1.2,hr:-.6,lx:-.05,lz:-.12,nod:-.3,hd:-1.4,fc:0}};
+  cel:{h:[0,.82,0],d:[.1,1,.2],sr:-1.2,hr:-.6,lx:-.05,lz:-.12,nod:-.3,hd:-1.4,fc:0},
+  // Tests: duck under a short ball at the body, sway back from one outside it, flinch when hit
+  duck:{hip:[-.45,.56,.98],ff:[-.5,1.3,.3],fb:[-.42,.72,-.1],hr:.2,lx:.95,lz:-.1,sr:.1,h:[.12,-.08,-.22],d:[-.25,-.55,-.8],nod:1.25,hd:-.5,heel:.3,fc:1.2},
+  sway:{dh:[-.06,-.04,-.1],lx:-.3,lz:-.28,sr:-.1,h:[-.02,.62,-.18],d:[-.15,.85,-.5],nod:-.35,hd:.55,fc:1.2},
+  hit:{dh:[-.03,-.05,-.08],hr:-.25,sr:-.6,lx:.45,lz:-.3,h:[.02,.48,-.12],d:[-.35,.6,-.7],nod:1,hd:-1.1,fc:1.3}};
 // per SHOTS entry: i impact, f follow-through, li/lf lofted overrides. Drive follow-throughs are aimed in shotKeys.
 const SH3=[
   {i:{h:[.17,.16,.14],d:[.05,-1,-.05],sr:.25,hr:.15,lx:.3,nod:.7},f:{h:[.1,.12,.1],d:[-.55,-.8,-.3],sr:.35,nod:.6},
@@ -133,6 +137,14 @@ const SH3=[
    li:{h:[.45,.45,.08],d:[.8,-.1,-.4]},lf:{h:[.35,.8,0],d:[.55,.7,-.4],lz:-.12}},
   {i:{dh:[0,-.06,-.05],h:[.27,.06,-.02],d:[.4,-.88,-.3],sr:.2,lx:.4,nod:.8},f:{h:[.26,.06,-.02],d:[.55,-.7,-.45],sr:.25},
    li:{h:[.22,.32,.05],d:[.3,-.2,-.9]},lf:{h:[.2,.45,0],d:[.3,.45,-.85]}}];
+// Tests' sweeps (SWEEPS in logic.js): down on the back knee, front leg bent, bat flat across the line in front of the front pad;
+// the reverse sweep brings the bat back the other way with the face turned to the off side (faceFor). Same keys as SH3, plus l: the
+// crouch while the player aims a sweep (the backlift), so the batter is already down when the swing starts.
+const SWK={ff:[-.3,1.97,1],fb:[-.62,.78,-1.5708],hip:[-.5,.46,1.22],heel:1,kn:1,hr:.5,lx:.35,lz:1,nod:1};
+const SW3={Sweep:{i:{...SWK,sr:.55,h:[.12,-.03,.59],d:[.6,-.2,.77],hd:.1},f:{sr:.9,h:[-.02,.3,.42],d:[-.65,.35,-.6],nod:.8,hd:-.3},
+    lf:{sr:1.05,h:[-.06,.62,.24],d:[-.4,.78,-.45],nod:.55,hd:-.45,lz:.8},l:{...SWK,sr:.15,h:[.15,.62,.35],d:[.3,.55,-.78],hd:.15}},
+  'Reverse sweep':{i:{...SWK,sr:.35,h:[.24,-.1,.5],d:[.3,-.2,.93],hd:.15},f:{sr:.15,h:[.4,.22,.3],d:[.78,.3,-.55],nod:.8,hd:.4},
+    lf:{sr:.05,h:[.38,.55,.2],d:[.55,.72,-.42],nod:.6,hd:.5},l:{...SWK,sr:.6,h:[-.05,.6,.42],d:[-.5,.6,-.62],hd:0}}};
 const PB={key:'',sw:false,t0:0,dur:.4,fd:.3,from:new Float32Array(PN),cur:new Float32Array(BP.st),tg:new Float32Array(PN),tmp:new Float32Array(PN),out:new Float32Array(PN),a:null,b:null};
 const smooth=u=>u*u*(3-2*u);
 function batAngleNow(){return new Float32Array(PB.cur);}
@@ -167,8 +179,10 @@ function idlePose(p,a){
   if(a<=0)return;const w=clock,tap=Math.pow(Math.max(0,Math.sin(w*1.7)),8)*a;
   p[qHY]+=Math.sin(w*2.1)*.006*a;p[qLX]+=Math.sin(w*2.1+.6)*.015*a;p[qHZ]+=Math.sin(w*.75)*.018*a;p[qHX]+=Math.sin(w*.75)*.005*a;
   p[qAY]+=tap*.04;p[qDZ]-=tap*.1;}
+// the shot the logic plays for this aim and ball: sweeps only in Tests (shotForBall), at the length met after footwork
+const shotOf=(aim,b)=>M&&M.sc&&b?shotForBall(aim,b,footAt(b,S.bpos).full):shotFor(aim);
 function shotKeys(b,aim){
-  const sw=S.swing||{},L=!!sw.lofted,sp=SH3[SHOTS.indexOf(shotFor(aim))]||SH3[3],a=footPose(new Float32Array(PN),b,1);
+  const sw=S.swing||{},L=!!sw.lofted,sh=shotOf(aim,b),sp=sh.sweep?SW3[sh.name]:SH3[SHOTS.indexOf(sh)]||SH3[3],a=footPose(new Float32Array(PN),b,1);
   poseSet(a,sp.i);if(L&&sp.li)poseSet(a,sp.li);
   const f=poseSet(new Float32Array(a),sp.f);if(L&&sp.lf)poseSet(f,sp.lf);
   if(sp===SH3[3]||sp===SH3[4]){const s=Math.sin(aim*D2R),c=Math.cos(aim*D2R);poseSet(f,{h:[.1+.25*s+(L?.02:0),L?.77:.78,.1+.15*c],d:[.3*s-(L?.25:.35),L?.95:.7,L?-.35:-.55]});}
@@ -182,9 +196,10 @@ function blockKeys(b){const a=footPose(new Float32Array(PN),b,1);poseSet(a,UP.bl
 const BK={mid:[.63,0],block:[.6,0],edge:[.6,.05],toe:[.8,.02],top:[.36,.03],miss:[.63,0]};
 function aimSwing(b){
   const sw=S.swing;PB.a0=PB.a;PB.b0=PB.b;PB.fin=!sw||!M;if(PB.fin)return;
-  const fa=footAt(b,S.bpos),dt=sw.tc-fa.t,a=Math.abs(dt),w=windows(M.diff,dt<0,1+.35*fa.gain);
+  const fa=footAt(b,S.bpos),dt=sw.tc-fa.t,a=Math.abs(dt),sh=shotOf(sw.aim,b),T=M.sc&&TIER[M.st.bat[M.st.s].tier];
+  const w=windows(M.diff,dt<0,(1+.35*fa.gain)*(T?sw.defend?Math.pow(T.win,.3):T.win*(sh.sweep?sh.tw:1):1));
   const hit=fa.xc<.98&&fa.xc>REACH_LEG&&fa.c.y<2.05&&a<=w.edge&&!(b.onStumps&&!padHit(b,S.bpos)&&b.tStumps<sw.tc);
-  const k=!hit?'miss':a>w.ok?'edge':sw.defend?'block':'mid',L=PB.L=sw.defend?FAM.block:FAM[SHOT_FAM[SHOTS.indexOf(shotFor(sw.aim))]],N=facePt(PB.a0,[0,0,0,0,0,0,0,0,0],.63,0,0);
+  const k=!hit?'miss':a>w.ok?'edge':sw.defend?'block':'mid',L=PB.L=sw.defend?FAM.block:FAM[sh.sweep?'sweep':SHOT_FAM[SHOTS.indexOf(sh)]],N=facePt(PB.a0,[0,0,0,0,0,0,0,0,0],.63,0,0);
   const pv=t=>{const q=ballPos(b,t);return [q.x,q.y+.05,q.z];},T0=sw.tc-.05,T1=sw.tc+.14;
   let t=clamp(tAt(b,clamp(ballPos(b,sw.tc).z,N[2]+L.zw[0],N[2]+L.zw[1])),T0,T1);
   PB.P=pv(t);PB.xc=fa.xc;aimBat(k,sw.defend?-1:1,sw.aim+clamp(dt*300,-60,60));
@@ -222,7 +237,8 @@ function sweepGap(){
 const FAM={drive:{lo:[-.08,-.05,-.12,-.3,-.3,-.3,-1.2,-1,-.1],hi:[.08,.03,.15,.3,.45,.3,1.2,1,.3],tilt:.5,zw:[-.35,.3]},
   block:{lo:[-.06,-.04,-.1,-.25,-.25,-.25,-1,-1,-.1],hi:[.06,.03,.12,.25,.4,.25,1,1,.3],tilt:.35,zw:[-.25,.25]},
   pull:{lo:[-.15,-.1,-.2,-.45,-.45,-.45,-3,-2,-.2],hi:[.15,.04,.2,.45,.55,.45,3,2,.2],tilt:1.9,zw:[-.5,.3]},
-  glance:{lo:[-.12,-.1,-.2,-.4,-.4,-.4,-2,-1.5,-.15],hi:[.12,.04,.2,.4,.45,.4,2,1.5,.3],tilt:1.1,zw:[-.6,.2]}};
+  glance:{lo:[-.12,-.1,-.2,-.4,-.4,-.4,-2,-1.5,-.15],hi:[.12,.04,.2,.4,.45,.4,2,1.5,.3],tilt:1.1,zw:[-.6,.2]},
+  sweep:{lo:[-.12,-.12,-.15,-.4,-.4,-.4,-1,-.4,-.2],hi:[.12,.05,.15,.4,.35,.4,1,.4,.3],tilt:1.9,zw:[-.15,.35]}};
 const SHOT_FAM=['glance','pull','drive','drive','drive','pull','glance'];
 // a low ball bends the front knee a little more, leans the head over it and meets it lower on the blade; a ball above the
 // waist can't be met with an upright bat, so the bat flattens toward a fend or hook as it rises
@@ -254,10 +270,14 @@ function poseTick(){
   footPose(tg,fly?b:null,fly?footProg(fa.t,bt):0,fa);
   let key='st',dur=.4,now=clock,sw=false;
   if(cel){now=performance.now()/1000;key='cel';dur=.45;poseSet(tg,UP.cel);tg[qAY]+=Math.sin(now*5)*.025;}
+  else if(ph==='result'&&S.res&&S.res.body&&S.t<.7){key='hit';dur=.1;poseSet(tg,UP.hit);}
+  else if(fly&&b.duck&&!S.swing){key='dk';dur=.16;poseSet(tg,bodyHit(b,S.bpos)?UP.duck:UP.sway);}
   else if(fly&&(B.mode==='swing'||B.mode==='block')){key='sw'+B.t0;sw=true;}
   else if(B.mode==='backlift'){key='bl'+B.t0;dur=.18;
     const k=S.aim?.55+.45*clamp(Math.hypot(S.aim.x-S.aim.x0,S.aim.y-S.aim.y0)/dragMax(),0,1):1;
-    idlePose(tg,ph==='ready'||ph==='break'?1:0);PB.tmp.set(tg);poseSet(tg,UP.bl);for(let j=qAX;j<=qDZ;j++)tg[j]=PB.tmp[j]+(tg[j]-PB.tmp[j])*k;}
+    idlePose(tg,ph==='ready'||ph==='break'?1:0);PB.tmp.set(tg);poseSet(tg,UP.bl);for(let j=qAX;j<=qDZ;j++)tg[j]=PB.tmp[j]+(tg[j]-PB.tmp[j])*k;
+    const sh=fly&&S.aim&&Math.hypot(S.aim.x-S.aim.x0,S.aim.y-S.aim.y0)>=14&&shotOf(aimDeg(S.aim.x-S.aim.x0,S.aim.y-S.aim.y0),b);
+    if(sh&&sh.sweep){key='bs'+sh.name+B.t0;dur=.3;poseSet(tg,SW3[sh.name].l);}}
   else if(fly&&!S.swing&&(ph==='result'||bt>fa.t+.03)){key='lv';dur=.28;poseSet(tg,UP.leave);}
   else idlePose(tg,ph==='ready'||ph==='break'?1:ph==='runup'?clamp(1-S.t/(S.runupDur*.6),0,1):0);
   if(key!==PB.key){PB.from.set(PB.cur);PB.key=key;PB.sw=sw;PB.dur=dur;PB.t0=sw?B.t0:now;if(sw){if(B.mode==='block')blockKeys(b);else shotKeys(b,B.aim);aimSwing(b);}}
@@ -273,6 +293,22 @@ function poseTick(){
   o[qHX]+=.5*p.x+.25*(F.f[0]+F.b[0]);o[qHZ]+=.5*p.z+.25*(F.f[1]+F.b[1]);o[qHY]-=F.lift*.2;
   o[qFX]+=F.f[0];o[qFZ]+=F.f[1];o[qBX]+=F.b[0];o[qBZ]+=F.b[1];if(F.mv>=0)o[F.mv?qBLY:qFLY]+=F.lift;
   return o;}
+
+/* --- non-striker (Tests): the same model in its own frame (facing +z at the origin), placed at the bowler's end facing the
+   striker, on the side away from the bowler. He backs up as the bowler runs in and walks back between balls. --- */
+const NSP=poseSet(new Float32Array(PN),{ff:[-.13,.06,1.4],fb:[.13,-.06,1.75],hip:[0,.93,0],hr:1.5708,lx:0,lz:.06,sr:1.5708,h:[.06,.12,.24],d:[.05,-.85,.5],nod:.2,hd:0,fc:0});
+function nsPose(o,ph,mv){
+  o.set(NSP);const s=Math.sin(ph)*mv,c=Math.cos(ph);
+  o[qFZ]+=.2*s;o[qBZ]-=.2*s;o[qFLY]=Math.max(0,c)*.07*mv;o[qBLY]=Math.max(0,-c)*.07*mv;o[qHY]-=.025*mv*Math.abs(c);o[qHR]-=.1*s;o[qSR]+=.06*s;
+  if(mv<.5){o[qHZ]+=Math.sin(clock*.8)*.012;o[qHX]+=Math.sin(clock*.55)*.01;}
+  return o;}
+const NS={u:0,ph:0,mv:0,t:0},NS_Z=19.55;
+function nsTick(n,bx){
+  const dt=clamp(clock-NS.t,0,.1);NS.t=clock;n.on=!!(M&&M.sc);if(!n.on)return;
+  const ph=S.phase,tu=ph==='runup'?1.4*smooth(clamp((S.t/S.runupDur-.3)/.7,0,1)):ph==='flight'?1.4+Math.min(.5,(clock-S.ball.start)*1.4):ph==='result'?NS.u:0;
+  const du=clamp(tu-NS.u,-1.5*dt,1.8*dt);NS.u+=du;NS.ph+=Math.abs(du)/.7*Math.PI;NS.mv+=((Math.abs(du)>1e-4?1:0)-NS.mv)*Math.min(1,dt*10);
+  n.x=bx>0?-1.05:1.05;n.u=NS.u;n.ph=NS.ph;n.mv=NS.mv;nsPose(n.pose,n.ph,n.mv);
+}
 
 /* --- materials and meshes --- */
 const SKIN=[0.69,0.48,0.33],PAD=[.95,.95,.93],GLOVE=[.96,.96,.96],GRIP=[.2,.15,.1],GRILLE=[.34,.36,.4];
@@ -362,7 +398,7 @@ function buildScene(){
   G.pm={shirt:kit(black,{roughness:.88}),pants:kit(black,{roughness:.9}),skin:kit([1,1,1],{map:e.map,emissiveMap:e.em,emissive:0xffffff,roughnessMap:e.rough,roughness:1}),
     shoe:kit([0.16,0.16,0.18],{roughness:.6}),ex:kit(black,{roughness:.88,emissive:0}),torso:kit([1,1,1],{roughness:.88,map:painted(c=>{c.width=16;c.height=64;})})};
   G.torso=geo(torsoG(14,10,[[-.09,0,0],[-.08,.12,.09],[-.04,.165,.11],...TORSO.slice(3)]));
-  G.fielders=Array.from({length:NFL},()=>personRig(G));G.bowler=personRig(G);G.bat=batterRig();
+  G.fielders=Array.from({length:NFL},()=>personRig(G));G.bowler=personRig(G);G.bat=batterRig();G.ns=batterRig();G.ns.g.visible=false;
   return G;
 }
 
@@ -423,7 +459,7 @@ function batJoints(p){
   const Y=V3.norm([p[qLX],1,p[qLZ]]),s0=[-Math.sin(p[qSR]),0,Math.cos(p[qSR])],s=V3.norm(V3.sub(s0,V3.sc(Y,V3.dot(s0,Y)))),n=V3.cross(Y,s);
   Object.assign(J,{hip,ha,Y,s,n});
   const leg=(i,fx,fz,fr,ly,heel,side)=>{const t=[Math.cos(fr),0,Math.sin(fr)],an=[fx,.08+ly+heel*.05,fz],hj=V3.add(hip,V3.sc(ha,.1*side));hj[1]-=.04;
-    const fw=V3.norm([t[0]*.24,-heel*.07,t[2]*.24]),kp=V3.add(t,V3.sc(ha,.25*side));
+    const fw=V3.norm([t[0]*.24,-heel*.07,t[2]*.24]),kp=i&&p[qKN]?V3.lerp(V3.add(t,V3.sc(ha,.25*side)),[0,-.6,1],p[qKN]):V3.add(t,V3.sc(ha,.25*side));
     J.t[i]=t;J.an[i]=an;J.hj[i]=hj;J.kp[i]=kp;J.kn[i]=ik(hj,an,.43,.43,kp);J.fw[i]=fw;J.sole[i]=V3.sub([fx+t[0]*.16,ly,fz+t[2]*.16],V3.sc(fw,.16));};
   leg(0,p[qFX],p[qFZ],p[qFR],p[qFLY],0,1);leg(1,p[qBX],p[qBZ],p[qBR],p[qBLY],p[qHL],-1);
   const sh=V3.add(hip,V3.sc(Y,.5)),H=[hip[0]+p[qAX],hip[1]+p[qAY],hip[2]+p[qAZ]],d=V3.norm([p[qDX],p[qDY],p[qDZ]]),fn=faceN(d,p[qFC]),m=V3.norm(V3.cross(fn,d));
@@ -471,7 +507,7 @@ function bowlerState(){
 /* --- view state: everything render3D/draw take from the game. Live frames are built here; a replay feeds recorded
    frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
 const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay';
-const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,arm:null,brun:0,brn:false,
+const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,bx:0,arm:null,brun:0,brn:false,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
   nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0,dej:0});
 const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
@@ -481,11 +517,12 @@ function liveView(){
   V.mk=!settings.assist?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
   V.nf=0;
   if(M){
-    const bs=bowlerState();V.bz=bs.z;V.arm=bs.arm;V.brun=bs.run;V.brn=bs.running;
+    const bs=bowlerState(),bb=S.ball||S.pending;V.bz=bs.z;V.arm=bs.arm;V.brun=bs.run;V.brn=bs.running;V.bx=(bb?bb.xr:M.bowlerType==='pace'?.3:.22)+.2*(SPX?SPX.tw:1);
     S.fpos.forEach((p,i)=>{if(V.nf>=NFL)return;const f=M.field[i],o=V.f[V.nf++];o.on=!!f&&f.n!=='keeper'&&f.n!=='bowler';if(!o.on)return;
       const mv=!!p.mv&&clock-p.mv<0.12,tx=mv&&S.fanim?S.fanim.x:0,tz=mv&&S.fanim?S.fanim.z:BATS_Z;
       o.x=p.x;o.z=p.z;o.face=Math.atan2(tx-p.x,tz-p.z);o.running=mv;o.run=p.run;o.crouch=ph==='flight'||ph==='runup'?1:0;});
   }
+  nsTick(V.ns,V.bx);
   V.dej=S.cel?smooth(clamp((clock-S.cel.t0-.2)/.9,0,1)):0;
   V.hideBat=!!(S.chase&&clock>=S.chase.t0);V.trail=V.hideBat?S.trail3:null;
   // the crowd jumps once a boundary's ball crosses the rope (its outcome is no longer deferred) and through the win celebration
@@ -538,12 +575,14 @@ function render3D(V){
   for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on;G.fielders[i].g.visible=on;G.fsh[i].visible=on&&!inShadow(p.x,p.z);
     if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(G.fielders[i],p.x,p.z,p.face,p,i,V.dej);}}
   G.bowler.g.visible=!!M;
-  if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});person3D(G.bowler,(pc?.3:.22)+.2*SPX.tw,V.bz,Math.PI,BO,1,V.dej);}
+  if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});person3D(G.bowler,V.bx,V.bz,Math.PI,BO,1,V.dej);}
   G.ball.visible=!!bp;
   if(bp)mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);
   G.mk.visible=G.mkr.visible=!!mk;
   if(mk){mT(G.mk,[mk.xb,0,mk.zb],0.24,1,0.24);mT(G.mkr,[mk.xb,0,mk.zb],0.26,1,0.26);}
   stumps3D(G.stumps[0],0,V.st);
+  const n=V.ns;G.ns.g.visible=!!M&&n.on;
+  if(G.ns.g.visible){mB(G.ns.g,[n.x,0,NS_Z-n.u],[-1,0,0],[0,1,0],[0,0,-1]);const J=batsman3D(G.ns,n.pose,SKN.on);if(SKN.on)skin3D(J,SKN.b2);}
   G.bat.g.visible=!V.hideBat;if(!V.hideBat){const J=batsman3D(G.bat,pz,SKN.on);if(SKN.on)skin3D(J);}
   T3.r.render(T3.scene,T3.cam);
 }

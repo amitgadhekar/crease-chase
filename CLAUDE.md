@@ -15,8 +15,8 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 ```bash
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
-npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + 600 T20 chases per row (T20_N=) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet + two T20 overs with save/reload/resume in headless Chromium, fails on page errors
+npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + 600 T20 chases per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
+npm run test:smoke               # builds, plays each planet, two T20 overs with save/reload/resume and three scenarios in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -29,6 +29,9 @@ Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/w
 Its T20 checks: standard bot wins easy >=75%, medium 40-60%, hard <=25% on Earth; "always loft" wins fewer than it on medium and hard
 (both scored against the same pooled targets); mean targets never fall from easy to hard on any planet; each planet's `t20` within
 0.8-1.25 of its measured T20 scoring ratio; zero illegal fields, bowler picks or quota breaches (plus captain and field fuzzing).
+Its Test checks: a seeded fingerprint of the short-format and T20 rows is unchanged (`FP`; update only on purpose); swing, reverse,
+turn and bounce follow ball age and day; each scenario's bot win rate within its `band`; farming beats not farming in last pairs and
+careful beats slogging in survive scenarios; no bouncer-limit, Law 28.4 or consecutive-over breaches.
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
 
 ## Layout
@@ -47,7 +50,8 @@ tools/blender/            Model scripts run headless in Blender: rig.py (skeleto
                           batter.py (the batter). tools/model.mjs runs Blender, then gltf-transform prune/dedup/quantize
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
-03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
+03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 04c
+Scenarios (list, briefing, Test overs and balls, strike, Hold, sessions, stars, HUD) · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
 2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
@@ -142,8 +146,8 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   still connect). More bowled when moving to leg, more LBW when moving across, emerge from this geometry. `stumpedResult`
   at the keeper (tEnd): beaten or left with the back foot (0.8+bp.z) past the popping crease (1.22); 0.88 vs spin (keeper
   up), 0.3 vs pace; bails only. The balance bots use the same functions via `beaten()`.
-- **Batter animation** (07, visual only): full-body procedural pose (25-number arrays: feet, hips, spine, shoulders,
-  hands, bat, head, blade face azimuth `qFC`), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
+- **Batter animation** (07, visual only): full-body procedural pose (26-number arrays: feet, hips, spine, shoulders,
+  hands, bat, head, blade face azimuth `qFC`, back-knee kneel `qKN`), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
   length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
   Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
@@ -214,6 +218,34 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
     circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard.
   - Close catchers (slip, gully, short leg, silly point) are drawn; from the portrait batting camera they are out of frame, and
     in landscape silly point/short leg stand clear of the batter and the ball's line, so none were moved.
+- **Scenarios** (Tests; `settings.mode` `scen`, `M.sc` = the scenario, `M.st` = `newTest`; design, numbers and departures in
+  docs/scenarios-mode.md). Pure logic in logic.js (step 1: `SCEN`, `TIER`, `testBall`/`testRecord`, `scenEnd`/`scenStars`/`stageNext`),
+  flow in 04c:
+  - Menu mode "Scenarios" swaps venue/difficulty/Play for the list: the Series (5 Tests x 3, each unlocked by a star on the one
+    before) and the Classics (all open). A tile opens the briefing (`#brief`: situation, objective, stars, conditions, pair).
+    Stars (best per scenario id) are saved in `cc_scen` = `{stars:{id:n}}`. No mid-scenario save.
+  - Per over `scenOver` runs `testBall` (captain, spell, stock plan, field) for the first ball; per ball `scenNext` takes the
+    next `testBall` (tail plans change the field ball by ball: `M.note`). Swings and pads use the striker's tier
+    (`scBat()` -> `evalSwing`/`beaten`), so sweeps, fends, bat-pad catches, body hits and ducks apply; a missed sweep moves the
+    pads (`S.padBp` = `sweepBp`). A short ball at the body that was not ducked stops there (`bodyHit`, like a pad hit).
+  - Hold: after a ground shot with an odd run, `S.hold` and `#holdBtn` (left of Loft) last 0.6 s of game time; the ball is
+    recorded (`testRecord`, `applyHold` if tapped) when it is tapped or the window closes, or at the latest in `afterResult`.
+  - Duck: the stick pulled back after a short (S/B) ball pitches sets `b.duck` (the time); already holding it back at the pitch
+    counts as footwork instead (`b.noDuck`), so a duck needs pulling back after the pitch. After a duck the swing is ignored.
+  - End: `scenEnd` after each ball. A drawn session of a staged chase goes to the interstitial (the briefing card, "Lunch"/"Tea")
+    and the next session starts from `stageNext`; otherwise the result card (`#end` with `#eStars`, Next/Retry/Back). An objective
+    met (including survive draws) gets the celebration.
+  - HUD `#scenSlab`: objective line, conditions chip, partner card (strike marker, tier badge, runs and balls), bowler figures
+    O-M-R-W (maidens counted in 04c) and the field plan. Radar: square-root radial scale and no circle, so close catchers show.
+  - Non-striker (07): the skinned batter cloned with SkeletonUtils (`SKN.b2`) on a second `batterRig` (`G.ns`, its own bat),
+    posed in its own frame (`nsPose`, facing +z) and placed at the bowler's end on the side away from the bowler, turned to
+    face the striker. Backs up in the run-up (`nsTick`), walks back between balls. Both batters share the kit, so a strike change
+    shows only in the HUD. `V.ns` and `V.bx` (bowler x: the release side, so around the wicket is drawn) are recorded.
+    Cost: ~30 draw calls (172 vs 142 between balls) and ~26k triangles, Tests only.
+  - Poses (07): `SW3` sweep and reverse sweep (impact, follow-through, lofted, and `l`: the crouch onto the back knee while a
+    sweep is being aimed), family `FAM.sweep` (flat bat, contact window in front of the front pad); `qKN` kneel turns the back
+    knee's IK pole down and forward; `UP.duck` (ball at the body), `UP.sway` (outside it), `UP.hit` (flinch for 0.7 s).
+    `shotOf` = `shotForBall` in Tests, else `shotFor`, for poses, contact targeting and the aim label.
 - **Records:** `records[diff][format]`, format `short` (1-5 overs and nets) or `t20`; old flat records migrate to `short` at load.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
   plus `vis` for the look. `setPlanet` derives `ENV.carry`, `ENV.acc` (ground deceleration), `ENV.run` (fielder speed).
@@ -224,7 +256,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (107 floats/frame, max 600 frames, ~250 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (115 floats/frame, max 600 frames, ~275 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
@@ -238,7 +270,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com and styles from fonts.googleapis.com.
   Build-time npm deps (three, esbuild, playwright, @gltf-transform/cli for the model pipeline) are devDependencies pinned to exact versions that were at least two weeks
   old when added; the lock file resolves from registry.npmjs.org. three r163+ needs WebGL2 (iOS 15+).
-- localStorage keys are prefixed `cc_` (settings, mem, records, t20); every access is wrapped in try/catch.
+- localStorage keys are prefixed `cc_` (settings, mem, records, t20, scen); every access is wrapped in try/catch.
 - Mobile first: portrait iPhone, safe-area insets, `touch-action:none` on the input canvas, 44px+ touch targets.
 - Keep `src/logic.js` free of DOM access so the balance test can run it in Node.
 
@@ -284,6 +316,11 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - T20 save after the over is picked too, not only after balls: otherwise a resume at an over boundary re-picks a different bowler.
 - LBW added with footwork, pads from the trigger-step feet. The always-swinging bot rarely misses, so its LBW share is ~4%;
   human-like play (90 ms timing spread, 15% leaves) gives ~15-20% of dismissals, close to real cricket.
+- Scenarios (owner): a third mode with a Series and Classics and stars, both batters played by the player with tiers and a Hold
+  button, sweeps from the existing aim and the duck from the stick (no new shot buttons), fictional text only. Details in docs/scenarios-mode.md.
+- Non-striker: a SkeletonUtils clone of the skinned batter, not a second GLB (no size cost) or the procedural fallback (style clash).
+- Kneeling sweeps need a pose parameter (`qKN`) for the back knee's IK pole: the pole follows the toe, which points back when
+  kneeling. The crouch starts in the backlift while a sweep is aimed, so the 75 ms downswing doesn't drop the batter in one jump.
 
 ## Known gaps / backlog (ranked as discussed)
 1. Bowling: let the player bowl (line, length, pace, variations) to an AI batter, so a match is two real innings.
@@ -291,7 +328,8 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
 5. Unverified on real iPhone hardware: frame rate (~145 draw calls/frame between balls including the shadow pass, measured
-   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd). The adaptive tiers react to it; if still slow: merge person parts into
+   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd; Scenarios add the
+   non-striker: ~172 calls, ~190k triangles). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
   and stumpings just knock the bails off.

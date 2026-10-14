@@ -7,6 +7,7 @@ function newMatch(P,mode,diff,L){
      swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
 }
 function startMatch(){
+  if(M&&M.sc)return startScen(M.sc);
   if(M&&M.saved)store.del('t20');
   M=newMatch(setPlanet(settings.planet),settings.mode,settings.diff,LENGTHS[settings.len]);const P=M.planet;
   if(M.t20){M.attack=makeAttack(M.pk,M.diff);M.zones=[0,0,0,0,0,0,0,0];}
@@ -18,13 +19,14 @@ function startMatch(){
   }else beginPlay();
 }
 function beginPlay(cont){
-  showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver(cont);
+  showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#scenSlab').hidden=!M.sc;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver(cont);
 }
 // cont: a resumed T20 carries on with the saved over (bowler, plan, field)
 function newOver(cont){
   if(!cont){M.overNo++;M.overBalls=[];}
   let notes;
   if(M.t20)notes=t20Over(cont);
+  else if(M.sc)notes=scenOver();
   else{
     let type='pace';
     if(M.overNo>1){
@@ -42,26 +44,30 @@ function newOver(cont){
   const ws=rollWind(M.planet);if(ws>0.5)notes.push('Wind '+Math.round(ws*3.6)+' km/h');
   if(M.overNo===1||cont)notes.unshift(M.planet.name);
   updateHUD();
-  banner(M.mode==='chase'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join(M.t20?'\n':'. '),'small',M.t20?2900:1900);
-  S.phase='break';S.t=0;S.breakDur=M.t20?2.4:1.6;resetFielders();
+  const lng=M.t20||M.sc;
+  banner(M.mode!=='nets'?'Over '+M.overNo+' of '+M.overs:'Over '+M.overNo,notes.join(lng?'\n':'. '),'small',lng?2900:1900);
+  S.phase='break';S.t=0;S.breakDur=lng?2.4:1.6;resetFielders();
   if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
 function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
 function nextBall(){
-  S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  const sb=M.sc?scenNext():null;
   if(M.note){banner('Field change',M.note,'small',1600);M.note='';}
   resetFielders();
+  S.phase='ready';S.t=0;S.readyDur=BALL_GAP;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
+  if(sb){S.pending=sb;return;}
   const left=M.overs*6-M.balls,need=M.target-M.runs;
   const pressure=M.t20?t20Pressure(M.st):M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
   const bw=M.t20?M.attack[M.bi]:null,plan=planBall(M.t20?M.st.mem:mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot,bw,plan:M.plan});
   S.pending=makeDelivery(plan,M.diff,bw||M.spinDir);
-  S.phase='ready';S.t=0;S.readyDur=BALL_GAP;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
 }
 function releaseBall(){S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
 
 // a pending swing resolves before the pads, as the timing model lets late swings still reach the ball
+// Tests: a missed sweep lunges the front pad (S.padBp); a short ball at the body that was not ducked stops there (bodyHit)
 function flightUpdate(){
-  const b=S.ball,bt=clock-b.start,sw=S.swing,ph=S.padNow=padHit(b,S.bpos);
+  const b=S.ball,bt=clock-b.start,sw=S.swing,bp=S.padBp||S.bpos,pd=padHit(b,bp),bh=!pd&&M.sc&&bodyHit(b,bp),bo=bh&&!(b.duck&&bh.y>1.15)?bh:null,ph=S.padNow=pd||bo;
   if(!b.bounced&&bt>=b.t1){b.bounced=true;sfx.bounce();}
   const ev=[],pend=sw&&!sw.done;
   if(pend&&bt>=sw.tc)ev.push({t:sw.tc,k:0});
@@ -71,15 +77,16 @@ function flightUpdate(){
   for(const e of ev){
     if(S.phase!=='flight')return;
     if(e.k===0)doSwing();
-    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:0.5,rate:0.7});const r=padResult(b,ph,!!sw);commit(r,r.out?1.9:1.1);}
+    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:bo?0.7:0.5,rate:bo?0.55:0.7});const r=pd?padResult(b,ph,!!sw):beaten(b,bp,!!sw,scBat());commit(r,r.out?1.9:1.1);}
     else{b.stumpChecked=true;
       if(b.onStumps){tooLate(sw,b);sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
   }
   if(S.phase==='flight'&&bt>=b.tEnd&&!ph){
     sfx.keeper(b.wide?0.5:1);
     if(sw&&!sw.done){sw.done=true;sw.missed=true;}
-    const st=stumpedResult(b,S.bpos);
-    if(st){sfx.stumps();S.stumps={t0:clock,bails:true};commit(st,1.9);}
+    const st=M.sc?beaten(b,bp,!!sw,scBat()):stumpedResult(b,S.bpos);
+    if(st&&st.stumped){sfx.stumps();S.stumps={t0:clock,bails:true};commit(st,1.9);}
+    else if(st)commit(st,st.out?1.9:1.0);
     else if(b.wide)commit({runs:1,wide:true,label:'Wide',sub:'One extra',cls:'wide'},1.0);
     else commit({runs:0,label:sw?'Beaten':'Left alone',cls:'dot'},0.9);
   }
@@ -87,9 +94,9 @@ function flightUpdate(){
 function tooLate(sw,b){if(sw&&!sw.done){sw.done=true;sw.missed=true;S.timing={dt:sw.tc-footAt(b,S.bpos).t,early:false,label:'Too late',zone:-1};}}
 function doSwing(){
   const b=S.ball,sw=S.swing;sw.done=true;sw.bp={x:S.bpos.x,z:S.bpos.z};
-  const r=evalSwing(b,sw,M.diff,M.field);
+  const r=evalSwing(b,sw,M.diff,M.field,M.sc?scBat():undefined);
   S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
-  if(r.miss){sw.missed=true;return;}
+  if(r.miss){sw.missed=true;if(r.bp)S.padBp=r.bp;return;}
   const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start);
   sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
   if(res.stumps){S.stumps={t0:clock};sfx.stumps();}
@@ -109,6 +116,7 @@ function doSwing(){
 }
 function commit(res,dur,delay){
   const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
+  if(M.sc)return scenCommit(res,b,delay);
   const legal=!res.wide;
   M.runs+=res.runs;if(legal)M.balls++;if(res.out)M.wkts++;
   if(res.boundary===4)M.fours++;if(res.boundary===6)M.sixes++;
@@ -134,6 +142,7 @@ function showOutcome(res,b){
 }
 function afterResult(){
   if(S.deferred){showOutcome(S.deferred.res,S.deferred.b);S.deferred=null;}
+  if(M.sc)return scenAfter();
   if(M.mode==='chase'){
     const out=M.wkts>=M.wktsMax,done=M.balls>=M.overs*6;
     if(M.runs>=M.target)return endMatch('win');
@@ -145,6 +154,7 @@ function afterResult(){
 function endMatch(kind){
   sfx.end(kind);
   if(M.saved)store.del('t20');
+  $('#eStars').hidden=$('#nextBtn').hidden=true;$('#againBtn').textContent='Play again';$('#againBtn').className='primary';$('#menuBtn').textContent='Back to menu';
   const fmt=M.t20?'t20':'short',rd=records[M.diff]||(records[M.diff]={}),r=rd[fmt]||(rd[fmt]={w:0,p:0,hs:0});
   if(M.mode==='chase'){r.p++;if(kind==='win')r.w++;}
   const isBest=M.runs>r.hs;if(isBest)r.hs=M.runs;store.set('records',records);
@@ -167,9 +177,9 @@ function celebrate(){
   $('#loftBtn').hidden=true;$('#stick').hidden=true;fwReset();FW.next=clock+0.8;
 }
 function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
-function quitToMenu(){rpUI(false);S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();showScreen('menu');}
+function quitToMenu(){rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();buildScenList();showScreen('menu');}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
-  $('#pText').textContent=M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
+  $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#pCard').innerHTML=M.t20?t20Card():'';
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}
 

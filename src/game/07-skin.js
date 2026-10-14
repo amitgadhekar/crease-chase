@@ -2,7 +2,8 @@
    in MODEL_DATA) on the rig.py skeleton, driven every frame by the procedural pose. Each bone's rotation maps its rest
    aim/ref vectors (glTF extras, from rig.py) onto the same vectors taken from the pose's joints (batJoints), so the
    runtime doesn't depend on Blender's bone axes. Bone lengths equal the pose's limb lengths, so joints land on the pose's
-   joints (elbows move a little with the clavicle shrug); only the pelvis, hands and feet get positions. Rigid kit (helmet, pads, gloves, shoes) is parented to bones in the model.
+   joints (elbows move a little with the clavicle shrug); only the pelvis, hands and feet get positions. Helmet and shoes are rigid
+   on a bone; gloves are skinned to hand + forearm, pads to shin + thigh.
    The bat stays the procedural one (batsman3D), so contact targeting is unchanged. If the model can't be loaded the
    procedural batter stays. ---------- */
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -40,7 +41,8 @@ function skinLoad(){
 }
 // drive vectors (aim, ref) per bone from the pose's joints, plus pins. Elbows and knees bend toward the IK pole made
 // perpendicular to the limb line, as in ik(); the spine takes half the twist between hips and shoulders, the neck half
-// between chest and face; shins and pads face the toe, hands turn with the bat. Clavicles follow the upper arm by 15% of
+// between chest and face; shins and pads face the toe, hands turn with the bat and its face (GA, GF), forearms take half
+// of the hand's twist (pronation). Clavicles follow the upper arm by 15% of
 // its swing from rest (a shrug when the arms go up), so the arms are re-solved from the moved shoulders. A limb the pose
 // stretches beyond its reach (the back leg in a long stride) stops short, so hands and feet are pinned to the pose's hand
 // points and ankles: gloves stay on the handle and shoes on the ground (the stretch is inside the glove cuff or the pad).
@@ -49,11 +51,14 @@ function skinVecs(J){
     R=[J.ha,V3.add(V3.norm(prp(J.ha,J.Y)),J.s),J.s,V3.add(J.n,J.face),J.face],P=[];
   for(let i=0;i<2;i++){const lat=V3.sc(J.s,i?-1:1),c=V3.add(J.sh,V3.sc(lat,.02)),u0=V3.add(V3.sc(J.Y,-Math.SQRT1_2),V3.sc(lat,Math.SQRT1_2)),
       ca=V3.norm(V3.add(lat,V3.sc(V3.sub(V3.norm(V3.sub(J.e[i],J.sp[i])),u0),.15))),sp=V3.add(c,V3.sc(ca,.17)),
-      e=ik(sp,J.hd[i],.31,.3,J.ap[i]),sd=prp(J.ap[i],V3.sub(J.hd[i],sp)),f=V3.sub(J.hd[i],e);
-    A.push(ca,V3.sub(e,sp),f,f);R.push(J.Y,sd,sd,J.d);P.push([SKP[i],J.hd[i],e]);}
+      e=ik(sp,J.hd[i],.31,.3,J.ap[i]),sd=prp(J.ap[i],V3.sub(J.hd[i],sp)),f=V3.sub(J.hd[i],e),hr=V3.cross(J.gn[i],J.wa[i]),
+      fr=V3.add(V3.norm(prp(sd,f)),V3.sub(V3.sc(sd,.01),V3.norm(prp(hr,f))));
+    A.push(ca,V3.sub(e,sp),f,J.wa[i]);R.push(J.Y,sd,fr,hr);P.push([SKP[i],J.hd[i],e]);}
   for(let i=0;i<2;i++){const sd=prp(J.kp[i],V3.sub(J.an[i],J.hj[i]));
     A.push(V3.sub(J.kn[i],J.hj[i]),V3.sub(J.an[i],J.kn[i]),J.fw[i]);R.push(sd,J.t[i],[0,1,0]);P.push([SKP[2+i],J.an[i],J.kn[i]]);}
   return [A,R,P];}
+// Each hand bone is turned so the glove's handle lies exactly on the bat axis at its grip point, with the back of the hand
+// as batJoints sets it (GA, GF); the glove's forearm-skinned cuff absorbs the remaining wrist bend.
 const SKP=['hand_L','hand_R','foot_L','foot_R'].map(n=>SKB.indexOf(n));
 function skin3D(J){
   const [A,R,P]=skinVecs(J),W=SKQ.w;

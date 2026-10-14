@@ -145,16 +145,19 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
   Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
 - **Skinned batter** (07-skin, tools/blender): one smooth skinned body (skin, shirt, collar/cuff trim, trousers; 4
-  material groups, ~5.2k tris) plus rigid kit parented to bones (helmet + grille, pads, gloves, shoes; ~4.7k tris), 19 bones,
-  ~180 KB GLB, ambient occlusion baked into vertex colours. `batJoints(p)` (07-render3d) turns a pose into joints; both
+  material groups, ~6.1k tris; decimation keeps the face and shoulders denser) plus kit (~5.2k tris): helmet + grille and
+  shoes rigid on a bone, gloves skinned to hand + forearm (fingers curled round the handle radius, so the palm bends and the
+  cuff follows the arm), pads skinned to shin + thigh (the flap above the knee roll follows the thigh in lunges). 19 bones,
+  ~215 KB GLB, ambient occlusion and the face's eyes/brows/lips baked into vertex colours. `batJoints(p)` (07-render3d) turns a pose into joints; both
   the procedural parts and the skeleton use it. **Skeleton contract** = `tools/blender/rig.py` (`HUMAN` lengths = the
   pose's: thigh/shin .43, upper arm .31, forearm .30 to the grip, shoulders ±.19, spine+chest .5, neck .17; rest A-pose in
   game coordinates, L = front side). Each bone stores rest `aim`/`ref` vectors (glTF extras -> `bone.userData`);
-  `skinVecs` gives the same two vectors from the pose (limb line + IK pole for elbows/knees, toe for shins, bat for hands,
+  `skinVecs` gives the same two vectors from the pose (limb line + IK pole for elbows/knees, toe for shins; hands are turned
+  so the glove's grip channel lies exactly on the bat axis, forearms take half the hand's twist,
   half twists for spine and neck, clavicles follow 15% of the arm swing), and `skin3D` sets `bone.quaternion` to map one
   onto the other (no AnimationMixer). Only the pelvis, hands and feet get positions: hands/feet are pinned to the pose's
   hand points and ankles (a leg stretched past its reach stops short otherwise). The bat stays procedural (`batsman3D`),
-  so contact targeting is untouched. If the GLB fails to load, the procedural batter below stays (`__r.skin()` says why).
+  so contact targeting is untouched. Grip (`batJoints`, H = bat anchor): left glove at H+`HAND_AT`[0] .095·d (top of the handle, which starts at `HTOP`), right at .18 touching it ~4 cm above the blade; correctly handed gloves, top hand's back to the bowler, bottom palm behind the handle (`GA`/`GRIP_A`, `GF`), elbow poles toward the glove's forearm (`J.wa`). If the GLB fails to load, the procedural batter below stays (`__r.skin()` says why).
   Materials are replaced by name with `kit()` ones (KIT colours, vertex colours on). Species can reuse the rig with their
   own `HUMAN`-style lengths. Regenerate with `npm run model:batter` (Blender 5.2 at /Applications or `BLENDER=`; a
   `-- --render DIR --poses poses.json` run renders turntables and game poses; `__r.drive()` dumps a pose).
@@ -228,8 +231,17 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - Batter: a smooth skinned model scripted in Blender (signed-distance shapes -> surface nets -> voxel remesh ->
   decimate, automatic weights), rigged to our own skeleton so the procedural pose drives it and the bat/contact code is
   unchanged. Loaded with three's GLTFLoader rather than a custom loader for robustness (+~79 KB code; model +~238 KB as
-  base64; the build is ~1.35 MB). No meshopt/Draco: WebAssembly may be blocked by the artifact CSP. Quadriflow remeshing was tried and refused
+  base64; the build is ~1.4 MB). No meshopt/Draco: WebAssembly may be blocked by the artifact CSP. Quadriflow remeshing was tried and refused
   the mesh; decimation with its symmetry option folded faces along the mirror plane, so it runs without it.
+- Grip: hands slid down the handle with the bat fixed to H (contact unchanged); poses' hand points moved 4-8 cm (stance
+  also 3 cm lower) so the longer reach keeps a bent arm. Correctly handed gloves with the natural grip put the forearms
+  ~150° round from the old elbow poles (wrist bend ~90°); mirrored gloves (the earlier fix) were rejected as wrong hands, so
+  the elbow pole follows the glove instead (rms wrist bend ~15°, elbows bow forward in the stance).
+- Batter polish: the hand twist follows the blade face, not the forearm (a forearm-driven twist lets the bat spin inside
+  the gloves when the face rolls). The forearm-to-handle angle in the poses ranges 2-93 deg, so no rigid glove fits: the
+  palm is blended hand -> forearm and the cuff is open so the arm goes in without a seam. Pad flap skinned to
+  the thigh, chosen over a shorter pad (loses the knee-to-thigh cover) or a rigid bevel (still pokes out in lunges). Blender's
+  weighted decimation is very nonlinear: weights <= 0.5 and factor 0.04, else the zone takes all the triangles.
 - Glow: additive glow sprites (fireworks, floodlight halos) instead of UnrealBloomPass. Bloom needs an EffectComposer: a
   full-res HalfFloat target (~24 MB at 1170x2532, ~4x with MSAA, else the scene loses antialiasing), fog then mixes in linear
   space before tone mapping so it no longer matches the 2D sky, and its cost is fill rate, which headless swiftshader (CPU,

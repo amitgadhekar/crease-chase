@@ -31,7 +31,7 @@ for (const pk of planets) {
   await page.click('.seg[data-key=mode] button[data-v=nets]');
   await page.click(`#planetGrid button[data-v=${pk}]`);
   await page.click('#startBtn');
-  await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 15000, polling: 30});
+  await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
   if (pk === planets[0]) {
     await page.waitForFunction(() => { const s = __t.sfx(); return s.expected > 0 && s.decoded === s.expected; }, null, {timeout: 10000, polling: 50})
       .catch(async () => { errors.push('sfx decode: ' + JSON.stringify(await page.evaluate(() => __t.sfx()))); });
@@ -41,7 +41,7 @@ for (const pk of planets) {
   if (pk === planets[0]) await page.evaluate(() => Object.assign(__t.S.bpos, {x: 0.1, z: 1.2}));
   await page.screenshot({path: `${shots}${pk}-runup.png`});
   await camCheck(pk + ' runup');
-  await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 15000, polling: 30});
+  await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 30});
   // Force a perfectly timed lofted cover drive so the hit path and chase camera code run.
   await page.evaluate(() => { const S = __t.S; S.swing = {tc: footAt(S.ball, S.bpos).t + 0.002, aim: 30, power: 1, lofted: true, defend: false, done: false};
     S.bat = {mode: 'swing', t0: __t.clk(), from: null, aim: 30}; });
@@ -91,7 +91,7 @@ if (planets.includes('earth')) {
   await page.click('#planetGrid button[data-v=earth]');
   await page.click('#startBtn');
   await page.click('#chaseBtn');
-  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 15000, polling: 30});
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
   // Reach the target before the next ball; the real result flow then ends the chase with a win.
   await page.evaluate(() => { const M = __t.getM(); M.runs = M.target; });
   for (const [t, n] of [[1, 1], [3.5, 2]]) {

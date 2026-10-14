@@ -1,10 +1,11 @@
 """Builds the skinned batter: Blender -b --factory-startup --python tools/blender/batter.py -- --out batter.glb
-   [--render DIR] [--poses poses.json] [--h 0.005] [--save file.blend]
+   [--render DIR] [--poses poses.json] [--h 0.0035] [--save file.blend]
 
-Body: one smooth mesh from a smooth union of signed-distance shapes (sdf.py), meshed by surface nets, decimated,
-cut into kit regions (shirt, trim, trousers, skin) by plane bisects, skinned to the rig.py skeleton with automatic
-weights. Rigid kit (helmet with grille, pads, gloves, shoes) are separate meshes parented to bones; their placement
-matches the procedural batter in 07-render3d.js (same frames and profiles). Ambient occlusion is baked into vertex
+Body: one smooth mesh from a smooth union of signed-distance shapes (sdf.py), meshed by surface nets, decimated (denser
+on the face and shoulders), cut into kit regions (shirt, trim, trousers, skin) by plane bisects, skinned to the rig.py
+skeleton with automatic weights. Kit is separate meshes: helmet with grille and shoes parented to a bone, gloves (gripping
+the handle) skinned to hand + forearm, pads skinned to shin + thigh; placement matches the procedural batter in
+07-render3d.js (same frames and profiles). Ambient occlusion (and the face's eyes, brows, lips) is baked into vertex
 colours. Everything is authored in game coordinates (see rig.py) and converted with g2b.
 """
 import bpy
@@ -23,7 +24,7 @@ from sdf import ellipsoid, cone, sphere, torus, box, frame, norm  # noqa: E402
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 ARGS = {argv[i][2:]: argv[i + 1] for i in range(0, len(argv) - 1, 2)}
-H = float(ARGS.get('h', 0.005))
+H = float(ARGS.get('h', 0.0035))
 T0 = time.time()
 
 
@@ -39,7 +40,8 @@ def srgb(h):
 # Kit colours (KIT.you in 01-core.js) are applied by the game per material name; these are for the Blender renders.
 MATS = {'skin': ((0.69, 0.48, 0.33), 0.6), 'shirt': (srgb('#12606e'), 0.88), 'trim': (srgb('#f2b134'), 0.88),
         'pants': (srgb('#e9edf0'), 0.9), 'helmet': (srgb('#15324d'), 0.22), 'grille': ((0.34, 0.36, 0.4), 0.35),
-        'pad': ((0.95, 0.95, 0.93), 0.45), 'glove': ((0.96, 0.96, 0.96), 0.55), 'shoe': ((1, 1, 1), 0.6)}
+        'pad': ((0.95, 0.95, 0.93), 0.45), 'glove': ((0.96, 0.96, 0.96), 0.55), 'shoe': ((1, 1, 1), 0.6),
+        'grip': ((0.2, 0.15, 0.1), 0.8), 'blade': ((0.86, 0.74, 0.55), 0.5)}
 
 J = rig.joints()
 L = rig.HUMAN
@@ -50,6 +52,7 @@ SLEEVE = (0.245, 0.262)          # trim band along the upper arm (m from the sho
 COLLAR_C = P('shoulders') + v3(-0.006, 0.012, 0)
 COLLAR_N = norm([0.38, 1, 0])    # collar ring plane: lower at the front
 COLLAR_W = 0.011                 # half width of the collar band
+EYE_X, EYE_Z = 0.078, 0.033      # eyeball centres in the head frame (also darkened in face_tone)
 
 
 # ---------------------------------------------------------------- body shapes (game coordinates, rest pose)
@@ -72,21 +75,28 @@ def body_shapes():
     # neck, collar
     add('neck', 0.04, cone(P('shoulders') + v3(-0.01, -0.05, 0), P('neck_top') + v3(0.004, -0.01, 0), 0.066, 0.056))
     add('collar', 0.008, torus(COLLAR_C, COLLAR_N, 0.07, 0.0105, (1.0, 1.05)))
-    # head: cranium, jaw, chin, cheekbones, brow, nose, eyes, lips
+    # head (x forward, z left): cranium, jaw with its angles, chin, cheekbones, brow ridge, nose, eyes, lips, ears
     hc = P('head_c')
     add('head', 0.03, ellipsoid(hc + v3(-0.012, 0.012, 0), [0.103, 0.112, 0.088]))
-    add('head', 0.03, ellipsoid(hc + v3(0.035, -0.05, 0), [0.072, 0.07, 0.068]))
-    add('head', 0.02, ellipsoid(hc + v3(0.078, -0.098, 0), [0.028, 0.024, 0.032]))
+    add('head', 0.03, ellipsoid(hc + v3(0.03, -0.048, 0), [0.07, 0.066, 0.066]))
     for s in (1, -1):
-        add('head', 0.02, ellipsoid(hc + v3(0.07, -0.012, 0.047 * s), [0.032, 0.022, 0.026]))
-    add('head', 0.015, cone(hc + v3(0.087, 0.03, -0.042), hc + v3(0.087, 0.03, 0.042), 0.016, 0.016))
-    add('head', 0.012, cone(hc + v3(0.1, 0.022, 0), hc + v3(0.119, -0.022, 0), 0.01, 0.015))
-    add('head', 0.01, ellipsoid(hc + v3(0.106, -0.027, 0), [0.015, 0.012, 0.022]))
+        add('head', 0.025, ellipsoid(hc + v3(0.0, -0.072, 0.052 * s), [0.03, 0.022, 0.016]))
+        add('head', 0.03, cone(hc + v3(0.006, -0.074, 0.05 * s), hc + v3(0.074, -0.1, 0.016 * s), 0.014, 0.012))
+    add('head', 0.016, ellipsoid(hc + v3(0.079, -0.101, 0), [0.024, 0.02, 0.027]))
     for s in (1, -1):
-        add('head', -0.01, sphere(hc + v3(0.1, 0.006, 0.034 * s), 0.019))
-        add('head', 0.004, sphere(hc + v3(0.083, 0.005, 0.034 * s), 0.0145))
-    add('head', 0.01, ellipsoid(hc + v3(0.099, -0.058, 0), [0.012, 0.014, 0.026]))
-    add('head', -0.006, ellipsoid(hc + v3(0.112, -0.059, 0), [0.008, 0.003, 0.024]))
+        add('head', 0.018, ellipsoid(hc + v3(0.056, -0.018, 0.047 * s), [0.03, 0.019, 0.026]))
+        add('head', 0.012, cone(hc + v3(0.087, 0.026, 0.004 * s), hc + v3(0.077, 0.028, 0.05 * s), 0.0085, 0.007))
+        add('head', 0.008, ellipsoid(hc + v3(-0.008, -0.006, 0.087 * s), [0.019, 0.029, 0.009]))
+        add('head', -0.003, sphere(hc + v3(-0.004, -0.01, 0.097 * s), 0.008))
+        add('head', -0.004, ellipsoid(hc + v3(0.095, 0.005, EYE_Z * s), [0.01, 0.009, 0.014]))
+        add('head', 0.003, sphere(hc + v3(EYE_X, 0.004, EYE_Z * s), 0.0125))
+    add('head', 0.008, cone(hc + v3(0.095, 0.017, 0), hc + v3(0.117, -0.024, 0), 0.007, 0.0105))
+    add('head', 0.006, sphere(hc + v3(0.116, -0.027, 0), 0.0105))
+    for s in (1, -1):
+        add('head', 0.005, ellipsoid(hc + v3(0.103, -0.032, 0.013 * s), [0.009, 0.008, 0.008]))
+    add('head', 0.006, ellipsoid(hc + v3(0.1, -0.054, 0), [0.009, 0.006, 0.02]))
+    add('head', 0.006, ellipsoid(hc + v3(0.097, -0.066, 0), [0.009, 0.0065, 0.017]))
+    add('head', -0.003, ellipsoid(hc + v3(0.108, -0.06, 0), [0.006, 0.0015, 0.019]))
     # arms
     for k, s in (('L', 1), ('R', -1)):
         sh, el, gp, u = P('shoulder_' + k), P('elbow_' + k), P('hand_' + k), P('arm_dir_' + k)
@@ -96,7 +106,7 @@ def body_shapes():
         add('farm_' + k, 0.02, cone(el, gp - u * 0.07, 0.043, 0.029))
         F = frame(u, [1, 0, 0])
         add('farm_' + k, 0.02, ellipsoid(el + u * 0.065 + F[1] * 0.006, [0.09, 0.047, 0.042], F))
-        add('hand_' + k, 0.015, ellipsoid(gp - u * 0.005, [0.055, 0.045, 0.028], F))
+        add('hand_' + k, 0.015, ellipsoid(gp - u * 0.08, [0.03, 0.03, 0.022], F))   # wrist only: the hand is the glove
     # legs
     for k, s in (('L', 1), ('R', -1)):
         hj, kn, an, v = P('hipj_' + k), P('knee_' + k), P('ankle_' + k), P('leg_dir_' + k)
@@ -110,20 +120,44 @@ def body_shapes():
     return S
 
 
-# ---------------------------------------------------------------- rigid kit shapes
+# ---------------------------------------------------------------- kit shapes
+# handle vs forearm in the palm, as GA in 07-render3d.js (batJoints)
+GRIP_A = math.radians(-30)
+
+
+def glove_frame(k):
+    """hand point g, forearm u, handle e1 (toward the blade), back of the hand e2, and c: the hand's length direction
+    across the handle. The hand bone's rest ref is the bat axis x; the game turns the bone so e1 lies on the handle."""
+    g, u, x = P('hand_' + k), P('arm_dir_' + k), v3(1, 0, 0)
+    e1 = math.cos(GRIP_A) * u + math.sin(GRIP_A) * x
+    e2 = np.cross(u, x) * (-1 if k == 'L' else 1)   # left glove on the left hand: game coordinates are left-handed
+    return g, u, e1, e2, norm(u - e1 * (u @ e1))
+
+
+HANDLE_R = 0.017   # bat handle radius (capG(.017, ...) in 07-render3d.js)
+GLOVE_WRIST = (-0.005, 0.06)   # glove -> forearm weight along the forearm from the grip: the palm bends, so the cuff follows the arm
+
+
 def glove_shapes(k):
-    """padded batting glove around the handle; origin at the hand point (the grip), handle along +x at rest"""
-    g, u = P('hand_' + k), P('arm_dir_' + k)
-    b = v3(1, 0, 0)
-    w = np.cross(u, b) * (1 if k == 'L' else -1)   # back of the hand, mirrored between hands
-    G = lambda du, db, dw: g + u * du + b * db + w * dw
-    A = np.array([u, b, w])
-    S = [('glove', 0) + (box(G(0.006, 0, 0.004), [0.042, 0.05, 0.036], 0.022, A))]
-    for i in range(4):
-        db = -0.036 + 0.024 * i
-        S.append(('glove', 0.012) + (cone(G(0.04, db, -0.016), G(0.04, db, 0.024), 0.0135, 0.0135)))
-    S.append(('glove', 0.015) + (cone(G(-0.01, 0.046, -0.026), G(0.026, 0.036, -0.034), 0.015, 0.014)))
-    S.append(('glove', 0.02) + (cone(G(-0.03, 0, 0.002), G(-0.125, 0, 0), 0.042, 0.047)))
+    """batting glove gripping the handle: fingers curled round it as padded phalanx rolls, a wrapped thumb, a padded back
+    and a cuff around the forearm. Angles go round the handle from c (0) toward the back of the hand e2 (90 deg)."""
+    g, u, e1, e2, c = glove_frame(k)
+    at = lambda a, th, r: g + e1 * a + (c * math.cos(math.radians(th)) + e2 * math.sin(math.radians(th))) * r
+    S = [('glove', 0) + ellipsoid(g + e2 * (HANDLE_R + 0.006) - c * 0.028, [0.046, 0.019, 0.05], np.array([e1, e2, c]))]
+    for a, r, th in ((-0.032, 0.0115, (82, 10, -78, -150)), (-0.011, 0.0122, (84, 10, -82, -160)),
+                     (0.011, 0.0125, (84, 10, -84, -164)), (0.033, 0.012, (84, 10, -82, -160))):
+        R = HANDLE_R + r + 0.001
+        pts = [at(a, t, R + (0.003 if t > 60 else 0)) for t in th]
+        for p0, p1 in zip(pts, pts[1:]):
+            S.append(('glove', 0.003) + cone(p0, p1, r, r * 0.94))
+    for a in (-0.022, 0.0, 0.022):   # padded bars on the back of the hand
+        S.append(('glove', 0.006) + cone(at(a, 100, HANDLE_R + 0.022) - c * 0.012, at(a, 120, HANDLE_R + 0.022) - c * 0.042, 0.009, 0.009))
+    tb = [g + e1 * 0.016 + e2 * 0.012 - c * 0.04, at(0.042, 190, HANDLE_R + 0.02), at(0.05, 240, HANDLE_R + 0.013)]
+    S.append(('glove', 0.006) + cone(tb[0], tb[1], 0.0145, 0.0125))
+    S.append(('glove', 0.003) + cone(tb[1], tb[2], 0.0125, 0.011))
+    S.append(('glove', 0.018) + cone(g - u * 0.072, g - u * 0.15, 0.041, 0.047))
+    S.append(('glove', 0.004) + torus(g - u * 0.147, u, 0.046, 0.006))
+    S.append(('glove', -0.004) + cone(g - u * 0.11, g - u * 0.2, 0.033, 0.039))   # open cuff: the forearm goes in, no seam
     return S
 
 
@@ -235,16 +269,24 @@ def keep_largest(ob):
     return len(parts)
 
 
-def sdf_object(name, shapes, lo, hi, h, target, smooth=2, mats=None):
+def sdf_object(name, shapes, lo, hi, h, target, smooth=2, mats=None, keep=None):
     """surface nets -> voxel remesh (manifold) -> smooth -> decimate. Decimation without its symmetry option: with it,
-    faces along the mirror plane fold over."""
+    faces along the mirror plane fold over. keep(game verts) -> 0..1 weights where decimation keeps more detail."""
     v, q = sdf.mesh(shapes, lo, hi, h)
     ob = new_object(name, v, q, mats)
     n = keep_largest(ob)
     apply_mod(ob, 'REMESH', mode='VOXEL', voxel_size=h, adaptivity=0)
     if smooth:
         apply_mod(ob, 'SMOOTH', factor=0.5, iterations=smooth)
-    apply_mod(ob, 'DECIMATE', ratio=min(1.0, target / max(1, tris(ob))))
+    kw = {}
+    if keep:   # inverted weight 0 is never collapsed and small factors already bite hard, hence 0.5 and 0.04
+        vg = ob.vertex_groups.new(name='keep')
+        for i, w in enumerate(keep(game_verts(ob))):
+            vg.add([i], 0.5 * float(w), 'REPLACE')
+        kw = dict(vertex_group='keep', vertex_group_factor=float(ARGS.get('keepf', 0.04)), invert_vertex_group=True)
+    apply_mod(ob, 'DECIMATE', ratio=min(1.0, target / max(1, tris(ob))), **kw)
+    if keep:
+        ob.vertex_groups.remove(ob.vertex_groups['keep'])
     log('%s: %d quads -> %d tris (%d parts)' % (name, len(q), tris(ob), n))
     return ob
 
@@ -283,10 +325,19 @@ def shade_smooth(ob):
 
 
 # ---------------------------------------------------------------- body
+def detail_zone(gv):
+    """face, shoulders, deltoids and upper chest: seen up close in replays and curved, so decimation keeps them denser"""
+    d = lambda c, r: smooth01(2.2 - 2.2 * np.linalg.norm((gv - c) / r, axis=1))
+    w = d(P('head_c') + v3(0.075, -0.035, 0), v3(0.07, 0.1, 0.1))
+    for k in ('L', 'R'):
+        w = np.maximum(w, d(P('shoulder_' + k) + v3(0, -0.01, 0), v3(0.1, 0.11, 0.09)))
+    return np.maximum(w, 0.6 * d(P('shoulders') + v3(0.03, -0.07, 0), v3(0.1, 0.09, 0.17)))
+
+
 def build_body():
     shapes = body_shapes()
-    ob = sdf_object('body', shapes, [-0.24, -0.02, -0.72], [0.26, 1.9, 0.72], H, int(ARGS.get('tris', 4700)), smooth=3,
-                    mats=['skin', 'shirt', 'trim', 'pants'])
+    ob = sdf_object('body', shapes, [-0.24, -0.02, -0.72], [0.26, 1.9, 0.72], H, int(ARGS.get('tris', 5600)), smooth=3,
+                    mats=['skin', 'shirt', 'trim', 'pants'], keep=detail_zone)
     # region cuts: waist, collar band, sleeve trim band
     near = lambda c, r: (lambda p: np.linalg.norm(p - c) < r)
     collar = lambda p: np.linalg.norm((p - COLLAR_C) - COLLAR_N * ((p - COLLAR_C) @ COLLAR_N)) < 0.12 and abs((p - COLLAR_C) @ COLLAR_N) < 0.06
@@ -317,7 +368,7 @@ def build_body():
         if l == 'head':
             idx[i] = 0
         elif l in ('neck', 'collar') or (l == 'torso' and radial < 0.12 and abs(dc) < 0.06):
-            idx[i] = 0 if dc > COLLAR_W else 2 if dc > -COLLAR_W else 1
+            idx[i] = 0 if dc > COLLAR_W else 2 if dc > -COLLAR_W and (l != 'torso' or radial < 0.095) else 1
         elif l == 'torso':
             idx[i] = 3 if c[1] < WAIST_Y else 1
         elif l[:4] in ('uarm', 'cuff', 'farm', 'hand'):
@@ -423,13 +474,14 @@ def build_helmet():
     return ob
 
 
+PAD_HINGE = (0.012, 0.05)   # pad -> thigh weight from 1.2 cm above the knee joint over 5 cm (the knee roll top)
 PADK = [[-.27, .055, .062], [-.2, .066, .08], [0, .074, .086], [.17, .078, .09], [.215, .084, .1], [.26, .08, .094],
         [.3, .074, .082], [.335, .066, .07]]
 
 
 def build_pad(k):
     """the procedural pad profile (padG in 07-geometry.js): ribbed front, knee roll; open behind the thigh above
-    the knee so a bent knee doesn't push the thigh through it"""
+    the knee, where the flap is skinned to the thigh (PAD_HINGE) so a deep lunge bends it at the knee roll"""
     rows = sorted(set(lin(7, 0, 1) + [0.76, 0.81, 0.89]))
     segs = [math.pi * i / 28 for i in range(28)] + [math.pi + math.pi * (i + 0.5) / 8 for i in range(8)]
 
@@ -441,6 +493,7 @@ def build_pad(k):
         c, s = math.cos(a), math.sin(a)
         fr = max(0.0, s)
         rid = fr * (0.008 * (0.5 - 0.5 * math.cos(a * 14)) + 0.011 * math.exp(-((y - 0.225) / 0.022) ** 2))
+        e *= 1 - 0.16 * min(1, max(0, -s / 0.5)) * min(1, max(0, (y - 0.19) / 0.04))   # flap edges tuck in against the thigh
         return (e * (hw + rid) * c, y, e * (fz + rid if s > 0 else 0.062) * s)
     V, Q = surf(rows, segs, f)
     n = len(segs)
@@ -478,10 +531,26 @@ def build_pad(k):
 
 def build_glove(k):
     g = P('hand_' + k)
-    ob = sdf_object('glove_' + k, glove_shapes(k), g - 0.17, g + 0.17, 0.0025, 480, smooth=4,
-                    mats=['glove'])
+    ob = sdf_object('glove_' + k, glove_shapes(k), g - 0.2, g + 0.2, 0.002, int(ARGS.get('glove', 700)), smooth=2, mats=['glove'])
     shade_smooth(ob)
     return ob
+
+
+def skin_to(ob, arm, b0, b1, w):
+    """skins ob to two bones: weight w (per vertex) on b1, 1 - w on b0"""
+    ob.parent = arm
+    ob.modifiers.new('rig', 'ARMATURE').object = arm
+    g0, g1 = ob.vertex_groups.new(name=b0), ob.vertex_groups.new(name=b1)
+    for i, x in enumerate(w):
+        if x < 0.999:
+            g0.add([i], 1 - float(x), 'REPLACE')
+        if x > 0.001:
+            g1.add([i], float(x), 'REPLACE')
+
+
+def smooth01(x):
+    x = np.clip(x, 0, 1)
+    return x * x * (3 - 2 * x)
 
 
 def build_shoe(k):
@@ -547,6 +616,20 @@ def bake_ao(objs, detail):
         log('ao %s: mean %.2f min %.2f' % (ob.name, val.mean(), val.min()))
 
 
+def face_tone(gv):
+    """dark eyes, brows and slightly darker lips on the skin (vertex colours multiply the material colour)"""
+    q = gv - P('head_c')
+    t = np.ones((len(gv), 3))
+    for s in (1, -1):
+        e = np.linalg.norm(q - v3(EYE_X, 0.004, EYE_Z * s), axis=1)
+        t *= 1 - 0.8 * smooth01((0.0142 - e) / 0.003)[:, None]
+        b = np.linalg.norm((q - v3(0.09, 0.03, 0.03 * s)) / v3(0.02, 0.006, 0.022), axis=1)
+        t *= 1 - 0.45 * smooth01((1.1 - b) / 0.3)[:, None]
+    m = np.linalg.norm((q - v3(0.1, -0.06, 0)) / v3(0.014, 0.012, 0.021), axis=1)
+    t *= 1 - smooth01((1.05 - m) / 0.25)[:, None] * v3(0.08, 0.22, 0.2)
+    return t
+
+
 def shoe_tone(gv):
     y = gv[:, 1]
     return np.where(y < 0.022, 0.55, 1.0)[:, None] * np.ones(3)
@@ -600,6 +683,32 @@ def render_setup():
     return cam
 
 
+def bat_objects(bat):
+    """render-only bat from the game's pose: handle (radius 0.017) H+0.04d..H+0.30d, blade H+0.28d..H+0.86d facing n"""
+    from mathutils import Matrix, Vector
+    H, d, n = (np.array(bat[k]) for k in ('H', 'd', 'n'))
+    x = np.cross(d, n)
+    obs = []
+    for nm, c, sz, mat in (('handle', H + d * 0.17, (0.017, 0.13, 0.017), 'grip'), ('blade', H + d * 0.57 - n * 0.012, (0.054, 0.29, 0.022), 'blade')):
+        me = bpy.data.meshes.new(nm)
+        bm = bmesh.new()
+        if nm == 'handle':
+            bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=1, radius2=1, depth=2)
+            bmesh.ops.rotate(bm, verts=bm.verts, matrix=Matrix.Rotation(math.pi / 2, 3, 'X'))
+        else:
+            bmesh.ops.create_cube(bm, size=2)
+        bm.to_mesh(me)
+        bm.free()
+        ob = bpy.data.objects.new(nm, me)
+        bpy.context.scene.collection.objects.link(ob)
+        M = Matrix([list(rig.g2b(x * sz[0])) + [0], list(rig.g2b(d * sz[1])) + [0], list(rig.g2b(n * sz[2])) + [0], [0, 0, 0, 1]]).transposed()
+        M.translation = Vector(rig.g2b(c))
+        ob.matrix_world = M
+        me.materials.append(material(mat))
+        obs.append(ob)
+    return obs
+
+
 def shoot(cam, path, az, el=8, dist=4.6, look=(0, 0, 0.95)):
     from mathutils import Vector
     a, e = math.radians(az), math.radians(el)
@@ -625,16 +734,21 @@ def main():
     bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
     empty = [g.name for g in body.vertex_groups if not any(g.index in [x.group for x in v.groups] for v in body.data.vertices)]
     log('bones without weights:', empty)
-    rigid = [(build_helmet(), 'head')]
+    rigid, skinned = [(build_helmet(), 'head')], []
     for k in ('L', 'R'):
-        rigid += [(build_pad(k), 'shin_' + k), (build_glove(k), 'hand_' + k), (build_shoe(k), 'foot_' + k)]
+        rigid.append((build_shoe(k), 'foot_' + k))
+        gl, pd = build_glove(k), build_pad(k)
+        g, u, an, kn = P('hand_' + k), P('arm_dir_' + k), P('ankle_' + k), P('knee_' + k)
+        skin_to(gl, arm, 'hand_' + k, 'forearm_' + k, smooth01(((g - game_verts(gl)) @ u - GLOVE_WRIST[0]) / GLOVE_WRIST[1]))
+        skin_to(pd, arm, 'shin_' + k, 'thigh_' + k, smooth01(((game_verts(pd) - kn) @ norm(kn - an) - PAD_HINGE[0]) / PAD_HINGE[1]))
+        skinned += [gl, pd]
     for ob, b in rigid:
         parent_to_bone(ob, arm, b)
-    objs = [body] + [o for o, _ in rigid]
-    bake_ao(objs, {'body': (0.7, None), 'helmet': (0.6, None), 'pad': (0.75, None), 'glove': (0.6, None),
+    objs = [body] + [o for o, _ in rigid] + skinned
+    bake_ao(objs, {'body': (0.7, face_tone), 'helmet': (0.6, None), 'pad': (0.75, None), 'glove': (0.6, None),
                    'shoe': (0.55, shoe_tone)})
     total = sum(tris(o) for o in objs)
-    log('triangles: body %d, rigid %d, total %d; bones %d' % (tris(body), total - tris(body), total, len(arm.data.bones)))
+    log('triangles: body %d, kit %d, total %d; bones %d' % (tris(body), total - tris(body), total, len(arm.data.bones)))
     if 'out' in ARGS:
         export(ARGS['out'], arm, objs)
     if 'save' in ARGS:
@@ -654,9 +768,20 @@ def main():
             if 'close' in ARGS:
                 views = [v + [1.3, 1.45] for v in views]
             look = rig.g2b(tg['root']) if tg else (0, 0, 0.95)
+            bat = bat_objects(tg['bat']) if tg and 'bat' in tg else []
             for v in views:
-                shoot(cam, os.path.join(ARGS['render'], '%s%s_%d.png' % (name, '_close' if len(v) > 2 else '', v[0])), v[0], v[1],
-                      v[2] if len(v) > 2 else 4.6, (look[0], look[1], v[3] if len(v) > 3 else 0.95))
+                # view = [azimuth, elevation, distance, look height or 'bone' / 'bone@f': f of the way from its head to its tail]
+                at = v[3] if len(v) > 3 else 0.95
+                tag = ('_' + at.partition('@')[0]) if isinstance(at, str) else '_close' if len(v) > 2 else ''
+                if isinstance(at, str):
+                    n, _, f = at.partition('@')
+                    pb = arm.pose.bones[n]
+                    at = tuple(arm.matrix_world @ pb.head.lerp(pb.tail, float(f or 0)))
+                else:
+                    at = (look[0], look[1], at)
+                shoot(cam, os.path.join(ARGS['render'], '%s%s_%d.png' % (name, tag, v[0])), v[0], v[1], v[2] if len(v) > 2 else 4.6, at)
+            for o in bat:
+                bpy.data.objects.remove(o)
         log('renders in', ARGS['render'])
 
 

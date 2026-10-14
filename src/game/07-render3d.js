@@ -108,30 +108,30 @@ function poseSet(p,o){
   if(o.dh){p[qHX]+=o.dh[0];p[qHY]+=o.dh[1];p[qHZ]+=o.dh[2];}
   for(let j=0;j<PK.length;j++){const x=o[PK[j][0]];if(x!=null)p[PK[j][1]]=x;}
   return p;}
-const BP={st:poseSet(new Float32Array(PN),{ff:[-.45,1.36,.15],fb:[-.45,.8,0],hip:[-.43,.88,1.06],hr:.1,lx:.28,lz:.04,sr:.15,h:[.16,.05,.02],d:[.12,-1,.12],nod:.25,hd:.2,fc:.7})};
+const BP={st:poseSet(new Float32Array(PN),{ff:[-.45,1.36,.15],fb:[-.45,.8,0],hip:[-.43,.85,1.06],hr:.1,lx:.28,lz:.04,sr:.15,h:[.16,.1,-.02],d:[.12,-1,.12],nod:.25,hd:.2,fc:.7})};
 BP.fw=poseSet(new Float32Array(BP.st),{ff:[-.33,1.8,.55],fb:[-.47,.8,.1],heel:.35,hip:[-.38,.8,1.31],hr:.2,lx:.3,lz:.22,sr:.2,nod:.55});
-BP.bk=poseSet(new Float32Array(BP.st),{ff:[-.38,1.18,.1],fb:[-.22,.6,-.1],hip:[-.32,.9,.9],hr:.05,lx:.18,lz:-.06,sr:.1,h:[.15,.08,.02],nod:.2});
+BP.bk=poseSet(new Float32Array(BP.st),{ff:[-.38,1.18,.1],fb:[-.22,.6,-.1],hip:[-.32,.9,.9],hr:.05,lx:.18,lz:-.06,sr:.1,h:[.15,.12,-.02],nod:.2});
 BP.tr=poseSet(new Float32Array(BP.st),{ff:[-.43,1.46,.2],fb:[-.38,.76,0],hip:[-.4,.87,1.1]});
 const UP={bl:{h:[.1,.5,-.18],d:[-.15,.8,-.6],sr:.08,fc:1.3},
-  block:{dh:[0,-.03,.04],h:[.2,.08,.2],d:[.1,-1,-.25],sr:.3,lx:.34,lz:.18,nod:1,fc:0},
-  leave:{h:[.02,.82,-.12],d:[-.1,.75,-.65],sr:.15,lx:.2,nod:.35,fc:1.1},
-  cel:{h:[.04,.88,.02],d:[.1,1,.2],sr:-1.2,hr:-.6,lx:-.05,lz:-.12,nod:-.3,hd:-1.4,fc:0}};
+  block:{dh:[0,-.03,.04],h:[.2,.12,.19],d:[.1,-1,-.25],sr:.3,lx:.34,lz:.18,nod:1,fc:0},
+  leave:{h:[.02,.775,-.08],d:[-.1,.75,-.65],sr:.15,lx:.2,nod:.35,fc:1.1},
+  cel:{h:[0,.82,0],d:[.1,1,.2],sr:-1.2,hr:-.6,lx:-.05,lz:-.12,nod:-.3,hd:-1.4,fc:0}};
 // per SHOTS entry: i impact, f follow-through, li/lf lofted overrides. Drive follow-throughs are aimed in shotKeys.
 const SH3=[
-  {i:{h:[.17,.08,.14],d:[.05,-1,-.05],sr:.25,hr:.15,lx:.3,nod:.7},f:{h:[.1,.12,.1],d:[-.55,-.8,-.3],sr:.35,nod:.6},
-   li:{h:[.15,.25,.18],d:[.4,-.5,.6]},lf:{h:[.05,.45,.05],d:[-.3,.55,-.75],sr:.3}},
-  {i:{dh:[0,-.05,-.02],hr:.9,sr:1.1,h:[.32,.3,.18],d:[.75,-.3,.55],lx:.1,lz:-.08,nod:.3,ffr:.7,heel:0},
+  {i:{h:[.17,.16,.14],d:[.05,-1,-.05],sr:.25,hr:.15,lx:.3,nod:.7},f:{h:[.1,.12,.1],d:[-.55,-.8,-.3],sr:.35,nod:.6},
+   li:{h:[.15,.285,.18],d:[.4,-.5,.6]},lf:{h:[.05,.45,.05],d:[-.3,.55,-.75],sr:.3}},
+  {i:{dh:[0,-.05,-.02],hr:.9,sr:1.1,h:[.31,.3,.18],d:[.75,-.3,.55],lx:.1,lz:-.08,nod:.3,ffr:.7,heel:0},
    f:{dh:[0,-.05,-.04],hr:1.3,sr:1.75,h:[-.12,.62,.02],d:[-.25,.35,-.9],lx:0,lz:-.12,ffr:.9,fbr:.5},
    li:{h:[.3,.48,.18],d:[.7,.1,.6]},lf:{h:[-.1,.82,0],d:[-.2,.65,-.75],lz:-.18}},
-  {i:{h:[.22,.12,.22],d:[0,-1,.18],sr:.4,hr:.25,lz:.15,nod:.7},f:{h:[.05,.25,.22],d:[-.85,-.25,.45],sr:.55,hr:.4,nod:.5},
-   lf:{h:[-.02,.6,.2],d:[-.6,.65,.4],lz:0}},
-  {i:{dh:[0,-.05,.08],h:[.22,.1,.24],d:[.08,-1,-.05],sr:.45,hr:.25,lx:.28,lz:.3,nod:.9,heel:.4},f:{sr:.6,lz:.25,heel:.7,nod:.5},
+  {i:{h:[.22,.2,.2],d:[0,-1,.18],sr:.4,hr:.25,lz:.15,nod:.7},f:{h:[.05,.25,.22],d:[-.85,-.25,.45],sr:.55,hr:.4,nod:.5},
+   lf:{h:[.01,.6,.16],d:[-.6,.65,.4],lz:0}},
+  {i:{dh:[0,-.05,.08],h:[.22,.14,.24],d:[.08,-1,-.05],sr:.45,hr:.25,lx:.28,lz:.3,nod:.9,heel:.4},f:{sr:.6,lz:.25,heel:.7,nod:.5},
    li:{dh:[0,-.02,.04]},lf:{sr:.75,lx:.15,lz:.05}},
-  {i:{dh:[0,-.05,.06],h:[.3,.1,.2],d:[.25,-.97,0],sr:.45,hr:.2,lx:.32,lz:.25,nod:.9,heel:.4,ffr:.7},f:{sr:.65,lz:.2,heel:.7,nod:.5},
+  {i:{dh:[0,-.05,.06],h:[.3,.135,.2],d:[.25,-.97,0],sr:.45,hr:.2,lx:.32,lz:.25,nod:.9,heel:.4,ffr:.7},f:{sr:.65,lz:.2,heel:.7,nod:.5},
    li:{dh:[0,-.02,.03]},lf:{sr:.8,lx:.15,lz:.05}},
-  {i:{dh:[.06,0,-.08],h:[.5,.28,.06],d:[.75,-.45,-.35],sr:.35,hr:.2,lx:.35,lz:-.05,nod:.5},f:{h:[.48,.18,-.04],d:[.45,-.75,-.45],sr:.45},
+  {i:{dh:[.06,0,-.08],h:[.5,.28,.06],d:[.75,-.45,-.35],sr:.35,hr:.2,lx:.35,lz:-.05,nod:.5},f:{h:[.46,.22,-.04],d:[.45,-.75,-.45],sr:.45},
    li:{h:[.45,.45,.08],d:[.8,-.1,-.4]},lf:{h:[.35,.8,0],d:[.55,.7,-.4],lz:-.12}},
-  {i:{dh:[0,-.06,-.05],h:[.3,.02,-.02],d:[.4,-.88,-.3],sr:.2,lx:.4,nod:.8},f:{h:[.32,.02,-.06],d:[.55,-.7,-.45],sr:.25},
+  {i:{dh:[0,-.06,-.05],h:[.27,.06,-.02],d:[.4,-.88,-.3],sr:.2,lx:.4,nod:.8},f:{h:[.26,.06,-.02],d:[.55,-.7,-.45],sr:.25},
    li:{h:[.22,.32,.05],d:[.3,-.2,-.9]},lf:{h:[.2,.45,0],d:[.3,.45,-.85]}}];
 const PB={key:'',sw:false,t0:0,dur:.4,fd:.3,from:new Float32Array(PN),cur:new Float32Array(BP.st),tg:new Float32Array(PN),tmp:new Float32Array(PN),out:new Float32Array(PN),a:null,b:null};
 const smooth=u=>u*u*(3-2*u);
@@ -171,7 +171,7 @@ function shotKeys(b,aim){
   const sw=S.swing||{},L=!!sw.lofted,sp=SH3[SHOTS.indexOf(shotFor(aim))]||SH3[3],a=footPose(new Float32Array(PN),b,1);
   poseSet(a,sp.i);if(L&&sp.li)poseSet(a,sp.li);
   const f=poseSet(new Float32Array(a),sp.f);if(L&&sp.lf)poseSet(f,sp.lf);
-  if(sp===SH3[3]||sp===SH3[4]){const s=Math.sin(aim*D2R),c=Math.cos(aim*D2R);poseSet(f,{h:[.1+.25*s,L?.85:.78,.1+.15*c],d:[.3*s-(L?.25:.35),L?.95:.7,L?-.35:-.55]});}
+  if(sp===SH3[3]||sp===SH3[4]){const s=Math.sin(aim*D2R),c=Math.cos(aim*D2R);poseSet(f,{h:[.1+.25*s+(L?.02:0),L?.77:.78,.1+.15*c],d:[.3*s-(L?.25:.35),L?.95:.7,L?-.35:-.55]});}
   a[qFLY]=a[qBLY]=f[qFLY]=f[qBLY]=0;
   const k=.55+.45*(sw.power||.7);for(let j=0;j<PN;j++)f[j]=a[j]+(f[j]-a[j])*k;
   PB.a=a;PB.b=f;PB.fd=L?.4:.3;}
@@ -241,7 +241,7 @@ function bend(a,T,u,w,f,L){
     const H=[hip[0]+a[qAX]+x[3],hip[1]+a[qAY]+x[4],hip[2]+a[qAZ]+x[5]],d=dir(),fn=faceN(d,a[qFC]),X=V3.norm(V3.cross(fn,d));
     const C=V3.add(V3.add(V3.add(H,V3.sc(d,u)),V3.sc(X,w)),V3.sc(fn,f)),dd=V3.sub(d,d0);
     return 100*(sq(C[0]-T[0])+sq(C[1]-T[1])+sq(C[2]-T[2]))+.5*(sq(x[0])+sq(x[2]))+sq(x[1])+.25*(sq(x[3])+sq(x[4])+sq(x[5]))+.08*V3.dot(dd,dd)+.3*sq(x[8])
-      +400*(far(H,V3.add(sh,V3.sc(s,.19)))+far(V3.add(H,V3.sc(d,.11)),V3.sub(sh,V3.sc(s,.19)))+sq(Math.max(0,.03-H[1]-.86*d[1])));};
+      +400*(far(V3.add(H,V3.sc(d,HAND_AT[0])),V3.add(sh,V3.sc(s,.19)))+far(V3.add(H,V3.sc(d,HAND_AT[1])),V3.sub(sh,V3.sc(s,.19)))+sq(Math.max(0,.03-H[1]-.86*d[1])));};
   let c=cost(),st=.08;
   for(let n=0;n<300&&st>.002;n++){let imp=false;
     for(let i=0;i<9;i++)for(let sg=-1;sg<2;sg+=2){const v=x[i];x[i]=clamp(v+sg*st,L.lo[i],L.hi[i]);const c2=cost();if(c2<c){c=c2;imp=true;}else x[i]=v;}
@@ -332,7 +332,7 @@ function batterRig(){
         return [.132*c*Math.cos(a),.015+.14*Math.sin(l),-.005+(s>0?.142:.152)*c*s];}),
       ellG([0,.04,.09],[.128,.012,.1],24,6,.18),ellG([0,-.105,-.118],[.082,.032,.024],16,5,-.5),ellG([.128,-.005,.072],[.018,.028,.028],10,5),ellG([-.128,-.005,.072],[.018,.028,.028],10,5)),hm),
     grille:p(GB.join(bar(-.005,.158,1),bar(-.055,.156,.95),bar(-.1,.142,.85),vb(0),vb(.42),vb(-.42)),kit(GRILLE,{roughness:.35,metalness:.7})),
-    handle:p(capG(.017,.017,.36,12,3),kit(GRIP,{roughness:.8})),blade:p(bladeG(24,32),kit([1,1,1],{map:painted(paintWood),roughness:.5}))};
+    handle:p(capG(.017,.017,.3-HTOP,12,3),kit(GRIP,{roughness:.8})),blade:p(bladeG(24,32),kit([1,1,1],{map:painted(paintWood),roughness:.5}))};
   shade(g);return r;
 }
 function buildScene(){
@@ -410,7 +410,14 @@ function ik(a,t,l1,l2,pole){
 function faceN(d,ps){const n=[Math.sin(ps),0,Math.cos(ps)],m=V3.sub(n,V3.sc(d,V3.dot(n,d)));return Math.hypot(m[0],m[1],m[2])>.25?V3.norm(m):V3.norm(V3.sub([0,1,0],V3.sc(d,d[1])));}
 // batter joints of a pose (game coordinates). Index 0 = front side (left leg, left arm/top hand), 1 = back side. The
 // procedural parts and the skinned skeleton (07-skin.js) are both placed from these; lengths match rig.py's HUMAN.
-const BJ={t:[],an:[],hj:[],kp:[],kn:[],fw:[],sole:[],sp:[],ap:[],hd:[],e:[]};
+// grip points along the bat from the pose's hand point H (the bat anchor): top (left) hand at the top of the handle, bottom
+// (right) hand touching it, just above the blade (0.28). Gloves are 0.09 long; the handle's rounded top starts at HTOP.
+const HAND_AT=[.095,.18],HTOP=.055;
+// right-hander's grip (gloves: tools/blender/batter.py glove_frame): the handle crosses each palm at GA to the forearm, the
+// back of the hand at GF from the blade face toward the edge (fn x d): top hand toward the bowler, bottom hand's palm behind
+// the handle. Fitted to the poses for the least wrist bend; the elbow then bends toward where the glove wants the forearm.
+const GA=-30*D2R,GF=[-30*D2R,165*D2R];
+const BJ={t:[],an:[],hj:[],kp:[],kn:[],fw:[],sole:[],sp:[],ap:[],hd:[],e:[],wa:[],gn:[]};
 function batJoints(p){
   const J=BJ,hip=[p[qHX],p[qHY],p[qHZ]],ha=[-Math.sin(p[qHR]),0,Math.cos(p[qHR])];
   const Y=V3.norm([p[qLX],1,p[qLZ]]),s0=[-Math.sin(p[qSR]),0,Math.cos(p[qSR])],s=V3.norm(V3.sub(s0,V3.sc(Y,V3.dot(s0,Y)))),n=V3.cross(Y,s);
@@ -419,13 +426,14 @@ function batJoints(p){
     const fw=V3.norm([t[0]*.24,-heel*.07,t[2]*.24]),kp=V3.add(t,V3.sc(ha,.25*side));
     J.t[i]=t;J.an[i]=an;J.hj[i]=hj;J.kp[i]=kp;J.kn[i]=ik(hj,an,.43,.43,kp);J.fw[i]=fw;J.sole[i]=V3.sub([fx+t[0]*.16,ly,fz+t[2]*.16],V3.sc(fw,.16));};
   leg(0,p[qFX],p[qFZ],p[qFR],p[qFLY],0,1);leg(1,p[qBX],p[qBZ],p[qBR],p[qBLY],p[qHL],-1);
-  const sh=V3.add(hip,V3.sc(Y,.5)),H=[hip[0]+p[qAX],hip[1]+p[qAY],hip[2]+p[qAZ]],d=V3.norm([p[qDX],p[qDY],p[qDZ]]),H2=V3.add(H,V3.sc(d,.11));
-  const arm=(i,hd,side)=>{const sp=V3.add(sh,V3.sc(s,.19*side)),ap=[s[0]*.6*side+n[0]*.2,-.7,s[2]*.6*side+n[2]*.2];
-    J.sp[i]=sp;J.ap[i]=ap;J.hd[i]=hd;J.e[i]=ik(sp,hd,.31,.3,ap);};
-  arm(0,H,1);arm(1,H2,-1);
+  const sh=V3.add(hip,V3.sc(Y,.5)),H=[hip[0]+p[qAX],hip[1]+p[qAY],hip[2]+p[qAZ]],d=V3.norm([p[qDX],p[qDY],p[qDZ]]),fn=faceN(d,p[qFC]),m=V3.norm(V3.cross(fn,d));
+  for(let i=0;i<2;i++){const side=i?-1:1,sp=V3.add(sh,V3.sc(s,.19*side)),hd=V3.add(H,V3.sc(d,HAND_AT[i])),
+      N=V3.sc(V3.add(V3.sc(fn,Math.cos(GF[i])),V3.sc(m,Math.sin(GF[i]))),-side),wa=V3.sub(V3.sc(d,Math.cos(GA)),V3.sc(V3.cross(N,d),Math.sin(GA))),
+      ap=V3.add(V3.sub(V3.sub(hd,V3.sc(wa,.3)),sp),[s[0]*.03*side,-.03,s[2]*.03*side]);
+    J.sp[i]=sp;J.ap[i]=ap;J.hd[i]=hd;J.wa[i]=wa;J.gn[i]=N;J.e[i]=ik(sp,hd,.31,.3,ap);}
   const hv=V3.norm([Y[0]+p[qNOD]*.3,Y[1],Y[2]+p[qNOD]*.12]),hc=V3.add(V3.add(hip,V3.sc(Y,.54)),V3.sc(hv,.19)),yw=p[qHDY],f=[Math.sin(yw),0,Math.cos(yw)];
   const fw=V3.norm(V3.sub(f,V3.sc(hv,V3.dot(f,hv))));
-  Object.assign(J,{sh,H,d,hv,hc,face:fw,hx:V3.cross(hv,fw),nt:V3.sub(hc,V3.sc(hv,.06))});
+  Object.assign(J,{sh,H,d,fn,hv,hc,face:fw,hx:V3.cross(hv,fw),nt:V3.sub(hc,V3.sc(hv,.06))});
   return J;}
 // skin: the skinned model is shown, so only the bat is placed here
 function batsman3D(B,p,skin){
@@ -438,8 +446,8 @@ function batsman3D(B,p,skin){
     mB(B.pelvis,J.hip,V3.cross(U,J.ha),U,J.ha);mB(B.torso,J.hip,J.n,J.Y,J.s);mL(B.neck,J.sh,J.nt,.17);
     for(const m of [B.head,B.helmet,B.grille])mB(m,J.hc,J.hx,J.hv,J.face);}
   const H=J.H,d=J.d,a=V3.add(H,V3.sc(d,.28)),b=V3.add(H,V3.sc(d,.86));
-  mL(B.handle,V3.add(H,V3.sc(d,-.06)),V3.add(a,V3.sc(d,.02)),.36);
-  mL(B.blade,a,b,.58,faceN(d,p[qFC]));
+  mL(B.handle,V3.add(H,V3.sc(d,HTOP)),V3.add(a,V3.sc(d,.02)),.3-HTOP);
+  mL(B.blade,a,b,.58,J.fn);
   return J;
 }
 // s = 3 stumps then 2 bails

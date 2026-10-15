@@ -5,12 +5,13 @@ const store={get(k,d){try{const v=localStorage.getItem('cc_'+k);return v?JSON.pa
              del(k){try{localStorage.removeItem('cc_'+k);}catch(e){}}};
 const LENGTHS=[{overs:1,w:2},{overs:2,w:3},{overs:5,w:5},{overs:20,w:10,t20:1}];
 const settings=Object.assign({mode:'chase',diff:'medium',len:1,netsW:5,planet:'earth',assist:true,sound:true},store.get('settings',{}));
-if(!['chase','nets','scen'].includes(settings.mode))settings.mode='chase';
+// T20 is its own mode (menu card); settings.len is the Quick match length only (0-2). Saves from the old menu stored T20 as len 3
+if(settings.len===3){settings.len=1;if(settings.mode==='chase')settings.mode='t20';}
+if(!['chase','t20','nets','scen'].includes(settings.mode))settings.mode='chase';
 const BALL_GAP=2;
 let mem=store.get('mem',{});
 const records=store.get('records',{});
 try{for(const d in records)if(records[d]&&typeof records[d].p==='number')records[d]={short:records[d]};}catch(e){}
-const recFmt=()=>settings.mode==='chase'&&LENGTHS[settings.len]&&LENGTHS[settings.len].t20?'t20':'short';
 const KIT={you:{shirt:'#12606e',trim:'#f2b134',pants:'#e9edf0',helmet:'#15324d'},ai:{shirt:'#7a1f2b',pants:'#f1ece0',skin:'#b07a55'}};
 
 let VIS=PLANETS.earth.vis,STARS=[],PARTS=[],lastDpr=1,flash=0;
@@ -18,6 +19,8 @@ let W=0,H=0,F=1,baseF=1,CX=0,HZ=0,baseHZ=0,hudBottom=80,stands=null,standsTop=0,
 let LAND=false,followF=1,radarTop=80;const SAFE={l:0,r:0,b:0};
 let clock=0,clockPerf=performance.now();
 let M=null;
+// the main menu is up: the camera shows the whole ground (menuCam) and frames render at 30 fps
+const MENU={on:true};
 const S={phase:'idle',t:0,paused:true,ball:null,pending:null,swing:null,aim:null,bat:{mode:'stance',t0:0,from:null,aim:0},
   res:null,hit:null,hitStart:0,trail:[],trail3:[],timing:null,stumps:null,fpos:[],fanim:null,resultDur:1,breakDur:1,runupDur:1,hintCount:0,bowlerZ:31,
   bpos:{x:0,z:0},stick:null,padNow:null,padHit:null};
@@ -37,7 +40,7 @@ function resize(){
   radarTop=LAND&&!hud.hidden?$('#targetSlab').getBoundingClientRect().bottom-r.top:hudBottom;
   skc.width=Math.round(W*dpr);skc.height=Math.round(H*dpr);glSize();
   sk.setTransform(dpr,0,0,dpr,0,0);
-  if(S.cel)celCam(clock-S.cel.t0);
+  if(S.cel)celCam(clock-S.cel.t0);else if(MENU.on)menuCam();
 }
 const cam={x:0,y:CAM_Y,z:CAM_Z,yaw:0,fx:0,fz:1,rx:1,rz:0};
 function setCam(x,y,z,yaw){cam.x=x;cam.y=y;cam.z=z;cam.yaw=yaw;const a=yaw*D2R;cam.fx=Math.sin(a);cam.fz=Math.cos(a);cam.rx=Math.cos(a);cam.rz=-Math.sin(a);}
@@ -49,7 +52,10 @@ function polyWorld(pts){const c=pts.map(p=>toCam(p[0],p[1],p[2])),N=0.3,out=[];
     if(ia!==ib){const t=(N-a[2])/(b[2]-a[2]);out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,N]);}}
   return out.map(projC);}
 function fillPoly(pts,style){if(pts.length<3)return;ctx.fillStyle=style;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();}
+// a planet already on screen (previewed in the menu) is not rebuilt when the match starts
+let shownP=null;
 function applyPlanet(P){
+  if(P===shownP)return;shownP=P;
   VIS=P.vis;curPlanet=Object.keys(PLANETS).find(k=>PLANETS[k]===P)||'earth';build3D();
   STARS=[];for(let i=0;i<140;i++)STARS.push({x:Math.random(),y:Math.random(),r:Math.random()<0.15?2:1.2,a:0.4+Math.random()*0.6});
   PARTS=[];const pv=VIS.particles;if(pv)for(let i=0;i<pv.n;i++)PARTS.push({x:Math.random(),y:Math.random(),s:rnd(0.6,1.4),p:Math.random()*6});

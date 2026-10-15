@@ -22,17 +22,67 @@ let camErr = 0;
 const camCheck = async where => { const e = await page.evaluate(() => __t.cam3());
   camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity ${where}: ${e} px`); };
 
+// menu: a mode card on the hub opens its sheet (it slides in; wait until it is still), options are picked there, Play starts
+const openMode = async (p, m) => { await p.click(`.mcard[data-m=${m}]`);
+  await p.waitForFunction(() => { const s = document.querySelector('#sheet'); return s.classList.contains('open') && getComputedStyle(s).transform === 'none'; }, null, {timeout: 5000, polling: 30}); };
+const startMode = async (p, m, opt = {}) => { await openMode(p, m);
+  for (const [k, v] of Object.entries(opt)) await p.click(k === 'planet' ? `#planetGrid button[data-v=${v}]` : `.seg[data-key=${k}] button[data-v="${v}"]`);
+  await p.click('#startBtn'); };
+const openPanel = async (p, btn, id) => { await p.click(btn);
+  await p.waitForFunction(id => getComputedStyle(document.querySelector(id)).transform === 'none', id, {timeout: 5000, polling: 30}); };
+
 await page.goto(url);
 // the skinned batter must load (the game would silently fall back to the procedural one)
 await page.waitForFunction(() => __r.skin().on || __r.skin().err, null, {timeout: 10000, polling: 50}).catch(() => {});
 const skin = await page.evaluate(() => __r.skin());
 if (!skin.on) errors.push('skinned batter: ' + skin.err);
 else console.log('skin     ok  skinned batter loaded');
+{
+  // Menu: the hub over the live stadium (a sweeping camera, in parity with the overlays), each mode's sheet, a planet picked in a
+  // sheet switches the stadium behind it, options persist, settings toggles, how to play; Play puts the batting lens back
+  await page.waitForTimeout(600);
+  const c0 = await page.evaluate(() => __t.cam());
+  await page.waitForTimeout(700);
+  const c1 = await page.evaluate(() => __t.cam());
+  if (!c0.menu || c0.base || c0.y < 20 || c0.yaw === c1.yaw) errors.push('menu: no moving menu camera ' + JSON.stringify([c0, c1]));
+  await camCheck('menu camera');
+  await page.screenshot({path: `${shots}menu-hub.png`});
+  await openMode(page, 'quick');
+  const ms = await page.evaluate(() => { const t = performance.now(); document.querySelector('#planetGrid button[data-v=mars]').click(); return Math.round(performance.now() - t); });
+  await page.click('.seg[data-key=diff] button[data-v=hard]');
+  await page.click('.seg[data-key=len] button[data-v="2"]');
+  const st = await page.evaluate(() => ({cam: __t.cam(), set: JSON.parse(localStorage.getItem('cc_settings')), blurb: document.querySelector('#planetBlurb').textContent}));
+  if (st.cam.planet !== 'mars' || st.set.planet !== 'mars' || st.set.diff !== 'hard' || st.set.len !== 2 || !/^Mars/.test(st.blurb)) errors.push('menu: Quick match sheet ' + JSON.stringify(st));
+  await page.waitForTimeout(500);
+  await page.screenshot({path: `${shots}menu-quick.png`});
+  await page.click('#planetGrid button[data-v=earth]');
+  await page.click('.seg[data-key=diff] button[data-v=medium]');
+  await page.click('#sheet .x');
+  for (const m of ['t20', 'nets', 'scen']) {
+    await openMode(page, m);
+    const v = await page.evaluate(() => ['#venueOpt', '#diffOpt', '#lenOpt', '#netsOpt', '#scenOpt', '#sgo'].map(q => document.querySelector(q).hidden ? 0 : 1).join(''));
+    const want = {t20: '110001', nets: '110101', scen: '000010'}[m];
+    if (v !== want) errors.push(`menu: ${m} sheet shows ${v}, expected ${want}`);
+    await page.screenshot({path: `${shots}menu-${m}.png`});
+    await page.click('#sheet .x');
+  }
+  await openPanel(page, '#setBtn', '#setSheet');
+  await page.click('#optAssist');
+  const as = await page.evaluate(() => JSON.parse(localStorage.getItem('cc_settings')).assist);
+  await page.click('#optAssist');
+  if (as !== false || await page.evaluate(() => JSON.parse(localStorage.getItem('cc_settings')).assist) !== true) errors.push('menu: pitch marker toggle did not persist');
+  await page.screenshot({path: `${shots}menu-settings.png`});
+  await page.click('#setSheet .x');
+  await openPanel(page, '#howBtn', '#howSheet');
+  await page.screenshot({path: `${shots}menu-how.png`});
+  await page.keyboard.press('Escape');
+  if (await page.evaluate(() => document.querySelector('#menu').classList.contains('sheet-on'))) errors.push('menu: Escape did not close the panel');
+  console.log(`menu     ok  hub camera sweep (yaw ${c0.yaw.toFixed(1)} -> ${c1.yaw.toFixed(1)}), four mode sheets, live planet switch ${ms} ms, settings and how-to`);
+}
 for (const pk of planets) {
-  await page.click('.seg[data-key=mode] button[data-v=nets]');
-  await page.click(`#planetGrid button[data-v=${pk}]`);
-  await page.click('#startBtn');
+  await startMode(page, 'nets', {planet: pk});
   await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
+  if (pk === planets[0]) { const c = await page.evaluate(() => __t.cam()); if (c.menu || !c.base) errors.push('menu: the batting lens was not restored ' + JSON.stringify(c)); }
   if (pk === planets[0]) {
     await page.waitForFunction(() => { const s = __t.sfx(); return s.expected > 0 && s.decoded === s.expected; }, null, {timeout: 10000, polling: 50})
       .catch(async () => { errors.push('sfx decode: ' + JSON.stringify(await page.evaluate(() => __t.sfx()))); });
@@ -58,11 +108,10 @@ for (const pk of planets) {
 if (planets.includes('earth')) {
   // Replay: force perfectly timed lofted shots that suit the length (a boundary ~90% of the time) until one goes for four or six.
   // The brain is reset first: after the forced drives above it bowls short, which a lofted drive mishits.
+  await openPanel(page, '#setBtn', '#setSheet');
   await page.click('#resetBrain');
-  await page.click('.seg[data-key=mode] button[data-v=nets]');
-  await page.click('.seg[data-key=netsW] button[data-v="0"]');
-  await page.click('#planetGrid button[data-v=earth]');
-  await page.click('#startBtn');
+  await page.click('#setSheet .x');
+  await startMode(page, 'nets', {netsW: 0, planet: 'earth'});
   let r = 'no';const tries = [];
   for (let i = 0; i < 8 && r !== 'replay'; i++) {
     await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 20000, polling: 20});
@@ -88,9 +137,7 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
-  await page.click('.seg[data-key=mode] button[data-v=chase]');
-  await page.click('#planetGrid button[data-v=earth]');
-  await page.click('#startBtn');
+  await startMode(page, 'quick', {planet: 'earth', len: 1});
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
   // Reach the target before the next ball; the real result flow then ends the chase with a win.
@@ -112,10 +159,7 @@ if (planets.includes('earth')) {
   // resume and compare the match state (lineup and strike included). A v1 save is not offered.
   await page.evaluate(() => localStorage.removeItem('cc_t20'));
   await page.reload();
-  await page.click('.seg[data-key=mode] button[data-v=chase]');
-  await page.click('.seg[data-key=len] button[data-v="3"]');
-  await page.click('#planetGrid button[data-v=earth]');
-  await page.click('#startBtn');
+  await startMode(page, 't20', {planet: 'earth'});
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
   // a hot off-side scoring zone, so the captain has a reason to move a fielder (after a boundary, and for the next over)
@@ -157,7 +201,8 @@ if (planets.includes('earth')) {
   await page.screenshot({path: `${shots}earth-t20-pause.png`});
   const saved = await page.evaluate(() => __t.t20());
   await page.reload();
-  await page.waitForSelector('#resumeT20:not([hidden])', {timeout: 5000}).catch(() => errors.push('T20: no Resume button after reload'));
+  await page.waitForSelector('#resumeT20:not([hidden])', {timeout: 5000}).catch(() => errors.push('T20: no Continue banner after reload'));
+  await page.screenshot({path: `${shots}menu-hub-continue.png`});
   await page.click('#resumeT20');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
   const back = await page.evaluate(() => __t.t20());
@@ -176,7 +221,7 @@ if (planets.includes('earth')) {
   // carried into its next session after the interstitial.
   await page.evaluate(() => { localStorage.removeItem('cc_scen'); localStorage.removeItem('cc_t20'); });
   await page.reload();
-  await page.click('.seg[data-key=mode] button[data-v=scen]');
+  await openMode(page, 'scen');
   await page.screenshot({path: `${shots}scen-menu.png`});
   const skipS = () => { const S = __t.S; if (S.phase === 'ready') S.t = Math.max(S.t, S.readyDur - 0.1); if (S.phase === 'break') S.t = Math.max(S.t, S.breakDur - 0.1);
     return S.phase === 'flight'; };
@@ -273,6 +318,7 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.evaluate(() => localStorage.setItem('cc_scen', JSON.stringify({stars: Object.fromEntries(SCEN.filter(s => s.set === 'series' && !s.stage).map(s => [s.id, 1]))})));
   await page.reload();
+  await openMode(page, 'scen');
   await page.click('#scenSeries .screw:nth-child(5) .sctile');
   await page.click('#gPlay');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
@@ -286,7 +332,7 @@ if (planets.includes('earth')) {
   const ls = await page.evaluate(() => JSON.parse(localStorage.getItem('cc_scensave')));
   if (!ls || ls.st || ls.sc.id !== 's5b') errors.push('Scenarios: next session not saved at the interval ' + JSON.stringify(ls && {id: ls.sc.id, st: !!ls.st}));
   await page.reload();
-  await page.click('#scenResume');
+  await page.click('#contScen');
   if (!await page.isVisible('#brief') || (await page.textContent('#gTitle')) !== await page.evaluate(() => scenById('s5b').title)) errors.push('Scenarios: Resume at the interval did not open the next briefing');
   await page.click('#gPlay');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
@@ -302,15 +348,18 @@ if (planets.includes('earth')) {
   const sNow = () => page.evaluate(() => __t.scen());
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('cc_scensave')));
   const quit = () => page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
-  const toBreak = async () => { await page.click('#scenResume'); await wf(() => __t.S.phase === 'break'); return sNow(); };
+  // after a quit the Scenarios sheet is open (its resume tile); after a reload the hub (its Continue banner)
+  const toBreak = async (sel = '#scenResume') => { await page.click(sel); await wf(() => __t.S.phase === 'break'); return sNow(); };
   const resume = async () => { await page.reload();
-    if (!await page.waitForSelector('#scenResume:not([hidden])', {timeout: 5000}).catch(() => null)) { errors.push('Scenarios: no Resume entry after reload'); return null; }
-    return toBreak(); };
+    if (!await page.waitForSelector('#contScen:not([hidden])', {timeout: 5000}).catch(() => null)) { errors.push('Scenarios: no Continue banner after reload'); return null; }
+    return toBreak('#contScen'); };
   const same = (a, b, where) => { for (const k in a) if (!['ns3d', 'hold'].includes(k) && a[k] !== b[k]) errors.push(`Scenario resume ${where}: ${k} was ${a[k]}, resumed ${b[k]}`); };
   let i = 0;
   const play = async () => { await wf(`(${skipS})()`); await bat([25, -40, 0, 60, -70][i % 5], {power: [0.3, 0.45, 0.35][i % 3]}); i++; await wf(() => __t.S.phase !== 'flight'); };
   await page.evaluate(() => localStorage.removeItem('cc_scensave'));
   await page.reload();
+  if (await page.isVisible('#contScen')) errors.push('Scenarios: Continue shown with no save');
+  await openMode(page, 'scen');
   if (await page.isVisible('#scenResume')) errors.push('Scenarios: Resume shown with no save');
   const c6 = await page.evaluate(() => [...document.querySelectorAll('#scenClassics .sctile')].findIndex(b => b.querySelector('b').textContent === scenById('c6').title) + 1);
   await page.click(`#scenClassics .sctile:nth-child(${c6})`);
@@ -363,7 +412,7 @@ if (planets.includes('earth')) {
     JSON.stringify({...JSON.parse(good), st: {...JSON.parse(good).st, bat: [], bi: 'x'}}), '{"v":1,"sc":null}']) {
     await page.evaluate(b => localStorage.setItem('cc_scensave', b), bad);
     await page.reload();
-    if (await page.isVisible('#scenResume')) errors.push('Scenarios: a corrupt save is offered: ' + bad.slice(0, 60));
+    if (await page.isVisible('#contScen')) errors.push('Scenarios: a corrupt save is offered: ' + bad.slice(0, 60));
   }
   await page.evaluate(b => localStorage.setItem('cc_scensave', b), good);
   await page.reload();
@@ -378,15 +427,21 @@ if (planets.includes('earth')) {
   if (scenGood) {
     await land.evaluate(b => localStorage.setItem('cc_scensave', b), scenGood);
     await land.reload();
-    await land.click('.seg[data-key=mode] button[data-v=scen]');
+    await land.waitForTimeout(600);
+    await land.screenshot({path: `${shots}landscape-hub.png`});
+    await openMode(land, 'scen');
     const r = await land.evaluate(() => { const b = document.querySelector('#scenResume').getBoundingClientRect(); return {w: b.width, right: b.right, top: b.top, vw: innerWidth}; });
     if (!await land.isVisible('#scenResume') || r.right > r.vw || r.w < 200) errors.push('landscape: Resume entry ' + JSON.stringify(r));
     await land.screenshot({path: `${shots}landscape-scen-menu.png`});
     console.log(`land     ok  scenario Resume entry ${JSON.stringify(r)}`);
   }
-  await land.click('.seg[data-key=mode] button[data-v=nets]');
-  await land.click('#planetGrid button[data-v=earth]');
-  await land.click('#startBtn');
+  if (scenGood) await land.click('#sheet .x');
+  await openMode(land, 'quick');
+  await land.screenshot({path: `${shots}landscape-quick.png`});
+  const sh = await land.evaluate(() => { const r = document.querySelector('#startBtn').getBoundingClientRect(); return {bottom: r.bottom, vh: innerHeight, scroll: document.querySelector('#sheet .sbody').scrollHeight - document.querySelector('#sheet .sbody').clientHeight}; });
+  if (sh.bottom > sh.vh || sh.scroll > 0) errors.push('landscape: Quick match sheet does not fit ' + JSON.stringify(sh));
+  await land.click('#sheet .x');
+  await startMode(land, 'nets', {planet: 'earth'});
   await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
   await land.screenshot({path: `${shots}landscape-runup.png`});
   for (const [where, prep] of [['runup', null], ['shot', async () => {
@@ -405,9 +460,7 @@ if (planets.includes('earth')) {
   await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await land.waitForTimeout(100);
   if (await land.isVisible('#end')) await land.click('#menuBtn');
-  await land.click('.seg[data-key=mode] button[data-v=chase]');
-  await land.click('.seg[data-key=len] button[data-v="3"]');
-  await land.click('#startBtn');
+  await startMode(land, 't20');
   await land.click('#chaseBtn');
   // a spinner's run-up is only 1.1 s
   await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 0.5, null, {timeout: 30000, polling: 30});
@@ -419,6 +472,20 @@ if (planets.includes('earth')) {
   await land.screenshot({path: `${shots}landscape-t20-pause.png`});
   console.log(`land     ok  T20 slab ${JSON.stringify(lay)}`);
   await land.close();
+}
+for (const [w, h] of [[375, 667], [430, 932]]) {
+  const p = await browser.newPage({viewport: {width: w, height: h}});
+  p.on('pageerror', e => errors.push(`${w}x${h}: ` + (e.stack || String(e))));
+  await p.goto(url);
+  await p.waitForTimeout(600);
+  const f = await p.evaluate(() => ({sw: document.documentElement.scrollWidth, vw: innerWidth, vh: innerHeight,
+    low: Math.max(...[...document.querySelectorAll('.mcard,.htitle,.hicons')].map(e => e.getBoundingClientRect().bottom)),
+    right: Math.max(...[...document.querySelectorAll('.mcard,.hicons')].map(e => e.getBoundingClientRect().right))}));
+  if (f.sw > f.vw || f.low > f.vh || f.right > f.vw) errors.push(`menu ${w}x${h}: overflows ${JSON.stringify(f)}`);
+  await p.screenshot({path: `${shots}menu-hub-${w}.png`});
+  if (w === 430) { await p.emulateMedia({colorScheme: 'dark'}); await openMode(p, 'nets'); await p.screenshot({path: `${shots}menu-nets-dark.png`}); }
+  console.log(`menu     ok  ${w}x${h} hub fits ${JSON.stringify(f)}`);
+  await p.close();
 }
 await browser.close();
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }

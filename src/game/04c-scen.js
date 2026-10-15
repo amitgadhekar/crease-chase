@@ -51,9 +51,14 @@ function buildScenList(){
     row.innerHTML='<span class="sct"><i style="background:'+P.vis.sw+'"></i>Test '+t+'<small>'+P.name+'</small></span>';
     ss.forEach(s=>row.appendChild(scenTile(s)));se.appendChild(row);}
   CLASSICS.forEach(s=>cl.appendChild(scenTile(s)));
-  const sv=scenSaved(),rb=$('#scenResume'),o=sv&&sv.sc.obj,st=sv&&sv.st;rb.hidden=!sv;
-  if(sv)rb.innerHTML='<b>Resume: '+scBase(sv.sc).title+'</b><span>'+(st?objNow(st,o)+(o.type==='survive'?'':' · '+plural(Math.max(0,o.balls-st.balls),'ball')+' left'):kickText(sv.sc)+', about to start')+'</span>';
+  const sv=scenSaved(),rb=$('#scenResume');rb.hidden=!sv;
+  if(sv){const t=scenResumeText(sv);rb.innerHTML='<b>Resume: '+t[0]+'</b><span>'+t[1]+'</span>';}
   const tot=SCEN.reduce((a,s)=>a+scStars(s.id),0);$('#scenTotal').textContent=tot+' of '+SCEN.length*3+' stars';
+}
+// a saved scenario, for the sheet's resume tile and the hub's Continue banner: [title, where it stands]
+function scenResumeText(sv){
+  const o=sv.sc.obj,st=sv.st;
+  return [scBase(sv.sc).title,st?objNow(st,o)+(o.type==='survive'?'':' · '+plural(Math.max(0,o.balls-st.balls),'ball')+' left'):kickText(sv.sc)+', about to start'];
 }
 // the briefing card, also shown between sessions of a staged scenario (st = the session just played)
 function scenBrief(sc,done){

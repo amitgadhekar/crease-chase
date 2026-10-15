@@ -6,6 +6,17 @@ function celCam(t){
   setCam(-d*Math.sin(ar)*u,lerp(CAM_Y,h,u),lerp(CAM_Z,-d*Math.cos(ar),u),a*u);
   F=baseF*Math.pow(Fw/baseF,u);HZ=lerp(baseHZ,HZw,u);
 }
+// main menu: the whole ground from outside the stands (celebration-style framing, lower), the stands' back edge (RT) spanning the
+// width, centred higher in portrait so the cards and sheets cover the near side. The camera sweeps slowly (up to 3°/s, real
+// time; still with reduced motion) along the off side, where the sun lights the batter, and stays 30° clear of the floodlight
+// towers (azimuths ±35° from each end), which would otherwise fill the foreground
+const RM=matchMedia('(prefers-reduced-motion: reduce)');
+function menuCam(){
+  const sH=VIS.standsH,RT=BOUNDARY+7+sH*1.15,d=1.45*RT,h=0.62*RT,kn=(h-sH)/(d-RT),kf=(h-sH)/(d+RT);
+  const a=-90+(RM.matches?-12:25*Math.sin(performance.now()/1000*0.12)),ar=a*D2R;
+  setCam(-d*Math.sin(ar),h,-d*Math.cos(ar),a);
+  F=Math.min(0.5*W*d/RT,(LAND?0.6:0.34)*H/(kn-kf));HZ=H*(LAND?0.72:0.5)-F*kn;
+}
 function updateCam(dt){
   if(S.cel)celCam(clock-S.cel.t0);
   else if(S.phase==='replay')rpCam(dt);
@@ -38,9 +49,13 @@ function update(dt){
       if(t>=6)showEnd();break;}
   }
 }
+let lastDraw=0;
 function frame(now){
   const dt=Math.min(0.25,(now-clockPerf)/1000);clockPerf=now;
   if(!S.paused){clock+=dt;update(dt);}
+  // behind the menu and the other overlays (paused): 30 fps. rAF itself stops while the page is hidden
+  if(S.paused&&now-lastDraw<30){requestAnimationFrame(frame);return;}
+  lastDraw=now;if(MENU.on)menuCam();
   if(!S.paused&&S.phase==='result')recContact();
   const V=S.phase==='replay'?rpView():liveView();
   if(!S.paused&&(S.phase==='runup'||S.phase==='flight'||S.phase==='result'))recFrame(V);

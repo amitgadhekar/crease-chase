@@ -1,30 +1,64 @@
-/* ---------- menu wiring ---------- */
+/* ---------- main menu: the hub (Continue, mode cards, settings, how-to) over the live stadium, one sheet per mode ---------- */
+const MODES={quick:{t:'Quick match',mode:'chase'},t20:{t:'T20',mode:'t20'},nets:{t:'Nets',mode:'nets'},scen:{t:'Scenarios'}};
+let sheetMode=null;
 function buildPlanetGrid(){
   const grid=$('#planetGrid');grid.innerHTML='';
-  for(const k of PLANET_ORDER){const P=PLANETS[k],b=document.createElement('button');b.dataset.v=k;
-    b.innerHTML='<i style="background:'+P.vis.sw+'"></i>'+P.name;b.addEventListener('click',()=>{settings.planet=k;store.set('settings',settings);refreshMenu();});grid.appendChild(b);}
+  for(const k of PLANET_ORDER){const P=PLANETS[k],b=document.createElement('button');b.dataset.v=k;b.setAttribute('aria-label',P.name);
+    b.innerHTML='<i'+(P.vis.rings?' class="ring"':'')+' style="background:'+P.vis.sw+'"></i>';
+    b.addEventListener('click',()=>{settings.planet=k;store.set('settings',settings);preview(k);refreshMenu();});grid.appendChild(b);}
 }
+// the live stadium switches to the chosen planet; the 3D layers fade in over the rebuild
+function preview(k){
+  if(PLANETS[k]===shownP)return;
+  applyPlanet(setPlanet(k));const a=$('#app');a.classList.remove('swap');void a.offsetWidth;a.classList.add('swap');
+}
+const recText=(r,none)=>r&&(r.p||r.hs)?settings.diff[0].toUpperCase()+settings.diff.slice(1)+': won '+r.w+' of '+r.p+' · best '+r.hs:none;
 function refreshMenu(){
+  const m=sheetMode,PP=PLANETS[settings.planet]||PLANETS.earth,v=PP.vis,L=LENGTHS[settings.len]||LENGTHS[1],rd=records[settings.diff]||{};
   $('#planetGrid').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===settings.planet)));
-  const PP=PLANETS[settings.planet]||PLANETS.earth;$('#planetBlurb').textContent=PP.blurb+' Gravity '+(PP.g/9.8).toFixed(2)+'× Earth.';
+  $('#planetBlurb').innerHTML='<b>'+PP.name+'.</b> '+PP.blurb+' Gravity '+(PP.g/9.8).toFixed(2)+'× Earth.';
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.key;seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(settings[k])===b.dataset.v)));});
-  const sm=settings.mode==='scen';
-  $('#lenOpt').style.display=settings.mode==='chase'?'':'none';$('#netsOpt').style.display=settings.mode==='nets'?'':'none';
-  for(const id of ['#venueOpt','#diffOpt','#startBtn'])$(id).style.display=sm?'none':'';$('#scenOpt').style.display=sm?'':'none';
+  $('#scenOpt').hidden=m!=='scen';$('#venueOpt').hidden=$('#diffOpt').hidden=$('#sgo').hidden=m==='scen';$('#lenOpt').hidden=m!=='quick';$('#netsOpt').hidden=m!=='nets';
+  $('#lenBlurb').textContent=m==='quick'?L.overs+(L.overs>1?' overs, ':' over, ')+L.w+' wickets. Chase the '+PP.team+'’s total.'
+    :m==='t20'?'20 overs, 10 wickets, against a five-bowler attack with real fielding restrictions. Saved after every ball.'+(t20Saved()?' A new one replaces your saved T20.':'')
+    :m==='nets'?'No target: face pace and spin in turn and work on your shots.':'';
   $('#optAssist').checked=settings.assist;$('#optSound').checked=settings.sound;
-  const fmt=recFmt(),r=(records[settings.diff]||{})[fmt],L=LENGTHS[settings.len]||LENGTHS[1];
-  $('#recordLine').textContent=r&&(r.p||r.hs)?'On '+settings.diff+(fmt==='t20'?', T20':'')+': '+r.w+' of '+r.p+' chases won.'+' Highest score '+r.hs+'.':'';
-  $('#lenBlurb').textContent=L.t20?'20 overs, 10 wickets, against a five-bowler attack with real fielding restrictions. Saved after every ball.':L.overs+(L.overs>1?' overs, ':' over, ')+L.w+' wickets.';
-  if(sm){const n=SCEN.reduce((a,s)=>a+scStars(s.id),0);$('#recordLine').textContent=n?'Scenarios: '+n+' of '+SCEN.length*3+' stars.':'';}
-  const sv=t20Saved(),rb=$('#resumeT20');rb.hidden=!sv;
-  if(sv)rb.textContent='Resume T20: '+PLANETS[sv.pk].name+', '+sv.st.runs+'/'+sv.st.wkts+' after '+oversText(sv.st.balls)+' overs';
+  $('#artQuick').style.background='linear-gradient(180deg,'+v.sky[0]+','+v.sky[1]+' 58%,'+v.ground[0]+' 58%,'+v.ground[1]+')';
+  $('#recQuick').textContent=recText(rd.short,'Chase a target in 1, 2 or 5 overs');
+  $('#recT20').textContent=recText(rd.t20,'20 overs against a five-bowler attack');
+  const n=SCEN.reduce((a,s)=>a+scStars(s.id),0),N=SCEN.length*3;$('#recScen').textContent=n+' of '+N+' stars';$('#scenBar').style.width=n/N*100+'%';
+  $('#artScen').innerHTML=[1,2,3,4,5].map(t=>{const ss=SERIES.filter(s=>s.test===t);
+    return '<i class="'+(ss.some(s=>scStars(s.id))?'on':'')+'" style="background:'+PLANETS[ss[0].planet].vis.sw+'"></i>';}).join('');
+  const sv=t20Saved(),ss=scenSaved(),rb=$('#resumeT20'),cs=$('#contScen');rb.hidden=!sv;cs.hidden=!ss;
+  $('#cont').hidden=!sv&&!ss;$('#cont').classList.toggle('two',!!sv&&!!ss);
+  if(sv)rb.innerHTML='<i class="cic">20</i><span><b>Continue T20</b><small>'+PLANETS[sv.pk].name+' · '+sv.st.runs+'/'+sv.st.wkts+' after '+oversText(sv.st.balls)+' overs, chasing '+sv.target+'</small></span><em></em>';
+  if(ss){const t=scenResumeText(ss);cs.innerHTML='<i class="cic red"></i><span><b>Continue: '+t[0]+'</b><small>'+t[1]+'</small></span><em></em>';}
 }
+// id: the sheet element; m: the mode it is set up for (mode sheet only)
+function openSheet(id,m){
+  if(id==='sheet'){sheetMode=m;$('#shTitle').textContent=MODES[m].t;if(m==='scen')buildScenList();else preview(settings.planet);$('#sheet .sbody').scrollTop=0;}
+  refreshMenu();
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.toggle('open',s.id===id));
+  $('#menu').classList.add('sheet-on');$('#hub').inert=true;$('#'+id+' .x').focus({preventScroll:true});
+}
+function closeSheet(){
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+  $('#menu').classList.remove('sheet-on');$('#hub').inert=false;sheetMode=null;
+}
+function showMenu(sheet){showScreen('menu');if(sheet)openSheet('sheet',sheet);else{closeSheet();refreshMenu();}}
+document.querySelectorAll('.mcard').forEach(c=>c.addEventListener('click',()=>openSheet('sheet',c.dataset.m)));
+document.querySelectorAll('.sheet .x').forEach(b=>b.addEventListener('click',closeSheet));
+$('#scrim').addEventListener('click',closeSheet);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&MENU.on&&$('#menu').classList.contains('sheet-on'))closeSheet();});
+$('#setBtn').addEventListener('click',()=>openSheet('setSheet'));
+$('#howBtn').addEventListener('click',()=>openSheet('howSheet'));
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const k=seg.dataset.key;settings[k]=(k==='len'||k==='netsW')?+b.dataset.v:b.dataset.v;store.set('settings',settings);refreshMenu();}));
 $('#optAssist').addEventListener('change',e=>{settings.assist=e.target.checked;store.set('settings',settings);});
 $('#optSound').addEventListener('change',e=>{settings.sound=e.target.checked;store.set('settings',settings);if(settings.sound)audio();});
-$('#startBtn').addEventListener('click',startMatch);
+$('#startBtn').addEventListener('click',()=>{settings.mode=MODES[sheetMode].mode;store.set('settings',settings);closeSheet();startMatch();});
 $('#resumeT20').addEventListener('click',resumeT20);
+$('#contScen').addEventListener('click',resumeScen);
 $('#scenResume').addEventListener('click',resumeScen);
 $('#chaseBtn').addEventListener('click',()=>beginPlay());
 $('#introBack').addEventListener('click',quitToMenu);
@@ -43,13 +77,13 @@ $('#rpSkip').addEventListener('click',()=>{if(S.phase==='replay'&&!S.paused)rpEn
 $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.target.textContent='Done. The bowler starts fresh.';});
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
-if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
+if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,cam:()=>({yaw:cam.yaw,y:cam.y,F,HZ,base:F===baseF&&HZ===baseHZ,planet:curPlanet,menu:MENU.on,sheet:sheetMode}),t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
   ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),
   s:M.st.s,ns:M.st.ns,bat:JSON.stringify(M.st.bat),hold:!!S.hold,ns3d:LV.ns.on}:null,
   scen:()=>M&&M.sc?{id:M.sc.id,runs:M.st.runs,wkts:M.st.wkts,balls:M.st.balls,s:M.st.s,ns:M.st.ns,ob:M.st.ob,hold:!!S.hold,pid:M.pid,ok:fieldOkTest(M.field),
     bi:M.bi,overNo:M.overNo,chips:M.overBalls.map(c=>c.t).join(' '),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),bat:JSON.stringify(M.st.bat),
     md:M.md.join(),hud:['#sOvers','#sTarget','#cObj','#cCond','#cBat0','#cBat1','#cBowl'].map(q=>$(q).textContent).join(' | '),
     viol:M.st.viol.bouncer+M.st.viol.field,ns3d:LV.ns.on}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
-buildPlanetGrid();buildScenList();applyPlanet(setPlanet(settings.planet));resize();refreshMenu();
+buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();showMenu(null);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

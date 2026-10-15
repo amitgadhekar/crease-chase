@@ -506,7 +506,7 @@ function bowlerState(){
 }
 /* --- view state: everything render3D/draw take from the game. Live frames are built here; a replay feeds recorded
    frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
-const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay';
+const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay'||MENU.on;
 const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,bx:0,arm:null,brun:0,brn:false,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
   nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0,dej:0});
 const LV=mkView(),CH={on:false,t0:-9},BO={};
@@ -553,7 +553,7 @@ function qTick(){
    Casters project onto their own shadows in light space, so covering the visible ground covers them too. --- */
 const SHB={x:[1,0,0],y:[0,1,0],x0:0,x1:0,y0:0,y1:0};
 function fitShadow(d){
-  const z=[-d[0],d[1],d[2]],x=V3.norm([z[2],0,-z[0]]),y=V3.cross(z,x),far=S.cel?Math.hypot(cam.x,cam.z)+BOUNDARY+12:wideCam()?60:46;
+  const z=[-d[0],d[1],d[2]],x=V3.norm([z[2],0,-z[0]]),y=V3.cross(z,x),far=S.cel||MENU.on?Math.hypot(cam.x,cam.z)+BOUNDARY+12:wideCam()?60:46;
   const dn=Math.max(.5,H-HZ>1?cam.y*F/(H-HZ):.5);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(const dd of [dn,far])for(const sx of [-CX,W-CX]){const l=sx*dd/F,gx=-(cam.x+cam.fx*dd+cam.rx*l),gz=cam.z+cam.fz*dd+cam.rz*l,a=x[0]*gx+x[2]*gz,b=y[0]*gx+y[2]*gz;
     x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,b);y1=Math.max(y1,b);}

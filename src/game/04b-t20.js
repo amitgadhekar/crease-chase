@@ -41,9 +41,16 @@ function t20Saved(){const s=store.get('t20',null);
   return s&&s.v===2&&s.st&&PLANETS[s.pk]&&DIFF[s.diff]&&Array.isArray(s.attack)&&s.attack.length===5&&s.attack.every(a=>a&&ARCH[a.arch])
     &&Array.isArray(s.st.bw)&&s.st.bw.length===5&&Array.isArray(s.st.bat)&&s.st.bat.length===XI.length&&s.st.bat.every(p=>p&&TIER[p.tier])
     &&s.st.s!==s.st.ns&&[s.st.s,s.st.ns].every(i=>Number.isInteger(i)&&i>=0&&i<XI.length)&&(s.pid==null||TPL[s.pid])&&(s.field==null||Array.isArray(s.field))?s:null;}
+// the T20 card's Play (and Restart): a 20-over chase of a simulated innings, at the chosen planet and difficulty
+function startT20(){
+  M=newMatch(setPlanet(settings.planet),'chase',settings.diff,LENGTHS[3]);
+  M.attack=makeAttack(M.pk,M.diff);M.zones=[0,0,0,0,0,0,0,0];
+  M.ai=simulateAI(M.overs,M.wktsMax,M.diff,M.planet.t20);M.target=M.ai.runs+1;M.st=newT20(M.attack,M.diff,M.target);
+  chaseIntro();
+}
 function resumeT20(){
   const s=t20Saved();if(!s)return;
-  Object.assign(settings,{mode:'chase',len:3,planet:s.pk,diff:s.diff});store.set('settings',settings);
+  Object.assign(settings,{mode:'t20',planet:s.pk,diff:s.diff});store.set('settings',settings);
   M=newMatch(setPlanet(s.pk),'chase',s.diff,LENGTHS[3]);
   Object.assign(M,{target:s.target,ai:s.ai,st:s.st,zones:s.zones,foot:s.foot,bi:s.bi,plan:{id:s.pid,mix:TPL[s.pid]},field:s.field,overNo:s.overNo,overBalls:s.overBalls,
     fours:s.fours,sixes:s.sixes,perfects:s.perfects,swings:s.swings,lastLens:s.lastLens,runs:s.st.runs,balls:s.st.balls,wkts:s.st.wkts,saved:true,

@@ -58,7 +58,8 @@ floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight 
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
 `geo`/`fillGeo` (-> BufferGeometry) · 07-people fielder/bowler species per planet (`SPECIES`, `spBuild`) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
 ball), batter pose, view state, adaptive quality · 07-skin skinned batter (loads the GLB, drives its bones from the pose) ·
-08 camera follow + main loop · 08b replay (recording, playback, replay cameras) · 09 menu wiring + boot.
+08 camera follow (incl. the menu camera `menuCam`) + main loop · 08b replay (recording, playback, replay cameras) · 09 menu (hub, sheets,
+planet preview) + boot.
 
 ## Core model (read before touching physics or rendering)
 - **World coords (metres):** batter's stumps at z=0, bowler's stumps at z=20.12, +z toward the bowler, +y up,
@@ -70,6 +71,11 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   `setViewOffset` puts the principal point at (CX, HZ), so 2D overlays drawn with `proj()` line up with the 3D scene. If you
   change one, change both; the smoke test asserts they agree within 0.5 px (`__t.cam3()`).
   Field of view is changed only by setting `F` (reset to `baseF`, like `HZ`/`baseHZ`), so both stay in sync.
+  While the menu is up (`MENU.on`, set by `showScreen`), `menuCam` (08) shows the whole ground from outside the stands:
+  celebration-style framing (stands' back edge `RT`, camera at 1.45·RT, 0.62·RT high, `F`/`HZ` from W and H, centred higher in
+  portrait), sweeping ±25° (up to 3°/s, fixed with reduced motion) along the off side, the sunlit side, 30° clear of the
+  floodlight towers (a full orbit passes right by them and they fill the foreground); `wideCam()` counts it (fog pushed out, surround land, whole-ground shadow frustum). Leaving the menu,
+  `newMatch`/`scenBrief` call `updateCam(0)`, which puts the batting camera and `baseF`/`baseHZ` back; `resize()` re-runs it.
 - **Landscape** (`LAND` in `resize()`, the same `(orientation: landscape)` query as the CSS): the batting view uses a longer
   lens, `F = 1.55*h`, `HZ = 0.235*h` with `h = H - SAFE.b` (portrait: `F = min(2.4W, 1.15H)`, `HZ = 0.31H`), so the bowler's
   release to the stumps' base fills the short view above the timing bar; only a sliver of sky is left. `followF` (the portrait
@@ -79,9 +85,10 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
   stick/Loft/Hold in the bottom corners, timing bar bottom centre with Early/Late beside it, hint above it, aim label top
   centre. Phones (`max-height: 520px`) get a 224 px left column with the T20/Scenarios rows stacked. Edge UI adds
   `--sa-l/r/b` (env safe-area insets); `#safe` carries them as padding so `resize()` reads them into `SAFE` for the canvas
-  overlays. Cards with a body (`.card.split`: menu, briefing, result, pause with the T20 scorecard) become two columns: board
-  (+ buttons) left, `.cbody` scrolling right; the menu's Play/Resume (`.cgo`) stick to the bottom of that column. `.cbody`
-  and `.cgo` are `display:contents` in portrait, so portrait is unchanged. `resize()` runs from a ResizeObserver on `#scene`.
+  overlays. Cards with a body (`.card.split`: briefing, result, pause with the T20 scorecard) become two columns: board
+  (+ buttons) left, `.cbody` scrolling right; `.cbody` is `display:contents` in portrait, so portrait is unchanged. The menu hub
+  puts the title top left and Continue + the four mode cards in rows along the bottom; its sheets become a right-hand side
+  panel (the stadium preview stays visible on the left). `resize()` runs from a ResizeObserver on `#scene`.
 - **Rendering layers:** `#sky` 2D canvas (gradient, stars, sun/moons with yaw shift, Jupiter bands, Venus clouds, Saturn rings)
   → `#gl` three WebGLRenderer (WebGL2, transparent clear) → `#scene` 2D overlay canvas, which also receives all pointer input.
 - **Three scene graph** (07-render3d): `buildScene` creates every mesh once at boot (12 fielder rigs + bowler, batter rig,
@@ -120,7 +127,8 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - **Glow:** fireworks and floodlight halos are additive `THREE.Points` with a radial glow texture (`addBlend`: colour adds,
   alpha is kept, so over the transparent sky the premultiplied canvas composites them as light), not tone mapped, no fog.
   `fw3D` fills the points from `FW` (06) each frame: rocket head + trail, spark + two trailing points.
-- **Adaptive quality** (no UI): `qTick` measures the average frame time over 90 frames after 1.2 s of play; above 22 ms it
+- **Adaptive quality** (no UI): `qTick` measures the average frame time over 90 frames after 1.2 s of play (only with a match
+  running and unpaused, so the menu camera and its 30 fps frames never count); above 22 ms it
   steps down one tier and measures again, otherwise it locks for the session. Tiers (`QT`): 0 shadow map 2048, full crowd
   (15000 desktop / 9000 phone), DPR cap 2.5 · 1 shadow map 1024 · 2 crowd halved · 3 GL canvas DPR cap 1.5 (`glSize`; the
   2D canvases keep theirs). iOS Low Power Mode (30 fps cap) also reads as slow and drops tiers, which saves battery anyway.
@@ -209,7 +217,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
 - **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier (T20: per-phase weights `AI_T20`,
   times the planet's `t20` and `DIFF.t20`).
-- **T20 chase** (4th `LENGTHS` entry, `M.t20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
+- **T20 chase** (4th `LENGTHS` entry, `M.t20`, its own menu mode `t20` started by `startT20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
   - `makeAttack`: 5 named bowlers per planet from `ARCH` archetypes (always a death specialist and a spinner); each carries a
     profile (`pace` x DIFF range or spin `v`, swing, `turn`/`dir`, `wrong`, `slow`, `acc`, `wide`, `len` bias) that `makeDelivery` reads.
   - Per over (`t20Over`): `captainPick` (max 4, never consecutive, phase roles, expensive bowlers rested, `canFinish` keeps the
@@ -232,7 +240,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
     multipliers don't carry over to 20 overs). Re-measure both after any T20 logic change.
   - Save/resume: `t20Save` writes `cc_t20` after every ball and after each over is picked (attack names + archetypes, `M.st`, zones,
     foot trend, current bowler/plan/field, over chips; `v:2`: lineup and strike are in `M.st`, v1 saves are not offered). `overNo*6 > balls` means the saved over is under way (resume continues it),
-    else a new over is picked. "Resume T20" in the menu; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
+    else a new over is picked. The hub's Continue banner (`#resumeT20`) resumes it; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
   - HUD: a full-width `#t20Slab` (phase chip, required vs current rate, the batters as in `#scenSlab` (`batCard`), bowler figures O-M-R-W and overs left, pace marker vs the
     straight line to the target, i.e. half by over 10). Over-break banner: bowler change + field line (`fieldLine`). Radar: inner
     circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard (batting with how out, yet to bat, bowling,
@@ -242,7 +250,7 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - **Scenarios** (Tests; `settings.mode` `scen`, `M.sc` = the scenario, `M.st` = `newTest`; design, numbers and departures in
   docs/scenarios-mode.md). Pure logic in logic.js (step 1: `SCEN`, `TIER`, `testBall`/`testRecord`, `scenEnd`/`scenStars`/`stageNext`),
   flow in 04c:
-  - Menu mode "Scenarios" swaps venue/difficulty/Play for the list: the Series (5 Tests x 3, each unlocked by a star on the one
+  - The Scenarios card's sheet holds the list (resume tile on top; the hub's Continue banner `#contScen` resumes too): the Series (5 Tests x 3, each unlocked by a star on the one
     before) and the Classics (all open). A tile opens the briefing (`#brief`: situation, objective, stars, conditions, pair).
     Stars (best per scenario id) are saved in `cc_scen` = `{stars:{id:n}}`.
   - Save/resume: one slot `cc_scensave` (`scenSave`/`scenSaved`/`resumeScen`), written after every recorded ball and after each over
@@ -271,6 +279,14 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
     sweep is being aimed), family `FAM.sweep` (flat bat, contact window in front of the front pad); `qKN` kneel turns the back
     knee's IK pole down and forward; `UP.duck` (ball at the body), `UP.sway` (outside it), `UP.hit` (flinch for 0.7 s).
     `shotOf` = `shotForBall` in Tests, else `shotFor`, for poses, contact targeting and the aim label.
+- **Main menu** (`#menu`, 09): a hub over the live stadium (title, Continue banners for the T20 and scenario saves, mode cards:
+  Quick match = mode `chase` with `settings.len` 0-2, T20 = mode `t20` via `startT20` in 04b, Scenarios, Nets; Settings and How
+  to play icon buttons) and sheets: one mode sheet (`#sheet`, set up per mode by `openSheet`: planets, bowler, overs or
+  wickets, Play; or the scenario list) plus `#setSheet` and `#howSheet`. Bottom sheets in portrait; the hub fades out while one
+  is open (`.sheet-on`, hub `inert`), so the stadium shows. Picking a planet calls `preview` -> `applyPlanet` (rebuilds the
+  stadium; the 3D layers fade in over it), and `applyPlanet` skips the planet already shown, so Play does not rebuild it. While
+  paused (menu and overlay screens) `frame` draws at 30 fps; rAF stops on a hidden page. `quitToMenu` returns to the hub, or to
+  the Scenarios sheet from a scenario (result, pause or briefing). Old settings with `len` 3 migrate to mode `t20`.
 - **Records:** `records[diff][format]`, format `short` (1-5 overs and nets) or `t20`; old flat records migrate to `short` at load.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
   plus `vis` for the look. `setPlanet` derives `ENV.carry`, `ENV.acc` (ground deceleration), `ENV.run` (fielder speed).
@@ -352,6 +368,9 @@ ball), batter pose, view state, adaptive quality · 07-skin skinned batter (load
 - Scenarios (owner): a third mode with a Series and Classics and stars, both batters played by the player with tiers and a Hold
   button, sweeps from the existing aim and the duck from the stick (no new shot buttons), fictional text only. Details in docs/scenarios-mode.md.
 - Non-striker: a SkeletonUtils clone of the skinned batter, not a second GLB (no size cost) or the procedural fallback (style clash).
+- Main menu (owner, 2026-10-14): a hub over the live stadium (a slowly sweeping camera, mode cards, a sheet per mode, planets previewed
+  live) over a hub on a static background (no venue preview, and a second look to keep in step with the game) and over polishing
+  the single long form card (still one scrolling form, every mode's options mixed). The live background costs a wide render at 30 fps.
 - Kneeling sweeps need a pose parameter (`qKN`) for the back knee's IK pole: the pole follows the toe, which points back when
   kneeling. The crouch starts in the backlift while a sweep is aimed, so the 75 ms downswing doesn't drop the batter in one jump.
 

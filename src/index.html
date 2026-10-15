@@ -54,31 +54,61 @@
   <div id="safe" aria-hidden="true"></div>
 
   <section id="menu" class="screen on" aria-label="Main menu">
-    <div class="card split">
-      <div class="board"><div class="seam" aria-hidden="true"></div>
-        <h1>Crease<br>Chase</h1>
-        <p>Bat against an AI bowler that studies your weak spots and moves its fielders to block your favourite shots.</p>
+    <div class="hub" id="hub">
+      <div class="hicons">
+        <button class="ibtn" id="howBtn" aria-label="How to play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9.2a2.9 2.9 0 1 1 4.1 2.6c-.8.4-1.3 1-1.3 1.9v.6"/><circle cx="12" cy="17.6" r=".9" fill="currentColor" stroke="none"/></svg></button>
+        <button class="ibtn" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg></button>
       </div>
-      <div class="opt"><span class="lbl">Mode</span>
-        <div class="seg" data-key="mode"><button data-v="chase">Chase</button><button data-v="nets">Nets</button><button data-v="scen">Scenarios</button></div></div>
-      <div class="cbody">
-      <div class="opt" id="scenOpt"><button class="sctile scres" id="scenResume" hidden></button><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
-        <span class="lbl">Classics</span><div class="scgrid" id="scenClassics"></div></div>
-      <div class="opt" id="venueOpt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
-      <div class="opt" id="diffOpt"><span class="lbl">Bowler</span>
-        <div class="seg" data-key="diff"><button data-v="easy">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button></div></div>
-      <div class="opt" id="lenOpt"><span class="lbl">Match length</span>
-        <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button><button data-v="3">T20</button></div>
-        <p class="pblurb" id="lenBlurb"></p></div>
-      <div class="opt" id="netsOpt"><span class="lbl">Session ends after</span>
-        <div class="seg" data-key="netsW"><button data-v="3">3 wickets</button><button data-v="5">5 wickets</button><button data-v="10">10 wickets</button><button data-v="0">No limit</button></div></div>
-      <label class="tog"><input type="checkbox" id="optAssist"> Show where the ball will pitch</label>
-      <label class="tog"><input type="checkbox" id="optSound"> Sound</label>
-      <div class="cgo"><button class="primary" id="startBtn">Play</button>
-      <button class="secondary" id="resumeT20" hidden>Resume T20</button></div>
-      <details class="how" open>
-        <summary>How to bat</summary>
-        <ul>
+      <header class="htitle">
+        <h1><span>Crease</span><span>Chase<i class="hball" aria-hidden="true"></i></span></h1>
+        <p>Outbat a bowler that learns your game.</p>
+      </header>
+      <div class="hmain">
+        <div class="cont" id="cont">
+          <button class="cbtn" id="resumeT20" hidden></button>
+          <button class="cbtn" id="contScen" hidden></button>
+        </div>
+        <div class="modes">
+          <button class="mcard mq" data-m="quick"><span class="art" id="artQuick" aria-hidden="true"><svg viewBox="0 0 120 70"><path class="streak" d="M18 30h34M10 38h40M22 46h26"/><circle cx="62" cy="38" r="7" fill="#c0392b"/><path d="M58 33.5q4 4.5 0 9M66 33.5q-4 4.5 0 9" stroke="rgba(255,255,255,.75)" stroke-width="1" fill="none"/><g fill="#efe8d2"><rect x="88" y="20" width="3.2" height="40" rx="1"/><rect x="95" y="20" width="3.2" height="40" rx="1"/><rect x="102" y="20" width="3.2" height="40" rx="1"/><rect x="87" y="17.5" width="9" height="2" rx="1"/><rect x="97" y="17.5" width="9" height="2" rx="1"/></g></svg></span>
+            <b>Quick match</b><small id="recQuick"></small></button>
+          <button class="mcard mt" data-m="t20"><span class="art" aria-hidden="true"><svg viewBox="0 0 120 70"><g class="tower"><path d="M14 70V22M106 70V22"/><rect x="6" y="12" width="16" height="10" rx="1.5"/><rect x="98" y="12" width="16" height="10" rx="1.5"/></g><path class="beam" d="M22 18L60 70H40ZM98 18L80 70H60Z"/></svg><em>20</em></span>
+            <b>T20</b><small id="recT20"></small></button>
+          <button class="mcard ms" data-m="scen"><span class="art" aria-hidden="true"><i class="rball"></i><span class="tests" id="artScen"></span></span>
+            <b>Scenarios</b><small id="recScen"></small><span class="mbar" aria-hidden="true"><i id="scenBar"></i></span></button>
+          <button class="mcard mn" data-m="nets"><span class="art" aria-hidden="true"><svg viewBox="0 0 120 70"><g fill="#efe8d2"><rect x="50" y="26" width="3" height="34" rx="1"/><rect x="58.5" y="26" width="3" height="34" rx="1"/><rect x="67" y="26" width="3" height="34" rx="1"/><rect x="49.5" y="23.5" width="10" height="2" rx="1"/><rect x="60.5" y="23.5" width="10" height="2" rx="1"/></g></svg></span>
+            <b>Nets</b><small>Practice, no target</small></button>
+        </div>
+      </div>
+    </div>
+    <div class="scrim" id="scrim" aria-hidden="true"></div>
+    <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+      <div class="shead"><h2 id="shTitle"></h2><button class="ibtn x" aria-label="Back to menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sbody">
+        <div class="opt" id="scenOpt"><button class="sctile scres" id="scenResume" hidden></button><span class="lbl">Series against the Meridian XI <small id="scenTotal"></small></span><div id="scenSeries"></div>
+          <span class="lbl">Classics</span><div class="scgrid" id="scenClassics"></div></div>
+        <div class="opt" id="venueOpt"><span class="lbl">Venue</span><div class="planets" id="planetGrid"></div><p class="pblurb" id="planetBlurb"></p></div>
+        <div class="opt" id="diffOpt"><span class="lbl">Bowler</span>
+          <div class="seg" data-key="diff"><button data-v="easy">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button></div></div>
+        <div class="opt" id="lenOpt"><span class="lbl">Match length</span>
+          <div class="seg" data-key="len"><button data-v="0">1 over</button><button data-v="1">2 overs</button><button data-v="2">5 overs</button></div></div>
+        <div class="opt" id="netsOpt"><span class="lbl">Session ends after</span>
+          <div class="seg" data-key="netsW"><button data-v="3">3 wickets</button><button data-v="5">5 wickets</button><button data-v="10">10 wickets</button><button data-v="0">No limit</button></div></div>
+        <p class="mblurb" id="lenBlurb"></p>
+      </div>
+      <div class="sgo" id="sgo"><button class="primary" id="startBtn">Play</button></div>
+    </div>
+    <div class="sheet" id="setSheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+      <div class="shead"><h2 id="setTitle">Settings</h2><button class="ibtn x" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sbody">
+        <label class="tog"><span>Sound</span><input type="checkbox" role="switch" id="optSound"></label>
+        <label class="tog"><span>Show where the ball will pitch</span><input type="checkbox" role="switch" id="optAssist"></label>
+        <button class="link" id="resetBrain">Make the bowler forget what it has learned about you</button>
+      </div>
+    </div>
+    <div class="sheet" id="howSheet" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+      <div class="shead"><h2 id="howTitle">How to bat</h2><button class="ibtn x" aria-label="Close how to play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sbody">
+        <ul class="how">
           <li>Pull back like a slingshot: put your finger down and drag away from where you want the ball to go. Drag down to hit it straight past the bowler, down-left for a cover drive, left for a cut, right for a pull, up for fine shots behind you.</li>
           <li>Shots stay on the ground by default. Tap Loft before you let go to hit that ball in the air; it switches off after every ball. A longer pull hits harder, up to the dashed ring.</li>
           <li>Let go to swing, just as the ball reaches the bat. The bar at the bottom shows how early or late you were.</li>
@@ -87,9 +117,6 @@
           <li>Early swings go squarer to the leg side, late ones to the off side. Drive full balls, cut and pull short ones.</li>
           <li>Scenarios: you bat both batters, whoever is on strike, and tail-enders time the ball worse. Tap Hold just after a ground shot to turn down an odd run and keep the strike. Against spin, aim fine on the leg side to sweep a full ball, or fine on the off side to reverse-sweep it. Pull the stick back once a short ball pitches to duck under it.</li>
         </ul>
-      </details>
-      <p class="foot" id="recordLine"></p>
-      <button class="link" id="resetBrain">Make the bowler forget what it has learned about you</button>
       </div>
     </div>
   </section>

@@ -1,5 +1,5 @@
 /* ---------- match flow ---------- */
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));MENU.on=id==='menu';}
 function newMatch(P,mode,diff,L){
   sfx.amb(true);rpUI(false);applyPlanet(P);
   S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
@@ -9,14 +9,17 @@ function newMatch(P,mode,diff,L){
 function startMatch(){
   if(M&&M.sc)return startScen(M.sc);
   if(M&&M.saved)store.del('t20');
-  M=newMatch(setPlanet(settings.planet),settings.mode,settings.diff,LENGTHS[settings.len]);const P=M.planet;
-  if(M.t20){M.attack=makeAttack(M.pk,M.diff);M.zones=[0,0,0,0,0,0,0,0];}
-  if(M.mode==='chase'){
-    M.ai=simulateAI(M.overs,M.wktsMax,M.diff,M.t20?P.t20:P.ai);M.target=M.ai.runs+1;if(M.t20)M.st=newT20(M.attack,M.diff,M.target);
-    $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
-    $('#iText').textContent=P.name+'. '+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
-    showScreen('intro');S.paused=true;
-  }else beginPlay();
+  if(settings.mode==='t20')return startT20();
+  M=newMatch(setPlanet(settings.planet),settings.mode,settings.diff,LENGTHS[settings.len]);
+  if(M.mode==='chase'){M.ai=simulateAI(M.overs,M.wktsMax,M.diff,M.planet.ai);M.target=M.ai.runs+1;chaseIntro();}
+  else beginPlay();
+}
+// the innings break before a chase: the AI's total and the target
+function chaseIntro(){
+  const P=M.planet;
+  $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
+  $('#iText').textContent=P.name+'. '+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
+  showScreen('intro');S.paused=true;
 }
 function beginPlay(cont){
   showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#scenSlab').hidden=!M.sc;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver(cont);
@@ -182,7 +185,8 @@ function celebrate(){
 }
 function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
 // a ball still in its Hold window is recorded as not held, so the T20 or scenario save includes it
-function quitToMenu(){if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');refreshMenu();buildScenList();showScreen('menu');}
+// back to the hub; from a scenario (its result, pause or briefing) straight into the Scenarios sheet
+function quitToMenu(){const toScen=!!(M&&M.sc)||$('#brief').classList.contains('on');if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');showMenu(toScen?'scen':null);}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#pCard').innerHTML=M.t20?t20Card():'';$('#pause .card').classList.toggle('split',!!M.t20);

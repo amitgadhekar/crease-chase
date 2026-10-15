@@ -22,7 +22,7 @@ let M=null;
 // the main menu is up: the camera shows the whole ground (menuCam) and frames render at 30 fps
 const MENU={on:true};
 const S={phase:'idle',t:0,paused:true,ball:null,pending:null,swing:null,aim:null,bat:{mode:'stance',t0:0,from:null,aim:0},
-  res:null,hit:null,hitStart:0,trail:[],trail3:[],timing:null,stumps:null,fpos:[],fanim:null,resultDur:1,breakDur:1,runupDur:1,hintCount:0,bowlerZ:31,
+  res:null,hit:null,hitStart:0,trail:[],trail3:[],timing:null,stumps:null,fpos:[],fplay:[],fev:null,f0:0,cord:null,resultDur:1,breakDur:1,runupDur:1,hintCount:0,bowlerZ:31,
   bpos:{x:0,z:0},stick:null,padNow:null,padHit:null};
 
 /* ---------- sizing ---------- */

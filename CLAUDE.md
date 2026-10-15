@@ -16,7 +16,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
+npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -36,6 +36,9 @@ picks, consecutive overs or quota breaches (plus captain and field fuzzing, the 
 Its Test checks: a seeded fingerprint of the short-format and T20 rows is unchanged (`FP`; update only on purpose); swing, reverse,
 turn and bounce follow ball age and day; each scenario's bot win rate within its `band`; farming beats not farming in last pairs and
 careful beats slogging in survive scenarios; no bouncer-limit, Law 28.4 or consecutive-over breaches.
+Its fielding checks: the same balls fielded at each level score less and are caught more from easy to hard; keeper/close and deep
+chances in reach taken within bands; rope catches happen; well-timed ground shots keep >=95% of their pre-v2 runs; no impossible
+fielding event. The whole test takes ~95 s (the fielding model doubled it from ~54 s).
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
 
 ## Layout
@@ -200,7 +203,10 @@ planet preview) + boot.
   `-- --render DIR --poses poses.json` run renders turntables and game poses; `__r.drive()` dumps a pose).
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
   without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG` (fallback); fielders/bowler are lower poly,
-  13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). `GB.surf`/`GB.join`
+  13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). Fielding actions (`o.act`): 1 run, 2 take
+  or stop (stoops to low balls), 3 dive, 4 leap, 5 slide, 6 keeper squat/gather; `person3D` poses the body standing, then turns it
+  as a whole about the hip (roll for a dive, pitch back for a slide), lifts it, and puts both hands on `hx/hy/hz` by IK through
+  the inverse of that transform. `GB.surf`/`GB.join`
   in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
 - **Species** (07-people): fielders and bowler are a species per planet (Earth humans, Selenites, Scorchlings, Cloudwaders,
   Rustkin, Gravitons, Ringlings, Tidefolk); the batter stays human. `SPECIES[planet]` sets bone lengths and radii (1.4 m to
@@ -224,6 +230,26 @@ planet preview) + boot.
   it into charge/back/across weights that scale lengths and lines (`FOOT_LEN`, `FOOT_LINE`: shorter and wider vs chargers,
   fuller vs back-foot players, straighter and yorkers vs moving across), and the plan text then names it (`FOOT_NOTE`).
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
+- **Fielding** (logic.js; skill `FS` per difficulty, the T20 first innings always at medium): every fielder makes a timed attempt
+  at the ball on the path the game draws (`res.path`, `hitPos`). `fsk` sets skill by position: keeper at his `KEEP` stance (back
+  to pace, up to spin), close catchers one step, ring, deep; reaction, sprint (`runD`), dive, jump, hands, judging time for a ball
+  in the air. `airChance` samples a flight every 0.05 s (take, running catch, leap, dive; a rope catch inside the rope in its last
+  0.25 s, x0.85); `groundPlay` every metre of a ground line (earliest clean pick-up, else best dive, a slide near the rope), tried
+  in time order: a failed dive lets it run on, a fumble costs a run. Edges fly fine on a real trajectory (the keeper-slip gap is
+  real; lofted edges leave at 0.7x speed and loop up), then run on from the landing or off the hands; skiers hang up for anyone.
+  Each result carries `res.fplay` (contract above `ev`), plus show-only events that use no randomness: dives and leaps that miss
+  by a little, earlier dives beaten by the ball, the fetch, the chase to the rope, the rider under a six. `DIFF.catchMul` only
+  scales the lofted-mishit chance. Balance: the same balls fielded at each level (runs fall, catches rise), close and deep chances
+  taken, rope catches, runs per well-timed ground shot (>=95% of before), and `fplayBad` (no event beyond run + reach, hands on
+  the ball for catch/drop/stop/fumble) over random balls on every planet, level, field and tier.
+  Game side (`fieldTick`, 08): `doSwing` moves the events onto the drawn path (it starts at the blade's `sw.cp`, the logic's at
+  `footAt(...).c`) into `S.fplay`/`S.fev` (per fielder, times after `S.f0` = contact). Each event: run from where he is to a
+  launch point on the logic's run profile (`FS`, `runP`), then the dive (launch `t1-(0.12+e/6)`, lie, up by 1.1 s), leap (0.35 s
+  either side of t1), slide (from t1-0.45) or take lands the hands at t1; a caught/stopped/fetched ball then stays in the hands
+  (`V.ball`). The keeper is drawn at `KEEP[M.bowlerType]` (`resetFielders`), squats in the run-up, rises at the pitch (pace) or
+  release (spin), shuffles up to 1 m and gathers what passes the bat (`keepTick`; `ballNow` carries the ball to his gloves where he
+  is drawn). He is hidden only in the home batting view (`batView()`); the bowler's slot carries caught-and-bowled. Ring and deep
+  fielders walk in 1.5 m in the last second of the run-up.
 - **AI innings:** short formats: simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier. T20: played ball by
   ball by the AI batters against the player's bowling (below).
 - **T20 chase** (4th `LENGTHS` entry, `M.t20`, its own menu mode `t20` started by `startT20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
@@ -347,13 +373,22 @@ planet preview) + boot.
   "scoring vs Earth" ratio (the test checks they stay within 0.8-1.25 of each other), and its T20 `t20` (AI batter timing spread
   x) until its medium full match is ~50%.
 - **Chase camera:** on fours and sixes the camera follows the ball (`updateCam`), and the banner and score reveal are
-  deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
+  deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active. It also runs
+  for lofted balls of 30 m+ or with a deep fielder's attempt (outcome deferred to the catch or landing), and for a dive, leap or
+  slide the batting camera can't see that gets a hand to the ball (not near misses: the follow-through stays on most balls).
+  **Cordon camera** (`S.cord`, batting only): when the keeper or a close catcher (<18 m) catches, drops, dives or leaps, 0.12 s
+  after contact a cut to a long lens from behind the bowler's stumps on the catch or drop (else the first such play; 9 m of ground
+  across the longer screen side), outcome deferred to its t1, until the next ball. `batView()` (keeper hidden) holds until either
+  camera's `t0`. A deferred holdable ball opens its 0.6 s Hold window when the outcome is shown; the catch groan/drop gasp plays at
+  contact + `path.T` whenever the outcome is shown. Boundary paths are kept consistent with the rope on the drawn path (`doSwing`:
+  a six lands >= 1 m over it, a one-bounce four 0.5 m inside).
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (115 floats/frame, max 600 frames, ~275 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (187 floats/frame, max 600 frames, ~450 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
+  Per fielder 12 floats: x, z, sin/cos face, run, flags, action, its time `ap`, hands' target, stretch.
   Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near contact) until 0.4 s after contact,
   then a spider-cam trailing the ball (closer and lower for low balls, backs off and rises for high ones so the stands stay in frame) at 1x until 0.3 s after it crosses the rope, with a glow ring on the ball (`rpGlow`). Tap/key/Skip skips after 0.3 s.
   The batter is shown in replays (the live chase camera hides it).
@@ -416,6 +451,21 @@ planet preview) + boot.
   marker without a meter; "Simulate rest" over bowling all 20 or only a star bowler's 4; no toss. Per-planet `t20` now scales
   the AI batter's timing, because its scoring follows planet physics less than the batting bot's (it reads swing and lofts by
   carry), so medium matches ran 25-80% without it.
+- Fielding v2 (owner, 2026-10-14: "they don't even try"): one time-based model for every fielder against the drawn path, over
+  retuning the old reach formulas (ground stops were superhuman but invisible, rope catches could never fire, edges were a flat
+  probability). The same balls score 2.28 / 2.04 / 1.82 runs per ball fielded at easy / medium / hard. Against the old model:
+  T20 chase -5/-6% runs on medium/hard; short formats easy +4%, medium level on runs (its gain is catches: 24 balls/out), hard
+  -5%, because well-timed ground shots now score more on every level (owner: gaps must pay). Not retuned further: it would reopen
+  the T20 ~50% medium calibration and the Test bands. Lofted edges leave
+  at 0.7x: at full speed they cleared the cordon (caught 22% vs 39% before) and always-lofting beat the standard bot on hard. To
+  keep T20 medium near 50% the AI batter's medium timing spread went 64 -> 68 ms (medium targets ~10% lower), and four Test targets
+  moved to their old win rates (s2b 85 -> 78, s3a 130 -> 120, s3c 190 -> 165, c1 20 -> 18); bands unchanged.
+- Fielding visuals: the logic's `fplay` events drive the existing 13-mesh rigs (a whole-body turn about the hip plus IK hands), no
+  new meshes or animation clips. The keeper is drawn but hidden in the home batting view (up to spin he would block the batter,
+  back to pace he is behind the camera); a cordon camera cut shows edges instead, and the chase camera follows dives the batting
+  camera can't see (most ring fielders are off screen in portrait), which trades some views of the follow-through for seeing them try.
+  Limited (review) to plays that get a hand to the ball and to close catches, drops, dives and leaps: off-screen near misses and
+  plain stops by the keeper or close fielders stay in the batting view (cut rate on ground shots down by about a fifth).
 - T20 strike (owner, 2026-10-14): you bat both, the XI in order with tiers, Hold and the non-striker, over "always on strike"
   (v1): it adds keep-the-strike planning (Hold at the death), at the cost of balls the tail faces.
   Targets were re-calibrated (`DIFF.t20`), and Moon/Mercury/Mars `t20` re-measured (their top order bats longer than Earth's).
@@ -446,8 +496,11 @@ planet preview) + boot.
 4. Original collectible characters/kits as part of career.
 5. Unverified on real iPhone hardware: frame rate (~145 draw calls/frame between balls including the shadow pass, measured
    with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd; Scenarios and T20 add the
-   non-striker: ~172 calls, ~190k triangles). The adaptive tiers react to it; if still slow: merge person parts into
+   non-striker: ~172 calls, ~190k triangles). The keeper adds 13 meshes (+13 in the shadow pass) wherever he is drawn (not in
+   the home batting view): 158 calls, ~128k triangles measured in the T20 bowling view at a keeper's gather (headless). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
-- No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
-  and stumpings just knock the bails off. The T20 bowling view looks at the empty spot behind the stumps.
+- Replays are only for fours and sixes; a replay of caught wickets (the cordon and deep catches) is a possible follow-up.
+- Wicket rates per planet are not guarded (only runs are): with real edge trajectories, Jupiter's gravity drops edges short of
+  the cordon (about half the catches; easy short-format chases rarely lose a wicket), while Venus, Saturn and Neptune catch more.
+  T20 per-planet win rates stay in band. If it matters: a per-planet cordon depth in `fieldFor`/`tplField`.
 - Sun/moons/stars are screen-space with a yaw shift; Saturn's rings don't rotate with the chase camera.

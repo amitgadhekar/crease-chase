@@ -37,7 +37,7 @@ CLAUDE.md; this doc keeps the reasoning and rejected options.
   matters, but where the marker goes matters more.
 - **Same physics, difficulty elsewhere:** the player's deliveries and the AI's shots use medium physics (`BOWL_D`) on every level;
   a harder `DIFF` would give the player faster bowlers and the batter tighter windows, i.e. make bowling easier. Difficulty is the
-  meter and the batter (`AIB`): timing spread 71 / 64 / 58 ms, share of a pace change read from the hand .5 / .6 / .7, misreads
+  meter and the batter (`AIB`): timing spread 71 / 68 / 58 ms (64 ms on medium before fielding v2), share of a pace change read from the hand .5 / .6 / .7, misreads
   and footwork.
 - **AI batter (`aiBat`):** reads length at release and line at the bat with errors (larger for swing); commits footwork on the
   length as read within the joystick's limits (back to short, forward or down the pitch to good length, across to an expected

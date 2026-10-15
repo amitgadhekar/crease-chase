@@ -63,11 +63,12 @@ function fwBurst(x,y,z,RT){
   if(clock-FW.sb>0.15){FW.sb=clock;sfx.fwBoom(clamp(Math.hypot(x-cam.x,y-cam.y,z-cam.z)/(3*RT),0,1));}
 }
 function ballNow(){
-  if(S.phase==='flight'){const sw=S.swing,t0=clock-S.ball.start,t=sw&&sw.cp&&!sw.missed?t0+sw.dl*clamp((t0-sw.tc)/SWING_DELAY+1,0,1):t0,p=ballPos(S.ball,S.padNow?Math.min(t,S.padNow.t):t);return p.z>-2.2?p:null;}
+  if(S.phase==='flight'){const sw=S.swing,t0=clock-S.ball.start,t=sw&&sw.cp&&!sw.missed?t0+sw.dl*clamp((t0-sw.tc)/SWING_DELAY+1,0,1):t0,p=ballPos(S.ball,S.padNow?Math.min(t,S.padNow.t):t);return p.z>-2.2||!batView()?p:null;}
   if(S.phase==='result'){
     if(S.hit)return hitPos(S.hit,clock-S.hitStart);
     if(S.padHit){const h=S.padHit,u=clock-h.t0;return {x:h.x+0.15*Math.min(u,0.6),y:Math.max(0,h.y+0.6*u-4.9*u*u),z:h.z+0.5*Math.min(u,0.6)};}
-    if(S.ball&&!S.res.out&&!S.stumps){const t=clock-S.ball.start;const p=ballPos(S.ball,t);return p.z>-2.2?p:null;}
+    // past the batter it goes on to the keeper's gloves where he is drawn (fieldTick then holds it in them), stumpings included
+    if(S.ball&&(!S.res.out&&!S.stumps||S.stumps&&S.stumps.bails)){const t=clock-S.ball.start,p=ballPos(S.ball,t),bv=batView();return !bv||!S.stumps&&p.z>-2.2?p:null;}
   }
   return null;
 }

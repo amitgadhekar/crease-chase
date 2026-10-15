@@ -77,9 +77,9 @@ function setPlanet(key){
 }
 function rollWind(p){if(!p.wind){WIND={x:0,z:0};return 0;}const a=Math.random()*Math.PI*2,v=p.wind*rnd(0.4,1);WIND={x:Math.sin(a)*v,z:Math.cos(a)*v};return v;}
 const DIFF={
-  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
-  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
-  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
+  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, deep:1,acc:.7,spd:.95,turn:.85,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
+  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   deep:2,acc:.85,spd:1,turn:1,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
+  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, deep:3,acc:1,spd:1.04,turn:1.1,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
 };
 // timing windows in seconds (late side is tighter: the ball is past you)
 const EARLY={perfect:.025,good:.055,ok:.095,edge:.14}, LATE={perfect:.025,good:.045,ok:.065,edge:.09};
@@ -322,12 +322,12 @@ const TPL={
  RV:{test:1,name:'Reverse-swing field',f:'slip point cover midoff midon midwk sqleg fine longon',atk:1,len:{Y:1.6,F:1.3,G:1.2,S:.5,B:.4},line:{wide:.1,off:.8,mid:2,leg:.6}}
 };
 for(const k in TPL)TPL[k].f=TPL[k].f.split(' ');
-// boundary riders (T20 templates): 0.9 x boundary; c widens their catching reach (they are set to take the catch, not save the single)
-const RIDER=0.9,RIDER_C=1.3;
+// boundary riders (T20 templates): 0.9 x boundary
+const RIDER=0.9;
 const phaseOf=o=>o<6?'pp':o<16?'mid':'death';
-const spot=(n,a,d,c)=>({x:d*Math.sin(a*D2R),z:d*Math.cos(a*D2R),n,a,d,c:c||1});
+const spot=(n,a,d)=>({x:d*Math.sin(a*D2R),z:d*Math.cos(a*D2R),n,a,d});
 function tplField(id){
-  const sc=BOUNDARY/65,f=TPL[id].f.map(n=>{const [a,d]=POS[n];return d==='deep'?spot(n,a,BOUNDARY*RIDER,RIDER_C):spot(n,a,d>17?d*sc:d);});
+  const sc=BOUNDARY/65,f=TPL[id].f.map(n=>{const [a,d]=POS[n];return d==='deep'?spot(n,a,BOUNDARY*RIDER):spot(n,a,d>17?d*sc:d);});
   f.push({x:0.15,z:-1.8,n:'keeper'},{x:0.5,z:17.5,n:'bowler'});
   return f;
 }
@@ -362,7 +362,7 @@ function adjust(field,Z,ctx){
       cold=idx.filter(j=>f[j].d>deep&&Z[zoneOf(f[j].a)]<Z[s]*0.5).sort((x,y)=>Z[zoneOf(f[x].a)]-Z[zoneOf(f[y].a)]);
     let nk='',bd=1e9;for(const k in POS)if(POS[k][1]==='deep'&&!POS[k][3]&&Math.abs(angDiff(POS[k][0],ang))<bd){bd=Math.abs(angDiff(POS[k][0],ang));nk=k;}
     for(const j of [...inner,...cold]){
-      const old=f[j];f[j]=spot(nk,ang,D,RIDER_C);
+      const old=f[j];f[j]=spot(nk,ang,D);
       if(ok(f)){moved.push({from:old.n,to:nk});break;}
       f[j]=old;
     }
@@ -610,115 +610,209 @@ function stageNext(sc,st){
 
 /* ---------- shot resolution ---------- */
 function windows(diffKey,early,m){const k=DIFF[diffKey].win*(m||1),b=early?EARLY:LATE;return {perfect:b.perfect*k,good:b.good*k,ok:b.ok*k,edge:b.edge*k};}
-// Tests (x = {field,c,T}): a block at chest height or above is a fend off the gloves; an inside edge can go to the close leg catchers
+/* ---------- fielding: every fielder in reach makes a timed attempt at the ball on the path the game draws ---------- */
+// re reaction (s), v sprint m/s and ac m/s2 (both x ENV.run), dv dive beyond the hands (outfield), cdv dive (keeper, close
+// catchers), jp jump above the standing reach (m, x min(9.8/G,9)), h hands, aj extra judging time for a ball in the air (not
+// close), mf fumbled pick-up
+const FS={easy:  {re:.28,v:6.2,ac:11,dv:2.7, cdv:2.2,jp:.35,h:.78,aj:.6, mf:.07},
+          medium:{re:.24,v:7.1,ac:12,dv:2.85,cdv:2.3,jp:.45,h:.86,aj:.45,mf:.045},
+          hard:  {re:.2, v:7.7,ac:13,dv:3,   cdv:2.5,jp:.55,h:.93,aj:.35,mf:.025}};
+// HANDS reach from the body, UP highest standing take; the keeper stands back to pace, up to spin; REC seconds to return the ball
+const HANDS=.7,UP=2.25,KEEP={pace:{x:.4,z:-12},spin:{x:.3,z:-.9}},REC={stop:.45,dive:1,slide:1.3};
+// one fielder's skill for this ball by position: keeper, close (one step), ring, deep
+function fsk(f,F,b){
+  const d=Math.sqrt(f.x*f.x+f.z*f.z),kp=f.n==='keeper',cl=kp||d<18&&f.n!=='bowler'||CLOSE.includes(f.n),dp=d>BOUNDARY*.6,p=kp?KEEP[b&&b.type]||KEEP.pace:f;
+  return {x:p.x,z:p.z,re:F.re-(kp?.12:cl?.08:dp?-.05:0),v:F.v*ENV.run,ac:F.ac*ENV.run,mx:kp?.3:cl?.6:1e9,dv:cl?F.cdv:F.dv,
+    jp:F.jp*Math.min(9,9.8/G),h:Math.min(.99,F.h+(kp?.05:cl?.02:0)),cl,kp,dp};
+}
+// metres run by t (s after contact), capped by position; runT: time to run d (uncapped: chasing after the play)
+function runD(k,t){const u=t-k.re;if(u<=0)return 0;const t0=k.v/k.ac;return Math.min(k.mx,u<t0?.5*k.ac*u*u:k.v*(u-t0/2));}
+function runT(k,d){const t0=k.v/k.ac,d0=.5*k.v*t0;return k.re+(d<=d0?Math.sqrt(2*d/k.ac):t0+(d-d0)/k.v);}
+// a play: the fielding events (fplay) and who is busy (a fielder who has acted starts again 1 s later from where he acted)
+const newPlay=(field,F,b,c)=>({field,F,b,c,ev:[],busy:{},nm:[]});
+function kOf(P,i,air){const k=fsk(P.field[i],P.F,P.b),u=P.busy[i];if(u){k.x=u.x;k.z=u.z;k.re=u.t;}if(air&&!k.cl)k.re+=P.F.aj;return k;}
+// res.fplay, sorted by t1 (t = s after contact, on the path hitPos draws from res.path): {i index into the field resolved
+// against, k 'run'|'take'|'dive'|'jump'|'slide'|'stop', o 'catch'|'drop'|'stop'|'fumble'|'miss'|'' (a plain run: fetch, chase,
+// rider), t0 starts moving, t1 hands meet the ball (or it passes, or he arrives), x,z ground point under the hands at t1 (keeper:
+// from his KEEP stance), y hand height, e stretch beyond his run (m; a full dive for a near miss), sd +1 if (x,z) is to his right
+// facing the contact point}. drop: the ball comes off the hands; miss: it goes on untouched (hands on it, except a near miss,
+// up to 1.2 m short or 1 m below it). A fielder's next event starts >= 1 s after his last t1, from its x,z
+function ev(P,i,k,kind,o,t1,x,z,y,e){
+  const fx=P.c.x-k.x,fz=P.c.z-k.z;
+  P.ev.push({i,k:kind,o,t0:Math.min(k.re,t1),t1,x,z,y,e:Math.max(0,e||0),sd:(x-k.x)*fz-(z-k.z)*fx<0?-1:1});P.busy[i]={t:t1+1,x,z};
+}
+// the hands' end point when a full stretch falls short of the ball at (x,z)
+function reachTo(k,x,z,r){const d=Math.hypot(x-k.x,z-k.z),s=Math.min(1,r/Math.max(d,1e-6));return {x:k.x+(x-k.x)*s,z:k.z+(z-k.z)*s};}
+const seg=(c,dir,sh,vy,y0)=>({x0:c.x,z0:c.z,y0,ux:Math.sin(dir*D2R),uz:Math.cos(dir*D2R),sh,vy});
+// best chance in the air on segment A over t in [ta,tb] (highest probability: take or running catch, jump, dive). Fielders who
+// went for it earlier without getting it, or missed by up to 1.2 m (dive) or 1 m (jump), are kept as show-only misses (P.nm)
+function airChance(P,A,ta,tb,skip){
+  let best=null;const own=[],nm=[],F=P.F,Rm=F.v*ENV.run*tb+HANDS+Math.max(F.dv,F.cdv)+1.2;
+  P.field.forEach((f,i)=>{
+    if(skip&&skip(f,i))return;
+    if(!P.busy[i]&&f.n!=='keeper'&&Math.abs((f.x-A.x0)*A.uz-(f.z-A.z0)*A.ux)>Rm)return;
+    const k=kOf(P,i,1),yl=k.cl?2:1.4,rx=k.x-A.x0,rz=k.z-A.z0,al=rx*A.ux+rz*A.uz,R=runD(k,tb)+HANDS+k.dv+1.2,t0=Math.max(ta,.05);let mine=null,m=null;
+    if(Math.abs(rx*A.uz-rz*A.ux)>R)return;
+    for(let t=t0+.05*Math.max(0,Math.ceil(((al-R)/A.sh-t0)/.05)),te=Math.min(tb,(al+R)/A.sh);t<=te+1e-6;t+=.05){
+      const y=A.y0+A.vy*t-.5*G*t*t;if(y<.05)continue;
+      const px=A.x0+A.ux*A.sh*t,pz=A.z0+A.uz*A.sh*t,dx=px-k.x,dz=pz-k.z,d=Math.sqrt(dx*dx+dz*dz),r=runD(k,t),fr=t-k.re,e=d-HANDS-r,
+        back=dx*A.ux+dz*A.uz<=r+.5;let p=0,kind='';
+      if(y>UP+k.jp){if(fr>=.3&&e<=.3&&y-UP-k.jp<=1&&(!m||y-UP-k.jp<m.g)){const h=reachTo(k,px,pz,r+HANDS+.3);m={g:y-UP-k.jp,t,x:h.x,z:h.z,y:UP+k.jp,kind:'jump',e};}continue;}
+      if(e<=0&&y<=UP&&y>=.25){p=k.h*(1-.5*clamp((d-HANDS)/20,0,1))*clamp(.45+1.5*fr,.45,1);kind=d-HANDS>2.5?'run':'take';}
+      else if(y>UP&&fr>=.3&&e<=.3){p=k.h*.6;kind='jump';}
+      else if(y<=yl&&fr>=.15&&back&&e<=k.dv){p=k.h*((k.cl?1:.7)-.5*e/k.dv);kind='dive';}
+      else if(y<=yl&&fr>=.15&&back&&e-k.dv<=1.2&&(!m||e-k.dv<m.g)){const h=reachTo(k,px,pz,r+HANDS+k.dv);m={g:e-k.dv,t,x:h.x,z:h.z,y,kind:'dive',e:k.dv};}
+      if(p>(mine?mine.p:0))mine={i,p,t,x:px,z:pz,y,kind,e,k,f};
+    }
+    if(mine){if(mine.p>(best?best.p:0))best=mine;own.push(mine);}else if(m)nm.push({i,k,kind:m.kind,o:'miss',t:m.t,x:m.x,z:m.z,y:m.y,e:m.e});
+  });
+  // an earlier dive or leap by someone else is shown missing; nothing is shown after the chosen chance (the ball is taken or off the hands)
+  for(const c of own)if(c!==best&&(c.kind==='dive'||c.kind==='jump'))nm.push({i:c.i,k:c.k,kind:c.kind,o:'miss',t:c.t,x:c.x,z:c.z,y:c.kind==='jump'?UP+c.k.jp:c.y,e:c.e});
+  for(const m of nm)if(!best||m.t<best.t)P.nm.push(m);
+  return best;
+}
+// a ball along the ground from (x0,z0) at time t0, speed s, slowing at a; yAt(t) its height. Per fielder his earliest clean
+// pick-up, else his best dive (a slide for a deep fielder within 6 m of the rope), rolled in time order: the first success
+// stops it, a fumble stops it 2 m on (+1 run), a failed dive lets it run on. q: metres from (x0,z0)
+function groundPlay(P,x0,z0,dir,s,a,t0,yAt,noKeeper){
+  const ux=Math.sin(dir*D2R),uz=Math.cos(dir*D2R),lim=distToBoundary(x0,z0,ux,uz),nat=s*s/(2*a),L=Math.min(nat,lim),F=P.F,cand=[],nm=[],
+    TQ=[],tAt=q=>TQ[q]||(TQ[q]=t0+(s-Math.sqrt(Math.max(0,s*s-2*a*q)))/a),pt=q=>({x:x0+ux*q,z:z0+uz*q}),done=(r,t)=>{for(const m of nm)if(m.t<t)P.nm.push(m);return r;};
+  const Rm=F.v*ENV.run*tAt(Math.max(1,Math.floor(L)))+HANDS+Math.max(F.dv,F.cdv)+1.2;
+  P.field.forEach((f,i)=>{
+    if(noKeeper&&f.n==='keeper')return;
+    if(!P.busy[i]&&f.n!=='keeper'){const rx=f.x-x0,rz=f.z-z0,A=rx*ux+rz*uz;if(A-14>L||A+14<1||Math.abs(rx*uz-rz*ux)>Rm)return;}
+    const k=kOf(P,i),rx=k.x-x0,rz=k.z-z0,A=rx*ux+rz*uz,p=Math.abs(rx*uz-rz*ux),ka=k.v/k.ac;let dv=null,m=null;
+    const qe=Math.min(L,A+14),R=runD(k,tAt(Math.max(1,Math.floor(qe))))+HANDS+k.dv+1.2;if(p>R)return;
+    const w=Math.sqrt(R*R-p*p);
+    for(let q=Math.max(1,Math.floor(A-14),Math.ceil(A-w));q<=Math.min(qe,A+w);q++){
+      const tq=tAt(q),u=tq-k.re,r=u<=0?0:Math.min(k.mx,u<ka?.5*k.ac*u*u:k.v*(u-ka/2)),e=Math.sqrt((q-A)*(q-A)+p*p)-HANDS-r;
+      if(e<=0){cand.push({i,k,t:tq,q,kind:'stop',p:1-F.mf*(s-a*(tq-t0)>25?1.5:1),e:0});return;}
+      if(tq-k.re<.15||q-A>r+.5)continue;
+      if(e<=k.dv){const pr=Math.min(.97,k.h*(1.2-.45*e/k.dv))*(s-a*(tq-t0)>25?.9:1);if(!dv||pr>dv.p)dv={i,k,t:tq,q,kind:k.dp&&q>lim-6?'slide':'dive',p:pr,e};}
+      else if(e-k.dv<=1.2&&(!m||e<m.e))m={t:tq,q,e,r};
+    }
+    if(dv)cand.push(dv);else if(m){const b=pt(m.q),h=reachTo(k,b.x,b.z,m.r+HANDS+k.dv);nm.push({i,k,kind:k.dp&&m.q>lim-6?'slide':'dive',o:'miss',t:m.t,x:h.x,z:h.z,y:Math.max(.05,yAt(m.t)),e:k.dv});}
+  });
+  cand.sort((x,y)=>x.t-y.t);
+  for(const c of cand){
+    const b=pt(c.q),y=Math.max(.05,yAt(c.t));
+    if(Math.random()<c.p){ev(P,c.i,c.k,c.kind,'stop',c.t,b.x,b.z,y,c.e);
+      return done({stop:{...c,...b},runs:runsFor(c.t+REC[c.kind]+Math.hypot(b.x,b.z-BATS_Z)/30),maxD:c.q},c.t);}
+    ev(P,c.i,c.k,c.kind,c.kind==='stop'?'fumble':'miss',c.t,b.x,b.z,y,c.e);
+    if(c.kind==='stop')return done({stop:{...c,...b},fumble:true,runs:Math.min(3,runsFor(c.t+1.4+Math.hypot(b.x,b.z-BATS_Z)/30)+1),maxD:c.q+2},c.t);
+  }
+  if(nat>=lim)return done({four:true,runs:4,rope:{...pt(lim),t:tAt(lim)}},1e9);
+  const S=pt(nat),nf=nearestFielder(P.field,S.x,S.z),k=fsk(nf.f,F,P.b);
+  return done({runs:Math.min(3,runsFor(t0+s/a+k.re+nf.dist/k.v+.5+Math.hypot(S.x,S.z)/30)),fetch:{...S,t:t0+s/a}},1e9);
+}
+// show-only: the misses kept in P.nm for fielders who did nothing else, then the one who gets there first runs to (x,z), where
+// the ball is at tb (fetch, chase to the rope); returns fplay sorted by t1
+function finish(P,to){
+  P.nm.sort((x,y)=>x.t-y.t);
+  for(const m of P.nm)if(!P.busy[m.i])ev(P,m.i,m.k,m.kind,m.o,m.t,m.x,m.z,m.y,m.e);
+  if(to){let best=null;
+    P.field.forEach((f,i)=>{if(f.n==='keeper')return;const k=kOf(P,i),t=runT(k,Math.max(0,Math.hypot(to.x-k.x,to.z-k.z)-HANDS));if(!best||t<best.t)best={i,k,t};});
+    if(best){ev(P,best.i,best.k,'run','',Math.max(to.t,best.t),to.x,to.z,.05,0);to.i=best.i;}}
+  return P.ev.sort((x,y)=>x.t1-y.t1);
+}
+// the deep fielder nearest the point where a six crosses the rope (within 15 m) runs to it; a leap if he gets there and it
+// passes no more than 1 m above his reach
+function sixRider(P,A,bd){
+  const te=bd/A.sh,x=A.x0+A.ux*bd,z=A.z0+A.uz*bd,y=A.y0+A.vy*te-.5*G*te*te;let best=null;
+  P.field.forEach((f,i)=>{const d=Math.hypot(f.x-x,f.z-z);if(Math.hypot(f.x,f.z)>BOUNDARY*.6&&d<15&&(!best||d<best.d))best={i,d};});
+  if(!best||P.busy[best.i])return;
+  const k=kOf(P,best.i,1),d=Math.hypot(x-k.x,z-k.z);
+  if(runT(k,Math.max(0,d-HANDS-.3))<=te&&y>UP+k.jp&&y<=UP+k.jp+1){const h=reachTo(k,x,z,Math.min(d,runD(k,te)+HANDS+.3));ev(P,best.i,k,'jump','miss',te,h.x,h.z,UP+k.jp,Math.max(0,d-HANDS-runD(k,te)));}
+  else ev(P,best.i,k,'run','',Math.max(te,runT(k,Math.max(0,d-HANDS))),x,z,.05,0);
+}
+const caught=(P,ch)=>ev(P,ch.i,ch.k,ch.kind,'catch',ch.t,ch.x,ch.z,ch.y,ch.e);
+// fielderTo: who stopped the ball, or fetched it from a gap (after finish), and where
+const fieldTo=g=>g.stop?{i:g.stop.i,x:g.stop.x,z:g.stop.z}:g.fetch&&g.fetch.i!=null?{i:g.fetch.i,x:g.fetch.x,z:g.fetch.z}:undefined;
+// Tests (x = {field,c,T,F}): a block at chest height or above is a fend off the gloves; an inside edge can go to the close leg catchers
 function resolveDefend(b,clean,x){
+  const take=(i,T,sub,shot)=>{const f=x.field[i],P=newPlay(x.field,x.F,b,x.c),k=kOf(P,i),dx=k.x-x.c.x,dz=k.z-x.c.z;ev(P,i,k,'take','catch',T,k.x,k.z,.5,0);
+    return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:sub+fieldName(f),dir:Math.atan2(dx,dz)/D2R,lofted:true,
+      path:{air:true,C:Math.hypot(dx,dz),T,yT:.5,stop:true},catcher:i,catchPt:{x:k.x,z:k.z},fplay:P.ev,cls:'out',shot};};
   if(x&&x.c.y>1.2&&Math.random()<clamp((x.c.y-1.2)/0.6,0,1)*(clean?0.12:0.35)*Math.sqrt(x.T.edge)){
     const F=x.field,ks=(x.c.x<-0.1?['fshort','shortleg','lslip','gully','slip']:['gully','slip','silly','fshort']).map(n=>F.findIndex(f=>f.n===n)).filter(i=>i>=0),
       i=ks.length&&Math.random()<0.75?ks[0]:Math.random()<0.25?F.findIndex(f=>f.n==='keeper'):-1;
-    if(i>=0){const f=F[i];return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:'Fended off the gloves to '+fieldName(f),dir:Math.atan2(f.x,f.z)/D2R,lofted:true,
-      path:{air:true,C:Math.hypot(f.x,f.z-x.c.z),T:0.7,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out',shot:'Fend'};}
+    if(i>=0)return take(i,0.7,'Fended off the gloves to ','Fend');
     return {runs:0,label:'Fended away',sub:'Off the gloves, safe',cls:'dot',dir:rnd(-60,60),lofted:false,path:{air:false,s:6,a:5},shot:'Fend'};
   }
   const po=!clean&&b.onStumps&&Math.random()<0.35;
   if(po)return {runs:0,out:true,outText:'Played on',label:'Out!',sub:'Inside edge onto the stumps',cls:'out',stumps:true,shot:'Block'};
   if(x&&!clean){
     const i=x.field.findIndex(f=>f.n==='fshort'||f.n==='shortleg');
-    if(i>=0&&Math.random()<0.2){const f=x.field[i];return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:'Bat-pad to '+fieldName(f),dir:-60,lofted:true,
-      path:{air:true,C:4.5,T:0.5,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out',shot:'Block'};}
+    if(i>=0&&Math.random()<0.2)return take(i,0.5,'Bat-pad to ','Block');
     return {runs:0,label:'Inside edge',cls:'dot',dir:rnd(-170,-140),lofted:false,path:{air:false,s:6,a:5},shot:'Block'};
   }
   if(clean){const r=Math.random()<0.12?1:0;return {runs:r,label:r?'Quick single':'Blocked',cls:r?'runs':'dot',dir:rnd(-25,25),lofted:false,path:{air:false,s:r?8:4,a:4},shot:'Block'};}
   return {runs:0,label:'Inside edge',cls:'dot',dir:rnd(-170,-140),lofted:false,path:{air:false,s:6,a:5},shot:'Block'};
 }
+// edges: a skier (mishit lofted) hangs up for anyone; other edges fly fine at the keeper and close catchers within 40 m (the
+// keeper-slip gap is real), then run on along the ground from where they land, or off the hands (third man, fine leg, four)
 function resolveEdge(b,c,sw,field,d,mishit){
-  const keeper=field.findIndex(f=>f.n==='keeper'), slips=field.reduce((a,f,i)=>(/^slip/.test(f.n)&&a.push(i),a),[]), slip=slips.length?slips[0]:-1,
-    gully=field.findIndex(f=>f.n==='gully'), ls=field.findIndex(f=>f.n==='lslip');
+  const P=newPlay(field,d.fs,b,c),y0=clamp(c.y,.3,2);
   if(mishit&&sw.lofted){
-    const C=rnd(10,32),dir=normAng(sw.aim+gauss()*25),T=rnd(2.6,3.3);
-    const L={x:c.x+Math.sin(dir*D2R)*C,z:c.z+Math.cos(dir*D2R)*C};
-    const nf=nearestFielder(field,L.x,L.z,C<12);
-    const reach=(2+4.5*(T-0.6))*(d.fSpeed/6.3);
-    if(nf.dist<reach&&Math.random()<(nf.dist<reach*0.5?0.95:0.75)*d.catchMul)
-      return {runs:0,out:true,outText:catchText(nf.f),label:'Out!',sub:'Top edge. '+catchText(nf.f),dir,lofted:true,path:{air:true,C,T,stop:true},catcher:nf.i,catchPt:L,cls:'out'};
-    const r=Math.random()<0.6?1:0;
-    return {runs:r,label:'Top edge',sub:'Lands safely',dir,lofted:true,path:{air:true,C,T,stop:true},cls:r?'runs':'dot'};
+    const C=rnd(10,32),dir=normAng(sw.aim+gauss()*25),T=rnd(2.6,3.3),A=seg(c,dir,C/T,(.5*G*T*T-y0)/T,y0),
+      ch=airChance(P,A,0,T,f=>f.n==='keeper'&&C>=12);
+    if(ch&&Math.random()<ch.p){caught(P,ch);return {runs:0,out:true,outText:catchText(ch.f),label:'Out!',sub:'Top edge. '+catchText(ch.f),dir,lofted:true,
+      path:{air:true,C:A.sh*ch.t,T:ch.t,yT:ch.y,stop:true},catcher:ch.i,catchPt:{x:ch.x,z:ch.z},fplay:finish(P),cls:'out'};}
+    const r=Math.random()<0.6?1:0,drop=ch&&ch.kind!=='dive';
+    if(ch)ev(P,ch.i,ch.k,ch.kind,drop?'drop':'miss',ch.t,ch.x,ch.z,ch.y,ch.e);
+    const rest=drop?{x:ch.x+A.ux*1.5,z:ch.z+A.uz*1.5,t:ch.t+.6}:{x:c.x+A.ux*C,z:c.z+A.uz*C,t:T};
+    return {runs:r,label:drop?'Dropped!':'Top edge',sub:drop?'Put down at '+fieldName(ch.f):ch?'Dives, can’t reach it':'Lands safely',dir,lofted:true,
+      path:drop?{air:true,C:A.sh*ch.t,T:ch.t,yT:ch.y,roll:1.5,rt:.6}:{air:true,C,T,stop:true},fplay:finish(P,rest),cls:r?'runs':'dot'};
   }
-  const off=c.x>-0.05;
-  let pc=(sw.lofted?0.36:0.22)+(off&&slip>=0?0.12:0)+(off&&gully>=0?0.06:0)+(off?0.05*Math.max(0,slips.length-1):0);if(!off)pc*=ls>=0?0.8:0.5;pc*=d.catchMul;
-  if(Math.random()<pc){
-    const ws=slips.length,wg=gully>=0?0.5:0,r=off&&ws+wg>0?Math.random()*(1+ws+wg):9,
-      i=r<ws?slips[Math.floor(r)]:r<ws+wg?gully:!off&&ls>=0&&Math.random()<0.5?ls:keeper, f=field[i], nm=fieldName(f);
-    const dx=f.x-c.x,dz=f.z-c.z;
-    return {runs:0,out:true,outText:i===keeper?'Caught behind':'Caught at '+nm,label:'Out!',sub:i===keeper?'Edged and caught behind':'Edged to '+nm,
-      dir:Math.atan2(dx,dz)/D2R,lofted:false,path:{air:true,C:Math.hypot(dx,dz),T:0.4,stop:true},catcher:i,catchPt:{x:f.x,z:f.z},cls:'out'};
-  }
-  const r=Math.random(),runs=r<0.5?0:r<0.8?1:4,dir=off?rnd(130,165):rnd(-165,-130);
-  return {runs,boundary:runs===4?4:0,label:runs===4?'Four!':runs?'1 run':'Edged',sub:runs===4?'Thick edge, races away':runs?'Thick edge':'Edged, no run',
-    dir,lofted:false,path:{air:false,s:runs===4?30:runs?14:9,a:3.2},cls:runs===4?'four':runs?'runs':'dot'};
+  const off=c.x>-0.05,u=Math.random(),dir=off?180-50*Math.pow(u,1.6):-(180-45*u),ve=(rnd(.55,.85)*b.vz2+4*(sw.power||.5))*(sw.lofted?.7:1),ph=(rnd(2,14)+(sw.lofted?8:0))*D2R,
+    A=seg(c,dir,ve*Math.cos(ph),ve*Math.sin(ph),y0),tg=(A.vy+Math.sqrt(A.vy*A.vy+2*G*y0))/G;
+  const ch=airChance(P,A,0,tg,f=>f.n==='bowler'||Math.hypot(f.x-c.x,f.z-c.z)>40);
+  if(ch&&Math.random()<ch.p){caught(P,ch);const kp=ch.f.n==='keeper';
+    return {runs:0,out:true,outText:kp?'Caught behind':'Caught at '+fieldName(ch.f),label:'Out!',sub:kp?'Edged and caught behind':'Edged to '+fieldName(ch.f),
+      dir,lofted:false,path:{air:true,C:A.sh*ch.t,T:ch.t,yT:ch.y,stop:true},catcher:ch.i,catchPt:{x:ch.x,z:ch.z},fplay:finish(P),cls:'out'};}
+  // through, short of or off the fielders: on along the ground from where it lands, or off the hands (slower), on the same line
+  if(ch)ev(P,ch.i,ch.k,ch.kind,'drop',ch.t,ch.x,ch.z,ch.y,ch.e);
+  const t1=ch?ch.t:tg,C=A.sh*t1,s=A.sh*(ch?.35:.6),a=ENV.acc,yT=ch?ch.y:0,
+    g=groundPlay(P,c.x+A.ux*C,c.z+A.uz*C,dir,s,a,t1,t=>yT*Math.max(0,1-(t-t1)*4));
+  const runs=g.four?4:Math.min(g.runs,2),fplay=finish(P,g.rope||g.fetch);
+  return {runs,boundary:g.four?4:0,label:g.four?'Four!':runs?runLabel(runs):'Edged',sub:ch?(ch.kind==='dive'?'Dives, can’t hold on':'Put down by '+fieldName(ch.f)):g.four?'Edged, races away':runs?'Edged into the gap':'Edged, no run',
+    dir,lofted:false,path:{air:true,C,T:t1,yT,roll:s*s/(2*a),rt:s/a,maxD:g.maxD!=null?C+g.maxD:undefined},
+    fielderTo:fieldTo(g),fplay,misfield:!!g.fumble,cls:g.four?'four':runs?'runs':'dot'};
 }
-function resolveGround(c,dir,q,power,field,d){
-  const ux=Math.sin(dir*D2R),uz=Math.cos(dir*D2R);
-  const s=10+32*q*(0.4+0.6*power),acc=ENV.acc,natural=s*s/(2*acc);
-  const tTo=A=>{const disc=s*s-2*acc*A;return disc<0?Infinity:(s-Math.sqrt(disc))/acc;};
-  const bd=distToBoundary(c.x,c.z,ux,uz);
-  let best=null;
-  field.forEach((f,i)=>{
-    if(f.n==='keeper')return;
-    const rx=f.x-c.x,rz=f.z-c.z,A=rx*ux+rz*uz;
-    if(A<=1||A>Math.min(natural,bd)+2)return;
-    const p=Math.abs(rx*uz-rz*ux),tA=tTo(Math.min(A,natural-0.01));
-    const R=2.2+d.fSpeed*Math.max(0,tA-0.3);
-    if(p<R&&(!best||A<best.A))best={i,A,p,tA};
-  });
-  let mis=false;
-  if(best&&Math.random()<d.misfield){best=null;mis=true;}
-  if(best){
-    const f=field[best.i],t=best.tA+best.p/d.fSpeed*0.5+0.5+Math.hypot(f.x,f.z-BATS_Z)/30,runs=runsFor(t);
-    return {runs,dir,lofted:false,path:{air:false,s,a:acc,maxD:best.A},fielderTo:{i:best.i,x:c.x+ux*best.A,z:c.z+uz*best.A},
-      label:runs?runLabel(runs):'Fielded',sub:'Stopped at '+fieldName(f),cls:runs?'runs':'dot'};
-  }
-  if(natural>=bd)return {runs:4,boundary:4,dir,lofted:false,path:{air:false,s,a:acc},label:'Four!',misfield:mis,cls:'four'};
-  const sx=c.x+ux*natural,sz=c.z+uz*natural,nf=nearestFielder(field,sx,sz);
-  const runs=Math.min(3,runsFor(s/acc+nf.dist/d.fSpeed+0.5+Math.hypot(sx,sz)/30));
-  return {runs,dir,lofted:false,path:{air:false,s,a:acc},fielderTo:{i:nf.i,x:sx,z:sz},label:runs?runLabel(runs):'No run',sub:mis?'Misfield':'Into the gap',cls:runs?'runs':'dot'};
+function resolveGround(b,c,dir,q,power,field,d){
+  const s=10+32*q*(0.4+0.6*power),a=ENV.acc,P=newPlay(field,d.fs,b,c),y0=clamp(c.y,.3,2),g=groundPlay(P,c.x,c.z,dir,s,a,0,t=>y0*Math.max(0,1-t*4),true),
+    fplay=finish(P,g.rope||g.fetch),to=fieldTo(g);
+  if(g.four)return {runs:4,boundary:4,dir,lofted:false,path:{air:false,s,a},label:'Four!',fplay,cls:'four'};
+  const f=to&&field[to.i],runs=g.runs;
+  return {runs,dir,lofted:false,path:{air:false,s,a,maxD:g.maxD},fielderTo:to,fplay,misfield:!!g.fumble,label:runs?runLabel(runs):g.stop?'Fielded':'No run',
+    sub:g.fumble?'Misfield':!g.stop?'Into the gap':(g.stop.kind==='stop'?'Stopped at ':g.stop.kind==='dive'?'Diving stop at ':'Cut off at ')+fieldName(f),cls:runs?'runs':'dot'};
 }
-function resolveAir(c,dir,q,power,field,d){
+function resolveAir(b,c,dir,q,power,field,d){
   let C=(10+80*Math.pow(q,1.35)*(0.4+0.6*power))*ENV.carry,T=hangTime(C);
   if(WIND.x||WIND.z){const lx=c.x+Math.sin(dir*D2R)*C+WIND.x*T*0.3,lz=c.z+Math.cos(dir*D2R)*C+WIND.z*T*0.3;
     C=Math.hypot(lx-c.x,lz-c.z);dir=Math.atan2(lx-c.x,lz-c.z)/D2R;T=hangTime(C);}
-  const ux=Math.sin(dir*D2R),uz=Math.cos(dir*D2R),bd=distToBoundary(c.x,c.z,ux,uz);
-  const Lx=c.x+ux*C,Lz=c.z+uz*C;
-  if(C>=bd){
-    for(let i=0;i<field.length;i++){
-      const f=field[i];if(Math.hypot(f.x,f.z)<BOUNDARY*0.74)continue;
-      const rx=f.x-c.x,rz=f.z-c.z,A=rx*ux+rz*uz,p=Math.abs(rx*uz-rz*ux);
-      if(p<3.2&&C-A<5&&C-A>-1.5&&Math.random()<0.45*d.catchMul)
-        return {runs:0,out:true,outText:catchText(f),label:'Out!',sub:'Caught on the rope at '+fieldName(f),dir,lofted:true,
-          path:{air:true,C:A,T,stop:true},catcher:i,catchPt:{x:c.x+ux*A,z:c.z+uz*A},cls:'out'};
-    }
-    return {runs:6,boundary:6,dir,lofted:true,path:{air:true,C:C+4,T},label:'Six!',dist:Math.round(Math.hypot(Lx,Lz)),cls:'six'};
-  }
-  const nf=nearestFielder(field,Lx,Lz,C<10);
-  const reach=(2+4.5*Math.max(0,T-0.6))*(d.fSpeed/6.3)*(nf.f.c||1);
-  let dropped=false;
-  if(nf.dist<reach){
-    const p=Math.min(0.97,(nf.dist<reach*0.45?0.95:0.68)*d.catchMul);
-    if(Math.random()<p)return {runs:0,out:true,outText:catchText(nf.f),label:'Out!',sub:catchText(nf.f),dir,lofted:true,
-      path:{air:true,C,T,stop:true},catcher:nf.i,catchPt:{x:Lx,z:Lz},cls:'out'};
-    dropped=true;
-  }
-  const roll=C*0.25;
-  if(C+roll>=bd)return {runs:4,boundary:4,dir,lofted:true,path:{air:true,C,T,roll:roll+6},label:'Four!',sub:dropped?'Dropped, and it bounces over':'One bounce over the rope',cls:'four'};
-  const sx=Lx+ux*roll,sz=Lz+uz*roll,nf2=nearestFielder(field,sx,sz);
-  let runs=Math.min(3,runsFor(T+roll/8+nf2.dist/d.fSpeed+0.5+Math.hypot(sx,sz)/30));
-  if(dropped)runs=Math.max(runs,1);
-  return {runs,dir,lofted:true,path:{air:true,C,T,roll},fielderTo:{i:nf2.i,x:sx,z:sz},
-    label:dropped?'Dropped!':runs?runLabel(runs):'No run',sub:dropped?'Put down at '+fieldName(nf.f):'Lands safely',cls:runs?'runs':'dot'};
+  const P=newPlay(field,d.fs,b,c),y0=clamp(c.y,.3,2),A=seg(c,dir,C/T,(.5*G*T*T-y0)/T,y0),bd=distToBoundary(c.x,c.z,A.ux,A.uz),six=C>=bd,
+    tb=Math.min(T,bd/A.sh),Lx=c.x+A.ux*C,Lz=c.z+A.uz*C,ch=airChance(P,A,0,tb,f=>f.n==='keeper'&&C>=10);
+  if(ch){const rope=six&&ch.t>tb-.25;
+    if(Math.random()<ch.p*(rope?.85:1)){caught(P,ch);return {runs:0,out:true,outText:catchText(ch.f),label:'Out!',sub:rope?'Caught on the rope at '+fieldName(ch.f):catchText(ch.f),
+      dir,lofted:true,path:{air:true,C:A.sh*ch.t,T:ch.t,yT:ch.y,stop:true},catcher:ch.i,catchPt:{x:ch.x,z:ch.z},fplay:finish(P),cls:'out'};}}
+  const drop=ch&&(ch.kind==='take'||ch.kind==='run');
+  if(ch)ev(P,ch.i,ch.k,ch.kind,drop?'drop':'miss',ch.t,ch.x,ch.z,ch.y,ch.e);
+  if(six){sixRider(P,A,bd);return {runs:6,boundary:6,dir,lofted:true,path:{air:true,C,T},label:'Six!',sub:ch?(drop?'Put down at ':'Just over ')+fieldName(ch.f):undefined,
+    fplay:finish(P),dist:Math.round(Math.hypot(Lx,Lz)),cls:'six'};}
+  // lands inside and rolls on (C*0.25 over 1.2 s, as hitPos draws it), or pops out of the hands of a drop
+  const t1=drop?ch.t:T,C1=A.sh*t1,s=drop?A.sh*.35:2*C*.25/1.2,a=drop?ENV.acc:s/1.2,yT=drop?ch.y:0,
+    g=groundPlay(P,c.x+A.ux*C1,c.z+A.uz*C1,dir,s,a,t1,t=>yT*Math.max(0,1-(t-t1)*4),true),fplay=finish(P,g.rope||g.fetch),
+    path={air:true,C:C1,T:t1,yT,roll:s*s/(2*a),rt:s/a,maxD:g.maxD!=null?C1+g.maxD:undefined};
+  if(g.four)return {runs:4,boundary:4,dir,lofted:true,path,fplay,label:'Four!',sub:drop?'Dropped, and it bounces over':'One bounce over the rope',cls:'four'};
+  const runs=drop?Math.max(g.runs,1):g.runs,cut=g.stop&&!drop&&C+s*s/(2*a)>=bd;
+  return {runs,dir,lofted:true,path,fielderTo:fieldTo(g),fplay,misfield:!!g.fumble,label:drop?'Dropped!':runs?runLabel(runs):'No run',
+    sub:drop?'Put down at '+fieldName(ch.f):cut?'Cut off at '+fieldName(field[g.stop.i]):ch?(ch.kind==='jump'?'Leaps, can’t reach it':'Dives, can’t reach it'):'Lands safely',cls:runs?'runs':'dot'};
 }
 // bat: {tier}; scales the timing window (less for a block: a tail-ender can defend, not score), power and edges, and enables
 // fends and hooking risk, and in Tests sweeps ({tier,t20:1} in T20: no sweeps). Without it: short formats
 function evalSwing(b,sw,diffKey,field,bat){
-  const T=bat?TIER[bat.tier]||TIER.A:null,fa=footAt(b,sw.bp),d={...DIFF[diffKey],fSpeed:DIFF[diffKey].fSpeed*ENV.run},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),
+  const T=bat?TIER[bat.tier]||TIER.A:null,fa=footAt(b,sw.bp),d={...DIFF[diffKey],fs:FS[diffKey]},dt=sw.tc-fa.t,early=dt<0,a=Math.abs(dt),
     c=fa.c,shot=T&&!bat.t20?shotForBall(sw.aim,b,fa.full):shotFor(sw.aim),mb=T&&shot.sweep&&!sw.defend?{bp:sweepBp(sw.bp)}:null,
     wm=(1+0.35*fa.gain)*(T?sw.defend?Math.pow(T.win,0.3):T.win*(mb?shot.tw:1):1),w=windows(diffKey,early,wm);
   const timing={dt,early,win:wm,
@@ -726,7 +820,7 @@ function evalSwing(b,sw,diffKey,field,bat){
     zone:a<=w.perfect?3:a<=w.good?2:a<=w.ok?1:a<=w.edge?0:-1};
   if(!(fa.xc<0.98&&fa.xc>REACH_LEG&&c.y<2.05)){timing.label='Out of reach';timing.zone=-1;return {miss:true,timing,...mb};}
   if(a>w.edge)return {miss:true,timing,...mb};
-  if(sw.defend)return {timing,res:resolveDefend(b,a<=w.ok,T&&{field,c,T})};
+  if(sw.defend){const r=resolveDefend(b,a<=w.ok,T&&{field,c,T,F:d.fs});r.fplay=r.fplay||[];return {timing,res:r};}
   const match=clamp(shotFit(shot,fa.full,fa.xc)*(1-0.5*fa.awk)*(mb?clamp(1-(c.y-0.75)*1.5,0.3,1):1)+0.25*fa.gain,0.1,1),name=sw.lofted?shot.loft:shot.name;
   let edge=a>w.ok,mishit=false;
   const mt=(sw.lofted?0.55:0.42)+(shot.risk||0),em=T?T.edge:1,hook=T&&shot===SHOTS[1]&&c.y>1.5;
@@ -738,7 +832,7 @@ function evalSwing(b,sw,diffKey,field,bat){
   const tq=a<=w.perfect?1:1-0.45*clamp((a-w.perfect)/(w.ok-w.perfect),0,1);
   const q=tq*(0.35+0.65*match),pw=sw.power*(T?T.pow:1);
   const dir=normAng(sw.aim+dt*300+gauss()*(1-q)*16);
-  const r=sw.lofted?resolveAir(c,dir,q,pw,field,d):resolveGround(c,dir,q,pw,field,d);
+  const r=sw.lofted?resolveAir(b,c,dir,q,pw,field,d):resolveGround(b,c,dir,q,pw,field,d);
   r.shot=name;r.q=q;r.match=match;
   if(r.boundary&&!r.sub)r.sub=name+(r.dist?', '+r.dist+' m':'')+(r.misfield?', misfield':'');
   return {timing,res:r};
@@ -867,7 +961,7 @@ function bowlDelivery(bw,o,m,rel,diffKey){
 }
 // AI batter skill by difficulty: sig = timing spread (s; x the planet's t20, measured so a medium full match is ~50% on every
 // planet), read = share of a change of pace picked from the hand, mis = misreading of length and line x, foot = footwork x
-const AIB={easy:{sig:.071,read:.5,mis:1.15,foot:.85},medium:{sig:.064,read:.6,mis:1,foot:1},hard:{sig:.058,read:.7,mis:.85,foot:1.15}};
+const AIB={easy:{sig:.071,read:.5,mis:1.15,foot:.85},medium:{sig:.068,read:.6,mis:1,foot:1},hard:{sig:.058,read:.7,mis:.85,foot:1.15}};
 const AI_LOFT={pp:.18,mid:.12,death:.3};
 // how open direction a is [along the ground, lofted]: lofted, no boundary rider within 18 degrees; along the ground, the angle
 // to the nearest fielder in the ring, less with a rider behind it
@@ -966,15 +1060,15 @@ function hitPos(h,t){
   let d,y=0;
   if(h.air){
     if(t<=h.T){d=h.sh*t;y=h.y0+h.vy*t-0.5*G*t*t;}
-    else if(h.stop){d=h.C;}
-    else{const u=Math.min(1,(t-h.T)/1.2);d=h.C+(h.roll!=null?h.roll:h.C*0.3)*(1-(1-u)*(1-u));}
+    else if(h.stop){d=h.C;y=h.yT||0;}
+    else{const u=Math.min(1,(t-h.T)/(h.rt||1.2));d=h.C+(h.roll!=null?h.roll:h.C*0.3)*(1-(1-u)*(1-u));y=(h.yT||0)*Math.max(0,1-(t-h.T)*4);}
   }else{const tt=Math.min(t,h.s/h.a);d=h.s*tt-0.5*h.a*tt*tt;y=Math.max(0,h.y0*(1-t*4));}
   if(h.maxD!=null)d=Math.min(d,h.maxD);
   return {x:h.x0+h.ux*d,z:h.z0+h.uz*d,y:Math.max(0,y),d};
 }
 function preparePath(p,start,dir){
   const h={...p,x0:start.x,z0:start.z,y0:clamp(start.y,0.3,2),ux:Math.sin(dir*D2R),uz:Math.cos(dir*D2R)};
-  if(h.air){h.sh=h.C/h.T;h.vy=(0.5*G*h.T*h.T-h.y0)/h.T;}
+  if(h.air){h.sh=h.C/h.T;h.vy=(0.5*G*h.T*h.T+(h.yT||0)-h.y0)/h.T;}
   return h;
 }
 
@@ -1003,24 +1097,24 @@ const SCEN=[
   planet:'venus',diff:'medium',day:2,ballAge:22,oppText:'Meridian XI 301. You 188/3.',obj:{type:'survive',balls:54,wkts:2},
   lineup:lu('F. Marlow;D;0;0|M. Calvane;A;64;121|S. Pellow;B|K. Lathan;B|R. Quarry;C'),striker:0,nonStriker:1,
   attack:atk('swing:.3:3 express:0:4 cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:12},{t:'bonus',noWkt:1}],band:[45,85]},
- {id:'s2b',set:'series',test:2,team:MER,title:'Reverse at the death',brief:'Day five. An old, scuffed ball and a fast bowler who knows how to hide it. Eighty-five to win in twenty overs.',
-  planet:'venus',diff:'medium',day:5,ballAge:45,oppText:'Meridian XI 301 & 198. You 233 & 182/3.',obj:{type:'chase',target:85,balls:120,wkts:7},
+ {id:'s2b',set:'series',test:2,team:MER,title:'Reverse at the death',brief:'Day five. An old, scuffed ball and a fast bowler who knows how to hide it. Seventy-eight to win in twenty overs.',
+  planet:'venus',diff:'medium',day:5,ballAge:45,oppText:'Meridian XI 301 & 198. You 233 & 189/3.',obj:{type:'chase',target:78,balls:120,wkts:7},
   lineup:lu('M. Calvane;A;41;77|D. Imrie;A;6;15|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
   attack:atk('express:0:4 death:0:3 swing cutter off'),plan:'attack',stars:[{t:'win'},{t:'margin',wkts:4},{t:'bonus',bat:{i:0,runs:80}}],band:[35,70]},
  {id:'s2c',set:'series',test:2,team:MER,title:'Last pair',brief:'Nine down, twelve to win. Imrie is set and Gage can barely hold a bat. Keep Gage away from the strike.',
   planet:'venus',diff:'medium',day:5,ballAge:62,oppText:'Meridian XI 301 & 198. You 233 & 255/9.',obj:{type:'chase',target:12,balls:90,wkts:1},
   lineup:lu('D. Imrie;A;71;133|O. Gage;E;0;0'),striker:0,nonStriker:1,
   attack:atk('express:.2:3 death:0:4 swing off'),plan:'tail',stars:[{t:'win'},{t:'margin',balls:66},{t:'bonus',tail:4}],band:[25,60]},
- {id:'s3a',set:'series',test:3,team:MER,title:'Sweep your way',brief:'Day three on a dust bowl, two spinners and a straight field. A hundred and thirty by stumps keeps you in this Test. Sweep for them.',
-  planet:'mercury',diff:'medium',day:3,ballAge:40,oppText:'Meridian XI 388. You 131/3.',obj:{type:'scoreBy',target:130,balls:36,wkts:5},
+ {id:'s3a',set:'series',test:3,team:MER,title:'Sweep your way',brief:'Day three on a dust bowl, two spinners and a straight field. A hundred and twenty by stumps keeps you in this Test. Sweep for them.',
+  planet:'mercury',diff:'medium',day:3,ballAge:40,oppText:'Meridian XI 388. You 131/3.',obj:{type:'scoreBy',target:120,balls:36,wkts:5},
   lineup:lu('D. Imrie;A;35;50|S. Pellow;B;20;31|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
   attack:atk('off:0:10 sla:0:10 leg cutter'),plan:'contain',stars:[{t:'win'},{t:'margin',runs:15},{t:'bonus',sixes:3}],band:[35,70]},
  {id:'s3b',set:'series',test:3,team:MER,title:'Session in the rough',brief:'Day four, last session. Meridian set 300 and spin into the footmarks from both ends. Lose no more than one wicket.',
   planet:'mercury',diff:'medium',day:4,ballAge:20,oppText:'Meridian XI 388 & 172/8d. You 261 & 41/2.',obj:{type:'survive',balls:90,wkts:2},
   lineup:lu('M. Calvane;A;18;37|D. Imrie;A;9;22|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
   attack:atk('off:0:8 leg:0:6 sla express'),plan:'attack',stars:[{t:'win'},{t:'margin',runs:20},{t:'bonus',noWkt:1}],band:[30,70]},
- {id:'s3c',set:'series',test:3,team:MER,title:'The final-day chase',brief:'Day five. The rough is wider, the turn sharper. A hundred and ninety to win in twenty overs with four wickets to lose.',
-  planet:'mercury',diff:'medium',day:5,ballAge:30,oppText:'Meridian XI 388 & 172/8d. You 261 & 110/2.',obj:{type:'chase',target:190,balls:120,wkts:4},
+ {id:'s3c',set:'series',test:3,team:MER,title:'The final-day chase',brief:'Day five. The rough is wider, the turn sharper. A hundred and sixty-five to win in twenty overs with four wickets to lose.',
+  planet:'mercury',diff:'medium',day:5,ballAge:30,oppText:'Meridian XI 388 & 172/8d. You 261 & 135/2.',obj:{type:'chase',target:165,balls:120,wkts:4},
   lineup:lu('M. Calvane;A;30;61|D. Imrie;A;24;40|S. Pellow;B|K. Lathan;B|R. Quarry;C|J. Ashby;C|F. Marlow;D'),striker:0,nonStriker:1,
   attack:atk('off:0:8 leg:0:6 sla express swing'),plan:'attack',stars:[{t:'win'},{t:'margin',balls:12},{t:'bonus',wkts:2}],band:[35,70]},
  {id:'s4a',set:'series',test:4,team:MER,title:'Short-ball barrage',brief:'A bouncy deck, two quicks round the wicket and a leg trap. Duck, sway or play: eight overs without losing a wicket.',
@@ -1048,8 +1142,8 @@ const SCEN=[
   lineup:lu('S. Pellow;B;25;40|K. Lathan;B;10;18|R. Quarry;C|J. Ashby;C|F. Marlow;D|L. Tenby;E|O. Gage;E'),striker:0,nonStriker:1,
   attack:atk('express:.3:4 death:.2:3 swing:.4 off leg'),plan:'attack',stars:[{t:'win'},{t:'margin',balls:12},{t:'bonus',wkts:3}],band:[35,70]},
  // ---- Classics: one-off finishes. Numbers are inspired by famous Tests (docs/scenarios-mode.md); teams and names are invented ----
- {id:'c1',set:'classic',title:'Last-wicket heist',brief:'The last man walks out with twenty still needed. Strand is set at the other end. The number eleven must not face.',
-  planet:'earth',diff:'medium',day:4,ballAge:52,oppText:'Northgate XI 179 & 246. You 67 & 339/9.',obj:{type:'chase',target:20,balls:150,wkts:1},
+ {id:'c1',set:'classic',title:'Last-wicket heist',brief:'The last man walks out with eighteen still needed. Strand is set at the other end. The number eleven must not face.',
+  planet:'earth',diff:'medium',day:4,ballAge:52,oppText:'Northgate XI 179 & 246. You 67 & 341/9.',obj:{type:'chase',target:18,balls:150,wkts:1},
   lineup:lu('H. Strand;A;61;160|B. Quill;E;0;0'),striker:0,nonStriker:1,attack:atk('express:.2:4 swing:0:3 death off'),plan:'tail',
   stars:[{t:'win'},{t:'margin',balls:120},{t:'bonus',tail:6}],band:[10,45]},
  {id:'c2',set:'classic',title:'Two short',brief:'Thirty to win with two wickets left on the final morning. The ball is reversing and the quicks are fresh.',

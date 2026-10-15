@@ -413,20 +413,44 @@ function limb(m1,m2,a,t,l1,l2,pole,side){
   const k=ik(a,t,l1,l2,pole);mL(m1,a,k,l1,side);mL(m2,k,t,l2,side);return t;}
 // dejected variants (lost the match): torso lean, head drop; arms hanging, hands on hips, hands on knees
 const DEJ=[[.38,.95],[.24,.8],[.8,.4]];
+// fielding actions (o.act, from fplay in fieldTick): 1 run, 2 take or stop, 3 dive, 4 leap, 5 slide, 6 keeper (o.e: squat);
+// o.ap s after the hands meet the ball (negative: approach, launch), o.hx/hy/hz their target, o.e the stretch, o.sd +1 to his
+// right. The body is posed standing, then turned as a whole about the hip (roll for a dive, pitch back for a slide) and lifted
+const AXN=[0,0,0];
 function person3D(r,x,z,face,o,id=0,dj=0){
-  const P=SPX,c=Math.cos(face),s=Math.sin(face),W=l=>[x+l[0]*c+l[2]*s,l[1],z-l[0]*s+l[2]*c],Wd=l=>[l[0]*c+l[2]*s,l[1],-l[0]*s+l[2]*c],R=Wd([1,0,0]),Fw=Wd([0,0,1]),U=[0,1,0];
-  const ra=o.running?1:0,cr=o.crouch||0,dv=id%3,dl=DEJ[dv],rn=(o.run||0)*P.fq,sn=Math.sin(rn),cs=Math.cos(rn),L=P.th+P.sh,k=L/.93,AL=P.ua+P.fa,tw=P.tw,bw=o.arm!=null;
+  const P=SPX,c=Math.cos(face),s=Math.sin(face),act=o.act||0,ap=o.ap||0,os=o.sd||1;
+  const dv=id%3,dl=DEJ[dv],rn=(o.run||0)*P.fq,sn=Math.sin(rn),cs=Math.cos(rn),L=P.th+P.sh,k=L/.93,AL=P.ua+P.fa,tw=P.tw,bw=o.arm!=null,hy0=P.an+L*P.kn;
+  let ra=o.running?1:0,cr=o.crouch||0,st=0,sq=0,rl=0,pt=0,hip=null,jh=0,wh=0,sl5=0,sp=0;
+  const rel=(a,b,u)=>ap<0?smooth(clamp((ap-a)/(b-a),0,1)):o.hold?1:1-smooth(clamp((ap-u)/.45,0,1));
+  if(act===2){wh=rel(-.35,-.05,.25);st=wh*clamp((1.05-o.hy)/.85,0,1);}
+  else if(act===3){const T=.12+o.e/6,th=os*(35+45*clamp(o.e/1.2,0,1))*D2R,lo=Math.max(.2,hy0*Math.cos(th)+.06),hc=clamp(o.hy-.1,lo+.05,1.6);
+    if(ap<-T)wh=.5*smooth(clamp((ap+T+.25)/.25,0,1));
+    else if(ap<=0){const g=smooth((ap+T)/T);rl=th*g;hip=lerp(hy0,hc,g)+.12*Math.sin(Math.PI*g);wh=1;ra=0;sp=1;}
+    else{const g=ap<.5?0:smooth(clamp((ap-.5)/.6,0,1));rl=th*(1-g);hip=ap<.3?lerp(hc,lo,(ap/.3)**2):lerp(lo,hy0,g);wh=o.hold?1:1-g;ra=0;sp=1-g;}}
+  else if(act===4){const jm=1.2*FS[M?physD():'medium'].jp*Math.min(9,9.8/G);jh=clamp(o.hy-(hy0+P.tor*.926+AL),0,jm)*(ap>-.35&&ap<.35?Math.sin(Math.PI*(ap+.35)/.7):0);
+    st=ap<-.35?.45*smooth(clamp((ap+.6)/.25,0,1)):ap>.35?.4*(1-smooth(clamp((ap-.35)/.3,0,1))):0;wh=rel(-.55,-.2,.4);if(jh>0)ra=0;}
+  else if(act===5){const g=ap<0?smooth(clamp((ap+.45)/.45,0,1)):ap<.6?1:1-smooth(clamp((ap-.6)/.5,0,1));sl5=g;pt=.85*g;hip=lerp(hy0,.34,g);wh=rel(-.35,-.1,.6);if(g>0)ra=0;}
+  else if(act===6){sq=o.e;wh=1;}
   const up=P.fl*ra*sn*sn+(bw?P.jp*Math.sin(Math.PI*clamp((o.arm-.4*Math.PI)/(.9*Math.PI),0,1)):0);
-  const A=.34*k*P.st*ra,lf=.12*k*P.lf*ra,fw=.12*tw+cr*.06,hw=.1*tw,kd=dv===2?dj:0;
-  const fL=[-fw,up+Math.max(0,cs)*lf,sn*A],fR=[fw,up+Math.max(0,-cs)*lf,-sn*A];
-  let hy=up+P.an+L*(P.kn-ra*.08-cr*.1-kd*.1);
-  for(const f of [fL,fR])hy=Math.min(hy,f[1]+P.an+Math.sqrt(Math.max(0,(L*.995)**2-f[2]**2-(fw-hw)**2)));
-  [fL,fR].forEach((f,i)=>{const sd=i?1:-1,a=limb(r.thigh[i],r.shin[i],W([sd*hw,hy,0]),W([f[0],f[1]+P.an,f[2]]),P.th,P.sh,Wd([sd*.12,0,1]),R);
-    mB(r.foot[i],[a[0],a[1]-P.an,a[2]],R,U,Fw);});
-  const ln=P.hu+ra*.12+cr*.3+dj*dl[0],cl=Math.cos(ln),sl=Math.sin(ln),Yl=[0,cl,sl],hip=[0,hy,0],top=V3.add(hip,V3.sc(Yl,P.tor));
-  mB(r.torso,W(hip),V3.sc(Wd([0,-sl,cl]),P.td),V3.sc(Wd(Yl),P.tor/.54),V3.sc(R,tw));
-  const shy=P.tor*.926-dj*.04,slump=[0,-sl*dj*.06,cl*dj*.06];
-  for(let i=0;i<2;i++){const sd=i?1:-1,S=V3.add(V3.add(V3.add(hip,V3.sc(Yl,shy)),slump),[sd*(.2*tw-dj*.02),0,0]);
+  const A=.34*k*P.st*ra,lf=.12*k*P.lf*ra,fw=.12*tw+cr*.06+sq*.13+sp*.04,hw=.1*tw,kd=dv===2?dj:0,tk=jh>0?.22*k:0;
+  const fL=[-fw,up+Math.max(0,cs)*lf+tk,sn*A+sp*.14],fR=[fw,up+Math.max(0,-cs)*lf+tk,-sn*A-sp*.14];
+  let hy=up+P.an+L*(P.kn-ra*.08-cr*.1-kd*.1-.42*st-.44*sq);
+  if(sl5)hy=hy0;else for(const f of [fL,fR])hy=Math.min(hy,f[1]+P.an+Math.sqrt(Math.max(0,(L*.995)**2-f[2]**2-(fw-hw)**2)));
+  // whole-body turn about the hip (py): roll rl about the forward axis (+: head to his right), pitch pt (+: head back), then lift
+  const py=hy,lift=hip!=null?hip-hy:jh,cl=Math.cos(rl),slr=Math.sin(rl),cp=Math.cos(pt),spt=Math.sin(pt);
+  const Qd=l=>{const x1=l[0]*cl+l[1]*slr,y1=-l[0]*slr+l[1]*cl;return [x1,y1*cp+l[2]*spt,-y1*spt+l[2]*cp];},
+    Q=l=>{const q=Qd([l[0],l[1]-py,l[2]]);q[1]+=py+lift;return q;},
+    Qi=q=>{const b=q[1]-py-lift,y1=b*cp-q[2]*spt,z1=b*spt+q[2]*cp;return [q[0]*cl-y1*slr,q[0]*slr+y1*cl+py,z1];},
+    W=l=>{const q=Q(l);return [x+q[0]*c+q[2]*s,q[1],z-q[0]*s+q[2]*c];},Wd=l=>{const q=Qd(l);return [q[0]*c+q[2]*s,q[1],-q[0]*s+q[2]*c];},
+    Wi=w=>{const dx=w[0]-x,dz=w[2]-z;return Qi([dx*c-dz*s,w[1],dx*s+dz*c]);},R=Wd([1,0,0]),Fw=Wd([0,0,1]),U=Wd([0,1,0]);
+  // slide: the leading leg along the ground ahead, the other tucked under (feet placed in the turned frame)
+  if(sl5)[[fL,[-.16,P.an+.03,.28*k]],[fR,[.1,P.an+.03,.95*k]]].forEach(([f,a])=>{const l=Qi(a);for(let j=0;j<3;j++)f[j]=lerp(f[j],l[j]-(j===1?P.an:0),sl5);});
+  [fL,fR].forEach((f,i)=>{const sd=i?1:-1,a=limb(r.thigh[i],r.shin[i],W([sd*hw,hy,0]),W([f[0],f[1]+P.an,f[2]]),P.th,P.sh,Wd([sd*.12+sd*.3*sq,0,1]),R);
+    mB(r.foot[i],V3.sub(a,V3.sc(U,P.an)),R,U,Fw);});
+  const ln=P.hu+ra*.12+cr*.3+dj*dl[0]+st*1.05+sq*.4,cn=Math.cos(ln),snl=Math.sin(ln),Yl=[0,cn,snl],hp=[0,hy,0],top=V3.add(hp,V3.sc(Yl,P.tor));
+  mB(r.torso,W(hp),V3.sc(Wd([0,-snl,cn]),P.td),V3.sc(Wd(Yl),P.tor/.54),V3.sc(R,tw));
+  const shy=P.tor*.926-dj*.04,slump=[0,-snl*dj*.06,cn*dj*.06];
+  for(let i=0;i<2;i++){const sd=i?1:-1,S=V3.add(V3.add(V3.add(hp,V3.sc(Yl,shy)),slump),[sd*(.2*tw-dj*.02),0,0]);
     let t=[sd*.07,-AL*.93,.07],p=[sd*.3,0,-1];
     if(ra)t=V3.lerp(t,[sd*.03,-AL*.55,.12+sd*sn*.28*k],ra);
     if(cr){t=V3.lerp(t,[-sd*.02,-AL*.62,AL*.5],cr);p=V3.lerp(p,[sd,-.2,-.3],cr);}
@@ -434,8 +458,12 @@ function person3D(r,x,z,face,o,id=0,dj=0){
     if(bw&&i===1){const a=o.arm,tr=clamp(2*Math.PI-Math.acos(clamp((S[1]-o.rel)/(AL+P.hd),-1,1)),Math.PI+.2,Math.PI+.8),th=a<=Math.PI?a*tr/Math.PI:tr+(a-Math.PI)*(2*Math.PI-tr)/Math.PI;
       t=[0,-Math.cos(th)*AL,-Math.sin(th)*AL];p=[1,0,0];}
     else if(bw)t=V3.lerp(V3.sc([-.07,.2,.62],AL),t,clamp((o.arm-Math.PI)/Math.PI,0,1));
+    // hands to the ball, side by side; sliding, the far hand goes back to the ground for support
+    if(wh>0){AXN[0]=o.hx+c*sd*.06;AXN[1]=o.hy;AXN[2]=o.hz-s*sd*.06;
+      if(sl5&&sd!==os){AXN[0]=x-s*.35+c*sd*.3;AXN[1]=.04;AXN[2]=z-c*.35-s*sd*.3;}
+      t=V3.lerp(t,V3.sub(Wi(AXN),S),wh);p=V3.lerp(p,[sd,act===4?.2:-.3,-.3],wh);}
     limb(r.uarm[i],r.farm[i],W(S),W(V3.add(S,t)),P.ua,P.fa,Wd(p),R);}
-  const hq=P.nod+ln*.35+dj*dl[1],Uh=Wd([0,Math.cos(hq),Math.sin(hq)]),Fh=Wd([0,-Math.sin(hq),Math.cos(hq)]),T=W(V3.add(top,slump));
+  const hq=P.nod+ln*.35+dj*dl[1]-st*.5,Uh=Wd([0,Math.cos(hq),Math.sin(hq)]),Fh=Wd([0,-Math.sin(hq),Math.cos(hq)]),T=W(V3.add(top,slump));
   mB(r.head,T,R,Uh,Fh);
   if(r.ex.visible){
     if(P.ring){const a=P.ring[1],ph=clock*.7+id,n=V3.norm(V3.add(V3.sc(Uh,Math.cos(a)),V3.sc(V3.add(V3.sc(R,Math.cos(ph)),V3.sc(Fh,Math.sin(ph))),Math.sin(a)))),
@@ -512,8 +540,10 @@ function bowlerState(){
 /* --- view state: everything render3D/draw take from the game. Live frames are built here; a replay feeds recorded
    frames instead (08b-replay). New per-frame render state goes here AND into the recorded frame layout. --- */
 const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay'||MENU.on;
+// the home batting camera: the keeper is hidden there (standing up he would block the batter; standing back he is behind it)
+function batView(){return !!M&&!M.bowl&&!S.cel&&S.phase!=='replay'&&!(S.chase&&clock>=S.chase.t0)&&!(S.cord&&clock>=S.cord.t0)&&!MENU.on;}
 const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,bx:0,arm:null,brun:0,brn:false,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
-  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0})),hideBat:false,trail:null,cheer:0,dej:0});
+  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0,act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,kp:false,bwl:false,hold:false})),hideBat:false,trail:null,cheer:0,dej:0});
 const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
   const V=LV,ph=S.phase;
@@ -523,9 +553,12 @@ function liveView(){
   V.nf=0;
   if(M){
     const bs=bowlerState(),bb=S.ball||S.pending;V.bz=bs.z;V.arm=bs.arm;V.brun=bs.run;V.brn=bs.running;V.bx=(bb?bb.xr:M.bowlerType==='pace'?.3:.22)+.2*(SPX?SPX.tw:1);
-    S.fpos.forEach((p,i)=>{if(V.nf>=NFL)return;const f=M.field[i],o=V.f[V.nf++];o.on=!!f&&f.n!=='keeper'&&f.n!=='bowler';if(!o.on)return;
-      const mv=!!p.mv&&clock-p.mv<0.12,tx=mv&&S.fanim?S.fanim.x:0,tz=mv&&S.fanim?S.fanim.z:BATS_Z;
-      o.x=p.x;o.z=p.z;o.face=Math.atan2(tx-p.x,tz-p.z);o.running=mv;o.run=p.run;o.crouch=ph==='flight'||ph==='runup'?1:0;});
+    // fielders from fieldTick; the bowler's slot only carries a caught-and-bowled attempt (he is drawn from bowlerState)
+    S.fpos.forEach(p=>{if(V.nf>=NFL)return;const o=V.f[V.nf++];
+      Object.assign(o,{on:!p.bw,kp:p.kp,bwl:p.bw,x:p.x,z:p.z,face:p.face,running:p.mv>.8,run:p.run,crouch:!p.kp&&(ph==='flight'||ph==='runup')?1:0,
+        act:p.act,ap:p.ap,hx:p.hx,hy:p.hy,hz:p.hz,e:p.e,sd:p.sd,hold:p.hold});
+      // a caught or gathered ball stays in the hands (behind the batting camera the keeper is not drawn, so neither is it)
+      if(p.hold&&p.ap>0&&!(p.kp&&batView()))V.ball=(V.bo.x=p.hx,V.bo.y=p.hy-.05,V.bo.z=p.hz,V.bo);});
   }
   nsTick(V.ns,V.bx);
   V.dej=S.cel?smooth(clamp((clock-S.cel.t0-.2)/.9,0,1)):0;
@@ -577,10 +610,13 @@ function render3D(V){
   if(lk.fog){const fo=wideCam()?Math.max(0,Math.hypot(cam.x,cam.z)+CAM_Z):0;T3.fog.near=lk.fog[1]+fo;T3.fog.far=lk.fog[2]+fo;}
   T3.scene.environmentIntensity=lk.env*(1+flash*2.5);
   G.wide.visible=wideCam();
-  for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on;G.fielders[i].g.visible=on;G.fsh[i].visible=on&&!inShadow(p.x,p.z);
+  const kh=batView();let cb=null;
+  for(let i=0;i<NFL;i++){const p=V.f[i],on=!!M&&i<V.nf&&p.on&&!(p.kp&&kh);G.fielders[i].g.visible=on;G.fsh[i].visible=on&&!inShadow(p.x,p.z);
+    if(i<V.nf&&p.bwl&&p.act)cb=p;
     if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(G.fielders[i],p.x,p.z,p.face,p,i,V.dej);}}
   G.bowler.g.visible=!!M;
-  if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});person3D(G.bowler,V.bx,V.bz,Math.PI,BO,1,V.dej);}
+  if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});
+    if(cb)person3D(G.bowler,cb.x,cb.z,cb.face,cb,1,V.dej);else person3D(G.bowler,V.bx,V.bz,Math.PI,BO,1,V.dej);}
   G.ball.visible=!!bp;
   if(bp)mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);
   G.mk.visible=G.mkr.visible=!!mk;
@@ -591,7 +627,10 @@ function render3D(V){
   G.bat.g.visible=!V.hideBat;if(!V.hideBat){const J=batsman3D(G.bat,pz,SKN.on);if(SKN.on)skin3D(J);}
   T3.r.render(T3.scene,T3.cam);
 }
-if(location.hash==='#test')window.__r={info:()=>({calls:T3.r.info.render.calls,tris:T3.r.info.render.triangles}),tier:()=>Q.t,setTier:n=>{Q.t=n;Q.lock=true;qApply();}};
+if(location.hash==='#test')window.__r={info:()=>({calls:T3.r.info.render.calls,tris:T3.r.info.render.triangles}),tier:()=>Q.t,setTier:n=>{Q.t=n;Q.lock=true;qApply();},
+  // a fielder's rig as drawn (-1: the bowler): torso up axis (1 upright, 0 lying), hip height, the hands (end of each forearm), visible
+  body:i=>{const r=i<0?G3.bowler:G3.fielders[i],e=r.torso.matrix.elements,l=Math.hypot(e[4],e[5],e[6]),m=j=>{const f=r.farm[j].matrix.elements;return [0,1,2].map(k=>f[12+k]+f[4+k]*SPX.fa/2);};
+    return {up:e[5]/l,hipY:e[13],hands:[m(0),m(1)],vis:r.g.visible};}};
 
 /* --- sky (2D canvas behind the 3D layer) --- */
 function renderSky(){

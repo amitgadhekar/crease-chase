@@ -25,20 +25,69 @@ function botBall(b,bp,diff,sigma,loftP,field,bat){
   const r=evalSwing(b,sw,diff,field,bat);return r.miss?beaten(b,r.bp||bp,true,bat):r.res;
 }
 function bot(pk,diff,sigma,loftP,n,fb){
-  const P=setPlanet(pk),mem={},ft={x:0,z:0},foot=FOOTBOTS[fb||'stationary'],how={};let runs=0,outs=0,balls=0,fours=0,sixes=0;
+  const P=setPlanet(pk),mem={},ft={x:0,z:0},foot=FOOTBOTS[fb||'stationary'],how={},hq={r:0,n:0};let runs=0,outs=0,balls=0,fours=0,sixes=0;
   const field=fieldFor([],diff).field;
   for(let i=0;i<n;i++){
     if(i%6===0)rollWind(P);
     const type=Math.random()<0.6?'pace':'spin';
     const b=makeDelivery(planBall(mem,type,diff,{last:[],foot:ft}),diff,Math.random()<.5?1:-1);
     const bp=foot&&foot(b),res=botBall(b,bp,diff,sigma,loftP,field);
-    runs+=res.runs;if(!res.wide)balls++;if(res.boundary===4)fours++;if(res.boundary===6)sixes++;
+    runs+=res.runs;if(!res.wide)balls++;if(res.boundary===4)fours++;if(res.boundary===6)sixes++;if(res.q>=0.85&&!res.lofted){hq.r+=res.runs;hq.n++;}
     if(res.out){outs++;const k=/^Caught/.test(res.outText)?'caught':res.outText||'other';how[k]=(how[k]||0)+1;}
     footTrend(ft,bp);brainLearn(mem,b,res.runs,!!res.out);
   }
-  return {rpb:runs/balls,bpo:balls/Math.max(1,outs),rpw:runs/Math.max(1,outs),fours:fours/balls,sixes:sixes/balls,how,outs};
+  return {rpb:runs/balls,bpo:balls/Math.max(1,outs),rpw:runs/Math.max(1,outs),fours:fours/balls,sixes:sixes/balls,how,outs,hq:hq.r/Math.max(1,hq.n)};
 }
 globalThis.PLANET_ORDER=PLANET_ORDER;globalThis.PLANETS=PLANETS;globalThis.DIFF=DIFF; // top-level consts are not context properties
+// fielding events (res.fplay) that could not happen: a fielder covering more ground than his run (from his reaction, or 1 s after
+// his previous event, from where it ended) plus his hands, dive (at most his dive) or jump allows; hands not at the ball on a catch,
+// drop, stop or fumble; a miss further than 1.2 m (dive) or 1 m (above a leap) from it; malformed fields
+const FK=['run','take','dive','jump','slide','stop'],FO=['catch','drop','stop','fumble','miss',''];
+function fplayBad(res,b,c,field,F){
+  const E=res.fplay;if(!Array.isArray(E))return 1;let bad=0,t=-1;const last={},h=res.path&&preparePath(res.path,c,res.dir);
+  for(const e of E){
+    const f=field[e.i];if(!f||!FK.includes(e.k)||!FO.includes(e.o)||Math.abs(e.sd)!==1||e.t1<t){bad++;continue;}
+    const k=fsk(f,F,b),p=last[e.i];t=e.t1;last[e.i]=e;
+    if(p){if(e.t0<p.t1+1-1e-6)bad++;k.x=p.x;k.z=p.z;}
+    if(e.t1<e.t0||e.t1<=0)bad++;
+    k.re=e.t0;if(e.k==='run')k.mx=1e9;
+    if(Math.hypot(e.x-k.x,e.z-k.z)>runD(k,e.t1)+HANDS+(e.k==='dive'||e.k==='slide'?e.e:e.k==='jump'?.3:0)+1e-3||e.e>k.dv+1e-6)bad++;
+    if(!h||!e.o)continue;
+    const q=hitPos(h,e.t1),g=Math.hypot(q.x-e.x,q.z-e.z);
+    if(e.o==='miss'?g>1.2+1e-3||q.y-e.y>1+1e-3:g>0.02||Math.abs(Math.max(.05,q.y)-e.y)>0.02)bad++;
+    if(e.o==='catch'&&(res.catcher!==e.i||Math.hypot(res.catchPt.x-e.x,res.catchPt.z-e.z)>1e-6))bad++;
+  }
+  return bad;
+}
+// the same balls (delivery, swing and random numbers) fielded at each level's skill (FS) on Earth, against the short-format ring
+// field and the T20 templates: runs, catches, chances to the keeper and close catchers (edges in reach) and to deep fielders
+function fieldSkill(n){
+  setPlanet('earth');const F0={...FS},ids=Object.keys(TPL).filter(k=>!TPL[k].test),R0=Math.random,R={};
+  for(const L in F0)R[L]={r:0,b:0,w:0,cc:0,ck:0,dc:0,dk:0,rope:0,lofts:0,bad:0};
+  for(let i=0;i<n;i++){
+    const field=i%2?fieldFor([],'medium').field:tplField(ids[i%ids.length]),type=Math.random()<0.6?'pace':'spin',
+      b=makeDelivery(planBall({},type,'medium',{last:[],foot:null}),'medium',Math.random()<.5?1:-1),seed=Math.floor(Math.random()*4294967296);
+    for(const L in F0){
+      FS.medium=F0[L];Math.random=seeded(seed);const res=botBall(b,null,'medium',0.045,0.3,field),A=R[L];Math.random=R0;
+      A.r+=res.runs;if(!res.wide)A.b++;if(res.out&&/^Caught/.test(res.outText))A.w++;if(res.lofted&&res.q!=null)A.lofts++;if(/^Caught on the rope/.test(res.sub||''))A.rope++;
+      for(const e of res.fplay||[])if(e.o==='catch'||e.o==='drop'){const k=fsk(field[e.i],F0[L],b);if(k.cl){A.cc++;if(e.o==='catch')A.ck++;}if(k.dp){A.dc++;if(e.o==='catch')A.dk++;}}
+    }
+  }
+  FS.medium=F0.medium;return R;
+}
+// fielding events of random balls on every planet and level, short-format, T20 and Test fields, batters of every tier (fends, bat-pad)
+function fplayAudit(n){
+  const ids=Object.keys(TPL),DS=['easy','medium','hard'];let bad=0,ev=0;
+  for(let i=0;i<n;i++){
+    const P=setPlanet(PLANET_ORDER[i%8]),d=DS[i%3];if(i%6===0)rollWind(P);
+    const field=i%3?tplField(ids[i%ids.length]):fieldFor([],d).field,bat=i%2?{tier:'ABCDE'[i%5]}:undefined,
+      b=makeDelivery(planBall({},Math.random()<0.6?'pace':'spin',d,{last:[],foot:null}),d,Math.random()<.5?1:-1),f=footAt(b,null);
+    const sw=Math.random()<0.15?{tc:f.t-0.005+gauss()*0.045,aim:0,power:0.3,lofted:false,defend:true,bp:null}
+      :{tc:f.t-0.005+gauss()*0.06,aim:rnd(-180,180),power:rnd(0.3,1),lofted:Math.random()<0.4,defend:false,bp:null};
+    const r=evalSwing(b,sw,d,field,bat);if(r.miss)continue;ev+=r.res.fplay.length;bad+=fplayBad(r.res,b,f.c,field,FS[d]);
+  }
+  return {bad,ev};
+}
 function aiTarget(diff,overs,wkts,pk){const P=setPlanet(pk);let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,P.ai).runs;return t/2000+1;}
 
 // T20 first innings: the player's attack (bowled by a bot) against the AI batters, through simRest. Bowling bots: std = the
@@ -250,10 +299,30 @@ let failures = 0;
 const check = (label, v, lo, hi) => { if (v < lo || v > hi) { failures++; console.log(`  !! ${label} = ${v.toFixed(2)} outside expected ${lo}-${hi}`); } };
 
 console.log(`\nBy difficulty on Earth (bot timing spread 45 ms, 30% lofted), ${N} balls each:`);
+// runs per well-timed ground shot (q >= 0.85) before fielding v2: stronger fielding must not take them away from good shots
+const HQ0 = {easy: 1.43, medium: 1.21, hard: 0.99};
 for (const d of ['easy', 'medium', 'hard']) {
   const r = ctx.bot('earth', d, 0.045, 0.3, N);
-  console.log(`  ${d.padEnd(7)} ${fmt(r)}   AI 2-over target ~${ctx.aiTarget(d, 2, 3, 'earth').toFixed(1)}`);
+  console.log(`  ${d.padEnd(7)} ${fmt(r)}   AI 2-over target ~${ctx.aiTarget(d, 2, 3, 'earth').toFixed(1)}   well-timed ground shots ${r.hq.toFixed(2)} runs (was ${HQ0[d]})`);
+  check(`${d} runs per well-timed ground shot vs before fielding v2`, r.hq / HQ0[d], 0.95, 9);
 }
+
+console.log(`\nFielding: the same ${N} balls (deliveries, swings, random numbers) fielded at each level's skill, Earth, ring field and T20 templates:`);
+const FSK = ctx.fieldSkill(N), fpc = (k, n) => `${(k / Math.max(1, n) * 100).toFixed(0).padStart(3)}%`;
+for (const d of ['easy', 'medium', 'hard']) { const A = FSK[d];
+  console.log(`  ${d.padEnd(7)} ${(A.r / A.b).toFixed(3)} rpb  caught ${(A.w / A.b * 1000).toFixed(1).padStart(5)} per 1000 balls  keeper/close chances taken ${fpc(A.ck, A.cc)} of ${A.cc}  deep chances taken ${fpc(A.dk, A.dc)} of ${A.dc}  rope catches ${(A.rope / Math.max(1, A.lofts) * 100).toFixed(1)}% of lofts`); }
+check('fielding: easy minus medium runs per ball (same balls)', FSK.easy.r / FSK.easy.b - FSK.medium.r / FSK.medium.b, 0.01, 9);
+check('fielding: medium minus hard runs per ball (same balls)', FSK.medium.r / FSK.medium.b - FSK.hard.r / FSK.hard.b, 0.01, 9);
+check('fielding: catches medium minus easy (per 1000 balls)', (FSK.medium.w / FSK.medium.b - FSK.easy.w / FSK.easy.b) * 1000, 0.5, 99);
+check('fielding: catches hard minus medium (per 1000 balls)', (FSK.hard.w / FSK.hard.b - FSK.medium.w / FSK.medium.b) * 1000, 0.5, 99);
+for (const d of ['easy', 'medium', 'hard']) {
+  check(`fielding ${d}: keeper and close catchers take chances in reach (%)`, FSK[d].ck / FSK[d].cc * 100, ...{easy: [50, 80], medium: [58, 85], hard: [65, 90]}[d]);
+  check(`fielding ${d}: deep fielders take running catches in reach (%)`, FSK[d].dk / FSK[d].dc * 100, ...{easy: [55, 85], medium: [60, 88], hard: [65, 92]}[d]);
+  check(`fielding ${d}: rope catches (% of lofts)`, FSK[d].rope / FSK[d].lofts * 100, 0.3, 10);
+}
+const AU = ctx.fplayAudit(N);
+console.log(`  fielding events of ${N} random balls (every planet and level, all fields, every tier): ${AU.ev} events, ${AU.bad} impossible`);
+check('impossible fielding events', AU.bad, 0, 0);
 
 console.log(`\nFootwork bots on Earth (medium), ${5 * N} balls each:`);
 const fw = {};
@@ -352,7 +421,7 @@ console.log(`  T20 section took ${((Date.now() - t0) / 1000).toFixed(1)} s (T20_
 const t1 = Date.now();
 // Short formats and T20 must not change when Test code is added: the same seeded rows hash the same as before the Test code.
 // Update FP only when short-format or T20 balance is changed on purpose.
-const FP = 'bb5bfa7a';
+const FP = '96fcd588';
 {
   const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const SM = Object.create(Math); SM.random = mulberry(20261014);

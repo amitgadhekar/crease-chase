@@ -57,7 +57,10 @@ function newOver(cont){
   S.phase='break';S.t=0;S.breakDur=lng?2.4:1.6;resetFielders();
   if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
-function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
+// fielders back at their places (the keeper at his stance for this bowler, KEEP), with the motion state fieldTick (08) drives
+function resetFielders(){S.fpos=M.field.map(f=>{const kp=f.n==='keeper',p=kp?KEEP[M.bowlerType]||KEEP.pace:f;
+  return {x:p.x,z:p.z,bx:p.x,bz:p.z,run:0,mv:0,face:kp?0:Math.atan2(-p.x,BATS_Z-p.z),act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,ev:null,kp,bw:f.n==='bowler'};});
+  S.fplay=[];S.fev=null;S.cord=null;}
 function nextBall(){
   $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
   const sb=M.sc?scenNext():null;
@@ -106,20 +109,38 @@ function doSwing(){
   const r=evalSwing(b,sw,physD(),M.field,M.st&&M.st.bat?scBat():undefined);
   S.timing=r.timing;if(!M.bowl){M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;}
   if(r.miss){sw.missed=true;if(r.bp)S.padBp=r.bp;return;}
-  const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start);
+  const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start),c0=footAt(b,sw.bp).c;
   sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
   if(res.stumps){S.stumps={t0:clock};sfx.stumps();}
   if(res.path){const h=S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;
-    if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}}
-  if(res.catcher!=null){S.fanim={i:res.catcher,x:res.catchPt.x,z:res.catchPt.z,speed:Math.max(4,Math.hypot(M.field[res.catcher].x-res.catchPt.x,M.field[res.catcher].z-res.catchPt.z)/Math.max(0.25,res.path.T*0.92))};}
-  else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[physD()].fSpeed*ENV.run};}
+    if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}
+    // the drawn path starts up to 0.5 m from the logic's: a six still lands over the rope, a one-bounce four inside it
+    if(h.air&&res.boundary&&!h.stop){const bd=distToBoundary(h.x0,h.z0,h.ux,h.uz),C=res.boundary===6?Math.max(h.C,bd+1):Math.min(h.C,bd-.5);
+      if(C!==h.C){h.C=C;h.sh=C/h.T;}}}
+  // the fielding events, moved onto the drawn path (it starts at the blade's contact point, the logic's at footAt's)
+  S.f0=S.hitStart;S.fplay=(res.fplay||[]).map(e=>({...e,x:e.x+cur.x-c0.x,z:e.z+cur.z-c0.z}));S.fev={};
+  for(const e of S.fplay)(S.fev[e.i]||(S.fev[e.i]=[])).push(e);
   let dur=1.2,tCross=0;
-  if(S.hit)dur=(S.hit.air?Math.min(S.hit.T+(S.hit.stop?0.2:0.9),2.6):Math.min(S.hit.s/S.hit.a,2.2))+0.8;
+  if(S.hit){const h=S.hit;dur=(h.air?Math.min(h.T+(h.stop?0.2:0.9),2.6):Math.min(h.s/h.a,2.2))+0.8;
+    // long enough to see every attempt land (a diver is up again 1.1 s after it)
+    for(const e of S.fplay)if(e.k!=='run'||e.o)dur=Math.max(dur,Math.min(3.4,e.t1+1));}
   if(res.boundary&&S.hit){
     const h=S.hit,bd=distToBoundary(h.x0,h.z0,h.ux,h.uz);
-    if(h.air)tCross=res.boundary===6?bd/h.sh:h.T+0.5;
+    if(h.air)tCross=bd<=h.C?bd/h.sh:h.T+(h.rt||1.2)*(1-Math.sqrt(Math.max(0,1-(bd-h.C)/(h.roll!=null?h.roll:h.C*0.3))));
     else{const disc=h.s*h.s-2*h.a*bd;tCross=disc>0?(h.s-Math.sqrt(disc))/h.a:2;}
     tCross=clamp(tCross,0.4,3.4);S.chase={t0:clock+0.15,tx:clock+tCross};dur=tCross+1.4;
+  }else if(S.hit){
+    // a catch or chance out of the batting camera's view: the chase camera for the deep, the cordon camera (bowler's end) for a
+    // catch, drop, dive or leap by the keeper or a close catcher (on the catch or drop if there is one), the chase camera again for
+    // a dive, leap or slide off screen that gets a hand to the ball; the outcome waits for that moment. Near misses and plain
+    // stops stay in the batting view, which keeps the follow-through on most balls
+    const h=S.hit,f=M.field,deep=S.fplay.find(e=>(e.k!=='run'||e.o)&&f[e.i]&&Math.hypot(f[e.i].x,f[e.i].z)>BOUNDARY*0.6),act=e=>e.k==='dive'||e.k==='slide'||e.k==='jump',
+      ct=e=>e.o==='catch'||e.o==='drop',cl=!M.bowl&&S.fplay.filter(e=>f[e.i]&&(ct(e)||act(e))&&(f[e.i].n==='keeper'||f[e.i].n!=='bowler'&&Math.hypot(f[e.i].x,f[e.i].z)<18)),
+      c=cl&&(cl.find(ct)||cl[0]);
+    if(h.air&&res.lofted&&(h.C>=30||deep)){S.chase={t0:clock+0.15,tx:clock+h.T};tCross=h.T;dur=Math.max(dur,h.T+1.4);}
+    else if(c){S.cord={t0:clock+0.12,x:c.x,z:c.z};tCross=Math.min(2,c.t1);}
+    else{const q=e=>proj(e.x,e.y,e.z),dv=S.fplay.find(e=>act(e)&&e.o&&e.o!=='miss'&&!(x=>x&&x.x>0&&x.x<W&&x.y>0&&x.y<H)(q(e)));
+      if(dv){S.chase={t0:clock+0.15,tx:clock+dv.t1};tCross=Math.min(2.5,dv.t1);}}
   }
   commit(res,dur,tCross);
 }
@@ -127,7 +148,8 @@ function commit(res,dur,delay){
   const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
   if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
   // Tests and T20: a holdable ball is recorded when Hold is tapped or its window closes (holdEnd)
-  if((M.sc||M.t20&&!M.bowl)&&holdable(res)){S.hold={until:clock+0.6,res,b};$('#holdBtn').hidden=false;}else if(M.sc)scenRecord(res,b,false,delay>0);else if(M.bowl)bowlRecord(res,b);else recordBall(res,b);
+  // a deferred outcome (a camera cut) opens the window when it is shown, so a Hold is never overwritten by the runs before it
+  if((M.sc||M.t20&&!M.bowl)&&holdable(res)){S.hold={until:clock+Math.max(0,delay||0)+0.6,res,b};$('#holdBtn').hidden=delay>0;}else if(M.sc)scenRecord(res,b,false,delay>0);else if(M.bowl)bowlRecord(res,b);else recordBall(res,b);
   if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
 }
 function recordBall(res,b){
@@ -143,9 +165,10 @@ function recordBall(res,b){
 }
 function showOutcome(res,b){
   updateHUD();
-  const speedNote=b.slower?'Slower ball, '+b.kmh+' km/h':'';
-  if(res.label==='Dropped!')sfx.gasp(res.path.T);
-  if(res.out){banner(res.label,res.sub||res.outText,'out',1800);sfx.groan(res.catcher!=null?res.path.T:0.3);}
+  // the crowd reacts when the ball reaches the hands (contact + T): a deferred outcome is shown about then already
+  const speedNote=b.slower?'Slower ball, '+b.kmh+' km/h':'',w=res.path?Math.max(0,S.hitStart+res.path.T-clock):0.3;
+  if(res.label==='Dropped!')sfx.gasp(w);
+  if(res.out){banner(res.label,res.sub||res.outText,'out',1800);sfx.groan(res.catcher!=null?w:0.3);}
   else if(res.boundary===6){banner('Six!',res.sub,'six',1800);sfx.cheer(true,res.dist);}
   else if(res.boundary===4){banner('Four!',res.sub||res.shot,'four',1700);sfx.cheer(false);}
   else if(res.wide){banner('Wide','One extra','small',1000);}

@@ -93,7 +93,10 @@ if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3
   scen:()=>M&&M.sc?{id:M.sc.id,runs:M.st.runs,wkts:M.st.wkts,balls:M.st.balls,s:M.st.s,ns:M.st.ns,ob:M.st.ob,hold:!!S.hold,pid:M.pid,ok:fieldOkTest(M.field),
     bi:M.bi,overNo:M.overNo,chips:M.overBalls.map(c=>c.t).join(' '),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),bat:JSON.stringify(M.st.bat),
     md:M.md.join(),hud:['#sOvers','#sTarget','#cObj','#cCond','#cBat0','#cBat1','#cBowl'].map(q=>$(q).textContent).join(' | '),
-    viol:M.st.viol.bouncer+M.st.viol.field,ns3d:LV.ns.on}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length})};
+    viol:M.st.viol.bouncer+M.st.viol.field,ns3d:LV.ns.on}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length}),
+  // fielding: the fielders as drawn (live or replay), the field set for the next ball (keeper at his stance), the camera in use
+  fv:()=>{const V=S.phase==='replay'?RV:LV;return V.f.slice(0,V.nf).map(f=>({on:f.on,kp:f.kp,act:f.act,ap:f.ap,x:f.x,z:f.z,hx:f.hx,hy:f.hy,hz:f.hz,face:f.face}));},
+  fieldSet:f=>{M.field=f;resetFielders();},view:()=>({bat:batView(),cord:!!S.cord,chase:!!S.chase})};
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();showMenu(null);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

@@ -28,6 +28,59 @@ const openMode = async (p, m) => { await p.click(`.mcard[data-m=${m}]`);
 const startMode = async (p, m, opt = {}) => { await openMode(p, m);
   for (const [k, v] of Object.entries(opt)) await p.click(k === 'planet' ? `#planetGrid button[data-v=${v}]` : `.seg[data-key=${k}] button[data-v="${v}"]`);
   await p.click('#startBtn'); };
+// Fielding plays: the next ball's swing is set (an edge: inside the edge window; else perfect), and evalSwing is re-rolled in the
+// page (fresh fielding randomness each time) until the play wanted comes up (pred over the result r and field f; key picks the
+// event to look at). At its t1 the fielder is checked: the action in the view state, the rig's pose (a diver lying out, a leaper
+// off the ground), and his hands on the ball for a catch or stop; then a screenshot. AI swings (T20 bowling) are set by forcing aiBat.
+const PLAYS = {
+  edge: {sw: {aim: 20, edge: 1}, cam: 'cord', pred: "r.fplay.some(e=>(f[e.i].n==='keeper'||f[e.i].n==='slip')&&(e.k==='dive'||e.k==='jump'))",
+    key: "(e,f)=>(f[e.i].n==='keeper'||f[e.i].n==='slip')&&(e.k==='dive'||e.k==='jump')"},
+  ring: {sw: {aim: 30, power: 1}, pred: "!r.lofted&&!r.boundary&&r.fplay.some(e=>e.k==='dive'&&e.o==='stop'&&Math.hypot(f[e.i].x,f[e.i].z)<35)",
+    key: "e=>e.k==='dive'&&e.o==='stop'"},
+  deep: {sw: {aim: 10, power: 0.3, loft: 1}, cam: 'chase', field: 1,
+    pred: "r.out&&r.catcher!=null&&Math.hypot(f[r.catcher].x,f[r.catcher].z)>BOUNDARY*.6&&r.fplay.some(e=>e.i===r.catcher&&e.o==='catch'&&Math.hypot(f[e.i].x-e.x,f[e.i].z-e.z)>3)",
+    key: "e=>e.o==='catch'"},
+  four: {sw: {aim: 30, power: 1}, pred: "r.boundary===4&&r.fplay.some(e=>e.k==='dive'&&e.o==='miss')", key: "e=>e.k==='dive'"}
+};
+const armPlay = (p, play) => p.evaluate(pl => {
+  const want = new Function('r', 'f', 'return ' + pl.pred), ev0 = evalSwing; window.__fp = 0;
+  window.evalSwing = (...a) => { window.evalSwing = ev0; for (let i = 0; i < 6000; i++) { const r = ev0(...a); if (r.res && r.res.fplay && want(r.res, a[3])) { window.__fp = i + 1; return r; } } return ev0(...a); };
+}, play);
+const fieldPlay = async (p, name, play, ai) => {
+  for (let n = 0; n < 4; n++) {
+    if (!ai) {
+      await p.waitForFunction(() => __t.S.phase === 'ready' || __t.S.phase === 'runup', null, {timeout: 30000, polling: 20});
+      // long-off and long-on back on the rope for the deep catch
+      if (play.field) await p.evaluate(() => __t.fieldSet(tplField(Object.keys(TPL).find(k => TPL[k].f.includes('longoff') && TPL[k].f.includes('longon')))));
+      await p.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 10});
+      await armPlay(p, play);
+      await p.evaluate(sw => { const S = __t.S, fa = footAt(S.ball, S.bpos), w = windows(__t.getM().diff, true, 1 + 0.35 * fa.gain);
+        S.swing = {tc: fa.t + (sw.edge ? -(w.ok + w.edge) / 2 : 0.002), aim: sw.aim, power: sw.power || 0.8, lofted: !!sw.loft, defend: false, done: false};
+        S.bat = {mode: 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim: sw.aim}; }, play.sw);
+    }
+    await p.waitForFunction(() => __t.S.phase !== 'flight' && __t.S.phase !== 'runup', null, {timeout: 30000, polling: 10});
+    const ev = await p.evaluate(key => { if (!window.__fp || __t.S.phase !== 'result') return null; const f = __t.getM().field, e = __t.S.fplay.find(x => new Function('return ' + key)()(x, f));
+      return e && {...e, n: f[e.i].n || '', label: __t.S.res.label + ', ' + (__t.S.res.sub || ''), view: __t.view()}; }, play.key);
+    if (!ev) { if (ai) return null; await p.waitForFunction(() => __t.S.phase !== 'result', null, {timeout: 30000, polling: 20}); continue; }
+    if (play.cam && !ev.view[play.cam]) errors.push(`fielding ${name}: expected the ${play.cam} camera, got ${JSON.stringify(ev.view)}`);
+    await p.waitForFunction(t => __t.clk() - __t.S.f0 >= t || __t.S.phase !== 'result', ev.t1 + 0.04, {timeout: 20000, polling: 5});
+    // paused, frames are still drawn at the paused clock: the rig is read from one of those, not from the frame before the pause
+    await p.evaluate(() => { __t.S.paused = true; });
+    await p.waitForTimeout(150);
+    const st = await p.evaluate(i => ({fv: __t.fv()[i], b: __r.body(i), par: __t.cam3()}), ev.i);
+    camErr = Math.max(camErr, st.par); if (!(st.par < 0.5)) errors.push(`camera parity ${name}: ${st.par} px`);
+    await p.screenshot({path: `${shots}${name}.png`});
+    await p.evaluate(() => { __t.S.paused = false; });
+    const f = st.fv, act = {dive: 3, jump: 4, slide: 5}[ev.k] || 2, hd = Math.min(...st.b.hands.map(h => Math.hypot(h[0] - f.hx, h[1] - f.hy, h[2] - f.hz)));
+    if (st.fv.act !== act || !st.b.vis) errors.push(`fielding ${name}: ${ev.k} by ${ev.n || ev.i} drawn as action ${st.fv.act}, visible ${st.b.vis}`);
+    if (ev.k === 'dive' && st.b.up > 0.9) errors.push(`fielding ${name}: diving ${ev.n || ev.i} still upright (${st.b.up.toFixed(2)})`);
+    if ((ev.o === 'catch' || ev.o === 'stop' || ev.o === 'drop') && Math.hypot(f.hx - ev.x, f.hy - ev.y, f.hz - ev.z) < 0.05 && hd > 0.35)
+      errors.push(`fielding ${name}: hands ${hd.toFixed(2)} m from the ball at ${ev.o}`);
+    return {...ev, up: st.b.up, hd};
+  }
+  errors.push(`fielding ${name}: the play did not come up in 4 balls`); return null;
+};
+const playText = e => e ? `${e.k} ${e.o || 'run'} by ${e.n || 'fielder ' + e.i} at t1 ${e.t1.toFixed(2)} s${e.up != null ? `, torso up ${e.up.toFixed(2)}, hands ${e.hd.toFixed(2)} m off` : ''} (${e.label})` : '(none)';
 const openPanel = async (p, btn, id) => { await p.click(btn);
   await p.waitForFunction(id => getComputedStyle(document.querySelector(id)).transform === 'none', id, {timeout: 5000, polling: 30}); };
 
@@ -137,6 +190,25 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
+  // Fielding (forced plays, see fieldPlay): an edge to the keeper or slip in the cordon camera, a diving stop in the ring, a running
+  // catch in the deep in the chase camera, and a four past a diving fielder, whose dive the replay must show too
+  await startMode(page, 'nets', {netsW: 0, planet: 'earth'});
+  const fp = {};
+  for (const k of ['edge', 'ring', 'deep']) fp[k] = await fieldPlay(page, 'earth-field-' + k, PLAYS[k]);
+  fp.four = await fieldPlay(page, 'earth-field-four', PLAYS.four);
+  if (fp.four) {
+    await page.waitForFunction(() => __t.S.phase === 'replay', null, {timeout: 20000, polling: 20}).catch(() => errors.push('fielding: no replay of the four'));
+    const rd = await page.waitForFunction(() => __t.S.phase !== 'replay' || __t.fv().findIndex(f => f.act === 3 && Math.abs(f.ap) < 0.12) + 1, null, {timeout: 20000, polling: 5})
+      .then(h => h.jsonValue()).catch(() => 0);
+    if (typeof rd !== 'number' || rd < 1) errors.push('fielding: the replay did not show the dive');
+    else { const b = await page.evaluate(i => { __t.S.paused = true; return __r.body(i); }, rd - 1);
+      await page.waitForTimeout(120); await page.screenshot({path: `${shots}earth-field-replay.png`}); await page.evaluate(() => { __t.S.paused = false; });
+      if (b.up > 0.9) errors.push('fielding: the replayed diver is upright ' + b.up.toFixed(2)); fp.four.up = b.up; fp.four.hd = 0; }
+  }
+  for (const k in fp) console.log(`field    ok  ${k}: ${playText(fp[k])}`);
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await page.waitForTimeout(100);
+  if (await page.isVisible('#end')) await page.click('#menuBtn');
   await startMode(page, 'quick', {planet: 'earth', len: 1});
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
@@ -197,6 +269,11 @@ if (planets.includes('earth')) {
     if (b1.mk === b.mk) errors.push('T20 bowling: marker drag did not move the marker');
     if (i === 0) await page.screenshot({path: `${shots}earth-t20-bowl.png`});
     if (i === 0) await camCheck('bowling view');
+    // fielding in the bowling view: on ball 4 the AI batter edges it to the keeper or slip, on ball 6 it leaves it for the keeper
+    if (i === 3 || i === 5) await page.evaluate(leave => { const ab = aiBat; window.aiBat = (st, b, f) => { window.aiBat = ab; const s = ab(st, b, f);
+      if (leave) return {leave: true, bp: null}; const fa = footAt(b, null), w = windows(BOWL_D, true, 1 + 0.35 * fa.gain);
+      return {...s, leave: false, defend: false, lofted: false, aim: 20, power: 0.8, bp: null, tc: fa.t - (w.ok + w.edge) / 2}; }; }, i === 5);
+    if (i === 3) await armPlay(page, PLAYS.edge);
     await page.click('#bowlBtn');
     await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > __t.S.runupDur - 0.6, null, {timeout: 30000, polling: 20});
     if (tap === 'mouse') await page.mouse.click(60, 300);
@@ -207,6 +284,20 @@ if (planets.includes('earth')) {
     if (f.ball.opt !== k || f.ball.mk !== 'b' + f.bi + ':' || Math.abs(f.ball.mark.x - mkx) > 1e-3 || Math.abs(f.ball.mark.z - mkz) > 1e-3) errors.push('T20 bowling: delivery ' + JSON.stringify([k, b1.mk, f.ball]));
     if (tap === null ? f.meter.tap !== null || Math.abs(f.ball.rel) < 0.1 : tap === 'mouse' ? f.meter.tap == null || f.ball.rel !== f.meter.tap : Math.abs(f.ball.rel - tap) > 1e-6)
       errors.push(`T20 bowling: release ${tap} gave ${JSON.stringify([f.meter, f.ball.rel])}`);
+    if (i === 3) { const e = await fieldPlay(page, 'earth-t20-bowl-field', {...PLAYS.edge, cam: null}, true); console.log(`field    ok  T20 bowling view: ${e ? playText(e) : '(no edge play came up: ball out of reach)'}`); }
+    if (i === 5) {
+      // the keeper (drawn in the bowling view) takes the ball at his gloves, which then hold it
+      const g = await page.waitForFunction(() => { const S = __t.S, k = __t.fv().findIndex(f => f.kp);
+        return S.phase !== 'flight' && S.phase !== 'result' ? -1 : S.res && (S.res.out || S.padHit) ? -2 : k >= 0 && __t.fv()[k].ap > 0.1 && k + 1; }, null, {timeout: 20000, polling: 5})
+        .then(h => h.jsonValue());
+      if (g === -2) console.log('field    ok  T20 bowling view: the ball left alone hit the pads or stumps, no gather to check');
+      else if (!(g > 0)) errors.push('fielding: the keeper did not gather a ball left alone in the bowling view');
+      else { const k = await page.evaluate(i => { __t.S.paused = true; const f = __t.fv()[i], b = __r.body(i), q = __t.S;
+          return {vis: b.vis, act: f.act, d: Math.min(...b.hands.map(h => Math.hypot(h[0] - f.hx, h[1] - f.hy, h[2] - f.hz))), info: __r.info()}; }, g - 1);
+        await page.waitForTimeout(120); await page.screenshot({path: `${shots}earth-t20-keeper.png`}); await page.evaluate(() => { __t.S.paused = false; });
+        if (!k.vis || k.act !== 6 || k.d > 0.3) errors.push('fielding: keeper gather ' + JSON.stringify(k));
+        else console.log(`field    ok  T20 bowling view: keeper gathers, gloves ${k.d.toFixed(2)} m from the ball, ${k.info.calls} draw calls, ${k.info.tris} triangles`); }
+    }
     await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 20});
     const r = await page.evaluate(() => ({res: __t.S.res, swing: !!__t.S.swing, b: __t.bowl()}));
     if (!f.ai.leave && !r.swing) errors.push('T20 bowling: the AI batter did not swing ' + JSON.stringify(f.ai));
@@ -542,6 +633,9 @@ if (planets.includes('earth')) {
     camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity landscape ${where}: ${e} px`);
   }
   console.log(`land     ok  844x390 run-up and shot: ${await land.evaluate(() => __t.S.res ? __t.S.res.label : __t.S.phase)}`);
+  { const e = await fieldPlay(land, 'landscape-field-edge', PLAYS.edge); const c = await land.evaluate(() => __t.cam3());
+    camErr = Math.max(camErr, c); if (!(c < 0.5)) errors.push(`camera parity landscape cordon: ${c} px`);
+    console.log(`land     ok  cordon camera: ${playText(e)}`); }
   // T20 in the phone layout: the slab (with the batters) stays in its column above the stick, and the pause scorecard
   await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await land.waitForTimeout(100);

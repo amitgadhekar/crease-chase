@@ -100,45 +100,46 @@ Departures from the plan above, and why:
 
 - **Game-scale run targets.** Against Test fields the standard bot scores ~2 runs a ball and an A-tier batter lasts ~12 balls,
   so a last-wicket stand is worth ~15-25 runs, as in real Tests. Tail chases keep their story but not their real totals: the
-  heist needs 20 (not 73), two short 30 (not 107), the master and the tail 30 (not 92), the follow-on turnaround a 50 lead,
+  heist needs 18 (not 73), two short 30 (not 107), the master and the tail 30 (not 92), the follow-on turnaround a 50 lead,
   the decider 200 in three 10-over sessions. Ball counts are kept where they fit (hold out 24, long stand 69, last over 4 to win).
 - **Band bot.** The band is checked with the standard bot, except survive scenarios, which use the careful bot: the standard
   bot swings at everything and survives 0-20% of them, which says nothing about the intended play.
 - **Narrative fixes.** You cannot declare while batting last, so Test 1's sprint is "120 by stumps" in a fourth-innings chase;
-  Test 3's sweep scenario is "130 by stumps" in the first innings; Test 4's tail scenario is a first-innings lead (38 in 6),
+  Test 3's sweep scenario is "120 by stumps" in the first innings; Test 4's tail scenario is a first-innings lead (38 in 6),
   because its Test ends with the last-over chase.
 - **Level or win** starts with the set batter on strike on Earth: with the number eleven on strike on the Moon the farming bot
   could not beat the standard bot (big hitting on the Moon beats strike farming).
 
-Measured (balance test, 1500 plays for the band bot; std / farm / careful at 300):
+Measured (1500 plays for the band bot, farm from the balance test's 900; since fielding v2, 2026-10-14, which moved four
+targets back to their old win rates: s2b 85 -> 78, s3a 130 -> 120, s3c 190 -> 165, c1 20 -> 18):
 
 | id | objective | numbers | band | measured |
 |---|---|---|---|---|
-| s1a | survive | 60 balls, no wicket | 55-90 careful | 76 |
-| s1b | avoidFO | 50 in 120 balls, 4 wkts | 50-85 | 68 |
-| s1c | scoreBy | 120 in 48 balls | 50-85 | 73 |
-| s2a | survive (nightwatchman) | 54 balls, 2 wkts | 45-85 careful | 74 |
-| s2b | chase (reverse) | 85 in 120, 7 wkts | 35-70 | 46 |
-| s2c | chase, last pair | 12 in 90 | 25-60 | 40 (farm 62) |
-| s3a | scoreBy (sweeps) | 130 in 36 | 35-70 | 53 |
-| s3b | survive (rough) | 90 balls, 2 wkts | 30-70 careful | 46 |
-| s3c | chase | 190 in 120, 4 wkts | 35-70 | 46 |
-| s4a | survive (short balls) | 48 balls, no wicket | 35-80 careful | 55 |
-| s4b | scoreBy (tail) | 38 in 36 | 30-65 | 40 |
-| s4c | tieOrWin | 12 off 6, 2 wkts | 30-65 | 50 |
-| s5a-c | session, session, chase | par 100, par 55, 45 to win | 40-85, 30-70, 35-70 | 68, 50, 61; all three in a row 9% |
-| c1 | chase, last pair | 20 in 150 | 10-45 | 20 (farm 37) |
-| c2 | chase | 30, 2 wkts | 15-50 | 30 |
+| s1a | survive | 60 balls, no wicket | 55-90 careful | 79 |
+| s1b | avoidFO | 50 in 120 balls, 4 wkts | 50-85 | 62 |
+| s1c | scoreBy | 120 in 48 balls | 50-85 | 59 |
+| s2a | survive (nightwatchman) | 54 balls, 2 wkts | 45-85 careful | 75 |
+| s2b | chase (reverse) | 78 in 120, 7 wkts | 35-70 | 46 |
+| s2c | chase, last pair | 12 in 90 | 25-60 | 33 (farm 53) |
+| s3a | scoreBy (sweeps) | 120 in 36 | 35-70 | 52 |
+| s3b | survive (rough) | 90 balls, 2 wkts | 30-70 careful | 44 |
+| s3c | chase | 165 in 120, 4 wkts | 35-70 | 44 |
+| s4a | survive (short balls) | 48 balls, no wicket | 35-80 careful | 53 |
+| s4b | scoreBy (tail) | 38 in 36 | 30-65 | 46 |
+| s4c | tieOrWin | 12 off 6, 2 wkts | 30-65 | 54 |
+| s5a-c | session, session, chase | par 100, par 55, 45 to win | 40-85, 30-70, 35-70 | 60, 50, 57; all three in a row 8% |
+| c1 | chase, last pair | 18 in 150 | 10-45 | 17 (farm 29) |
+| c2 | chase | 30, 2 wkts | 15-50 | 22 |
 | c3 | survive, last pair | 24 balls | 15-55 careful | 30 |
-| c4 | survive, last pair | 69 balls (easy) | 15-55 careful | 33 |
-| c5 | scoreBy | 50 lead, 3 wkts | 15-50 | 30 |
-| c6 | chase | 150 in 180, 6 wkts | 30-70 | 54 |
-| c7 | tieOrWin, last pair | 4 off 6 | 50-85 | 64 (farm 79) |
-| c8 | chase, last pair | 7 in 30 | 30-70 | 50 (farm 64) |
-| c9 | chase | 30, 2 wkts | 15-50 | 27 |
-| c10 | survive | 90 balls, 2 wkts | 25-65 careful | 51 |
+| c4 | survive, last pair | 69 balls (easy) | 15-55 careful | 34 |
+| c5 | scoreBy | 50 lead, 3 wkts | 15-50 | 28 |
+| c6 | chase | 150 in 180, 6 wkts | 30-70 | 46 |
+| c7 | tieOrWin, last pair | 4 off 6 | 50-85 | 59 (farm 67) |
+| c8 | chase, last pair | 7 in 30 | 30-70 | 43 (farm 53) |
+| c9 | chase | 30, 2 wkts | 15-50 | 24 |
+| c10 | survive | 90 balls, 2 wkts | 25-65 careful | 53 |
 
-Runtime: the whole balance test takes ~40 s on a laptop, the Test part ~20 s at `SCEN_N=300`.
+Runtime: the whole balance test takes ~95 s on a laptop, the Test part ~30 s at `SCEN_N=300`.
 
 ## As built (steps 2-4)
 

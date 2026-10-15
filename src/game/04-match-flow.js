@@ -1,7 +1,7 @@
 /* ---------- match flow ---------- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));MENU.on=id==='menu';}
 function newMatch(P,mode,diff,L){
-  sfx.amb(true);rpUI(false);applyPlanet(P);
+  sfx.amb(true);rpUI(false);applyPlanet(P);setKits(false);ctlUI(false);pickUI(false);S.ai=S.meter=S.pending=null;
   S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
   return {mode,planet:P,pk:curPlanet,diff,overs:L.overs,wktsMax:mode==='nets'?(settings.netsW||Infinity):L.w,t20:mode==='chase'&&!!L.t20,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
      swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
@@ -14,19 +14,24 @@ function startMatch(){
   if(M.mode==='chase'){M.ai=simulateAI(M.overs,M.wktsMax,M.diff,M.planet.ai);M.target=M.ai.runs+1;chaseIntro();}
   else beginPlay();
 }
+// the shot physics of this innings: the player's difficulty, or BOWL_D while the player bowls (difficulty is then the meter and the AI batter)
+const physD=()=>M.bowl?BOWL_D:M.diff;
 // the innings break before a chase: the AI's total and the target
 function chaseIntro(){
-  const P=M.planet;
+  const P=M.planet;introBody('');$('#chaseBtn').textContent='Start the chase';
   $('#iTitle').textContent=P.team+' '+M.ai.runs+'/'+M.ai.wkts;
   $('#iText').textContent=P.name+'. '+'They batted '+oversText(M.ai.balls)+' overs. You need '+M.target+' to win from '+M.overs*6+' balls, with '+M.wktsMax+' wickets in hand.';
   showScreen('intro');S.paused=true;
 }
 function beginPlay(cont){
-  showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#scenSlab').hidden=!M.sc;$('#loftBtn').hidden=false;$('#stick').hidden=false;resize();S.paused=false;newOver(cont);
+  showScreen(null);$('#hud').hidden=false;$('#t20Slab').hidden=!M.t20;$('#tBar').hidden=!!M.bowl;$('#scenSlab').hidden=!M.sc;ctlUI(true);resize();S.paused=false;newOver(cont);
 }
+// in-play controls: the slingshot's Loft and the footwork stick when batting, the delivery chips and Bowl when bowling
+function ctlUI(on){const b=!!(M&&M.bowl);$('#loftBtn').hidden=$('#stick').hidden=!on||b;$('#bowlBtn').hidden=$('#optChips').hidden=!on||!b;}
 // cont: a resumed T20 carries on with the saved over (bowler, plan, field)
 function newOver(cont){
   if(!cont){M.overNo++;M.overBalls=[];}
+  if(M.bowl)return bowlOver(cont);
   let notes;
   if(M.t20)notes=t20Over(cont);
   else if(M.sc)notes=scenOver();
@@ -54,18 +59,19 @@ function newOver(cont){
 }
 function resetFielders(){S.fpos=M.field.map(f=>({x:f.x,z:f.z,run:0}));S.fanim=null;}
 function nextBall(){
-  $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
   const sb=M.sc?scenNext():null;
   if(M.note){banner('Field change',M.note,'small',1600);M.note='';}
   resetFielders();
   S.phase='ready';S.t=0;S.readyDur=BALL_GAP;S.runupDur=M.bowlerType==='pace'?1.5:1.1;
+  if(M.bowl)return bowlReady();
   if(sb){S.pending=sb;return;}
   const left=M.overs*6-M.balls,need=M.target-M.runs;
   const pressure=M.t20?t20Pressure(M.st):M.mode==='chase'&&left>0&&(need/left>1.8||left<=4);
   const bw=M.t20?M.attack[M.bi]:null,plan=planBall(M.t20?M.st.mem:mem,M.bowlerType,M.diff,{last:M.lastLens,pressure,foot:M.foot,bw,plan:M.plan});
   S.pending=makeDelivery(plan,M.diff,bw||M.spinDir);
 }
-function releaseBall(){S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
+function releaseBall(){if(M.bowl)return bowlRelease();S.ball=S.pending;S.pending=null;S.ball.start=clock;S.ball.bounced=false;S.phase='flight';}
 
 // a pending swing resolves before the pads, as the timing model lets late swings still reach the ball
 // Tests: a missed sweep lunges the front pad (S.padBp); a short ball at the body that was not ducked stops there (bodyHit)
@@ -80,7 +86,7 @@ function flightUpdate(){
   for(const e of ev){
     if(S.phase!=='flight')return;
     if(e.k===0)doSwing();
-    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:bo?0.7:0.5,rate:bo?0.55:0.7});const r=pd?padResult(b,ph,!!sw):beaten(b,bp,!!sw,scBat());commit(r,r.out?1.9:1.1);}
+    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:bo?0.7:0.5,rate:bo?0.55:0.7});const of=!!sw||!!(S.ai&&!S.ai.sw.leave),r=pd?padResult(b,ph,of):beaten(b,bp,of,scBat());commit(r,r.out?1.9:1.1);}
     else{b.stumpChecked=true;
       if(b.onStumps){tooLate(sw,b);sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
   }
@@ -97,8 +103,8 @@ function flightUpdate(){
 function tooLate(sw,b){if(sw&&!sw.done){sw.done=true;sw.missed=true;S.timing={dt:sw.tc-footAt(b,S.bpos).t,early:false,label:'Too late',zone:-1};}}
 function doSwing(){
   const b=S.ball,sw=S.swing;sw.done=true;sw.bp={x:S.bpos.x,z:S.bpos.z};
-  const r=evalSwing(b,sw,M.diff,M.field,M.st&&M.st.bat?scBat():undefined);
-  S.timing=r.timing;M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;
+  const r=evalSwing(b,sw,physD(),M.field,M.st&&M.st.bat?scBat():undefined);
+  S.timing=r.timing;if(!M.bowl){M.swings.push(Math.abs(r.timing.dt));if(r.timing.zone===3)M.perfects++;}
   if(r.miss){sw.missed=true;if(r.bp)S.padBp=r.bp;return;}
   const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start);
   sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
@@ -106,7 +112,7 @@ function doSwing(){
   if(res.path){const h=S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;
     if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}}
   if(res.catcher!=null){S.fanim={i:res.catcher,x:res.catchPt.x,z:res.catchPt.z,speed:Math.max(4,Math.hypot(M.field[res.catcher].x-res.catchPt.x,M.field[res.catcher].z-res.catchPt.z)/Math.max(0.25,res.path.T*0.92))};}
-  else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[M.diff].fSpeed*ENV.run};}
+  else if(res.fielderTo&&res.fielderTo.i>=0){S.fanim={i:res.fielderTo.i,x:res.fielderTo.x,z:res.fielderTo.z,speed:DIFF[physD()].fSpeed*ENV.run};}
   let dur=1.2,tCross=0;
   if(S.hit)dur=(S.hit.air?Math.min(S.hit.T+(S.hit.stop?0.2:0.9),2.6):Math.min(S.hit.s/S.hit.a,2.2))+0.8;
   if(res.boundary&&S.hit){
@@ -121,7 +127,7 @@ function commit(res,dur,delay){
   const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
   if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
   // Tests and T20: a holdable ball is recorded when Hold is tapped or its window closes (holdEnd)
-  if((M.sc||M.t20)&&holdable(res)){S.hold={until:clock+0.6,res,b};$('#holdBtn').hidden=false;}else if(M.sc)scenRecord(res,b,false,delay>0);else recordBall(res,b);
+  if((M.sc||M.t20&&!M.bowl)&&holdable(res)){S.hold={until:clock+0.6,res,b};$('#holdBtn').hidden=false;}else if(M.sc)scenRecord(res,b,false,delay>0);else if(M.bowl)bowlRecord(res,b);else recordBall(res,b);
   if(delay>0)S.deferred={at:clock+delay,res,b};else showOutcome(res,b);
 }
 function recordBall(res,b){
@@ -149,6 +155,7 @@ function showOutcome(res,b){
 function afterResult(){
   if(S.deferred){showOutcome(S.deferred.res,S.deferred.b);S.deferred=null;}
   if(M.sc)return scenAfter();
+  if(M.bowl)return bowlAfter();
   holdEnd(false);
   if(M.mode==='chase'){
     const out=M.wkts>=M.wktsMax,done=M.balls>=M.overs*6;
@@ -170,6 +177,7 @@ function endMatch(kind){
   else if(kind==='win'){const wk=M.wktsMax-M.wkts,bl=M.overs*6-M.balls;title='You won';text='By '+wk+(wk===1?' wicket':' wickets')+(bl?', with '+bl+(bl===1?' ball':' balls')+' to spare.':' off the last ball.');}
   else if(kind==='tie'){title='Tied';text='Scores level on '+M.runs+'. So close.';}
   else{const by=M.target-1-M.runs;title=M.planet.team+' won';text='They won by '+by+(by===1?' run.':' runs.')+' You made '+M.runs+'/'+M.wkts+'.';}
+  if(M.i1)text=M.planet.team+' made '+M.i1.runs+'/'+M.i1.wkts+'. '+text;
   $('#eTitle').textContent=title;$('#eText').textContent=text;
   const avg=M.swings.length?Math.round(M.swings.reduce((a,b)=>a+b,0)/M.swings.length*1000):0;
   const sr=M.balls?Math.round(M.runs/M.balls*100):0;
@@ -181,14 +189,15 @@ function endMatch(kind){
 }
 function celebrate(){
   S.phase='celebrate';S.cel={t0:clock,fly:false};S.chase=null;S.trail3=[];S.aim=null;S.bat={mode:'celebrate',t0:clock,from:null,aim:0};
-  $('#loftBtn').hidden=true;$('#stick').hidden=true;fwReset();FW.next=clock+0.8;
+  ctlUI(false);fwReset();FW.next=clock+0.8;
 }
 function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
 // a ball still in its Hold window is recorded as not held, so the T20 or scenario save includes it
 // back to the hub; from a scenario (its result, pause or briefing) straight into the Scenarios sheet
-function quitToMenu(){const toScen=!!(M&&M.sc)||$('#brief').classList.contains('on');if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');showMenu(toScen?'scen':null);}
+function quitToMenu(){const toScen=!!(M&&M.sc)||$('#brief').classList.contains('on');if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;ctlUI(false);pickUI(false);setKits(false);S.ai=S.meter=null;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');showMenu(toScen?'scen':null);}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
-  $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
-  $('#pCard').innerHTML=M.t20?t20Card():'';$('#pause .card').classList.toggle('split',!!M.t20);
+  $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.bowl?M.planet.team+' are '+M.runs+'/'+M.wkts+' after '+oversText(M.balls)+' overs.':M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
+  $('#pCard').innerHTML=M.t20?(M.i1&&!M.bowl?inn1Line()+'\n':'')+t20Card(M.st,M.attack):'';$('#pause .card').classList.toggle('split',!!M.t20);
+  simUI($('#simBtn'),!!M.bowl);
   $('#quitBtn').textContent=M.mode==='nets'?'End session':'Quit to menu';showScreen('pause');}
 

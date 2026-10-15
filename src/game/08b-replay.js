@@ -46,14 +46,14 @@ function rpStart(nx){
   const tc=S.hitStart-REC.t0,x=recAt(tc);
   RP={t:Math.max(0,S.ball.start-REC.t0-.15),tc,s1:tc+.4,end:Math.min(S.chase.tx-REC.t0+.3,REC.buf[(REC.n-1)*RFL]),nx,t0:clock,h:S.hit,hit:false,
     snd:[batKind(S.res),S.res.q,S.swing&&S.swing.power],hx:x[10+qHX],hz:x[10+qHZ],yaw:null};
-  S.phase='replay';S.chase=null;$('#banner').className='';S.trail3=[];S.aim=null;$('#loftBtn').hidden=$('#stick').hidden=true;rpUI(true);updateCam(0);
+  S.phase='replay';S.chase=null;$('#banner').className='';S.trail3=[];S.aim=null;ctlUI(false);rpUI(true);updateCam(0);
 }
 function rpUpdate(dt){
   const R=RP;R.t+=dt*(R.t<R.s1?lerp(.6,.35,smooth(clamp((R.t-R.tc+.5)/.2,0,1))):1);
   if(!R.hit&&R.t>=R.tc){R.hit=true;sfx.bat(...R.snd,.7);}
   if(R.t>=R.end)rpEnd();
 }
-function rpEnd(){const R=RP;rpUI(false);$('#loftBtn').hidden=$('#stick').hidden=false;R.nx();updateCam(0);}
+function rpEnd(){const R=RP;rpUI(false);ctlUI(true);R.nx();updateCam(0);}
 function rpSkip(e){
   if(S.phase!=='replay'||S.paused||(e.target&&e.target.closest&&e.target.closest('#hud')))return false;
   if(clock-RP.t0>=.3)rpEnd();return true;

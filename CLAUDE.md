@@ -15,8 +15,8 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 ```bash
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
-npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + 600 T20 chases per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, two T20 overs with save/reload/resume, three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
+npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
+npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -26,10 +26,13 @@ Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub P
 test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
 Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/wicket; "always charges" and "always across" must not beat it.
-Its T20 checks (the bot bats the XI with tiers and strike rotation, no Hold): standard bot wins easy >=75%, medium 40-60%, hard <=25%
-on Earth; "always loft" wins fewer than it on medium and hard (both scored against the same pooled targets); on easy and medium the
-death overs outscore the middle overs batter tier for tier (the tail bats more of the death); mean targets never fall from easy to hard on any planet; each planet's `t20` within
-0.8-1.25 of its measured T20 scoring ratio; zero illegal fields, bowler picks or quota breaches (plus captain and field fuzzing).
+Its T20 checks (full matches: a bowling bot bowls the player's attack at the AI batters, then the batting bot chases as the XI with
+tiers and strike rotation, no Hold): standard bots win easy >=75%, medium 40-60%, hard <=25% on Earth and 35-65% on medium on every
+planet; first-innings totals never fall from easy to hard on any planet (Earth medium 140-200); "always loft" wins fewer chases on
+medium and hard (pooled targets); on easy and medium the death outscores the middle overs tier for tier; accurate bowling concedes
+<=90% of careless bowling; "always yorker", "always bouncer" and "same spot" each concede more than the standard bowling bot on
+medium and hard; a random legal field concedes more per ball than the captain's plan (same deliveries); zero illegal fields, bowler
+picks, consecutive overs or quota breaches (plus captain and field fuzzing, the player's attack and random legal picks included).
 Its Test checks: a seeded fingerprint of the short-format and T20 rows is unchanged (`FP`; update only on purpose); swing, reverse,
 turn and bounce follow ball age and day; each scenario's bot win rate within its `band`; farming beats not farming in last pairs and
 careful beats slogging in survive scenarios; no bouncer-limit, Law 28.4 or consecutive-over breaches.
@@ -51,7 +54,8 @@ tools/blender/            Model scripts run headless in Blender: rig.py (skeleto
                           batter.py (the batter). tools/model.mjs runs Blender, then gltf-transform prune/dedup/quantize
 ```
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
-03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 04c
+03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 04d T20
+first innings (over picker, delivery chips, marker, release meter, AI batter, innings break, Simulate rest) · 04c
 Scenarios (list, briefing, Test overs and balls, strike, Hold, sessions, stars, HUD) · 05 input (pointer/keys, footwork joystick) · 06 sky drawing, particles,
 2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
@@ -71,6 +75,11 @@ planet preview) + boot.
   `setViewOffset` puts the principal point at (CX, HZ), so 2D overlays drawn with `proj()` line up with the 3D scene. If you
   change one, change both; the smoke test asserts they agree within 0.5 px (`__t.cam3()`).
   Field of view is changed only by setting `F` (reset to `baseF`, like `HZ`/`baseHZ`), so both stay in sync.
+  Between balls the camera rests at `HOME` (`updateCam` returns to it): behind the batter, or in the T20 first innings (`M.bowl`)
+  the bowling view, set by `resize()` -> `bowlLens`: end-on from behind the bowler's arm (`BOWL_CAM` z 34.1, 6 m up, yaw 180, so
+  screen right is the leg side), with `F`/`HZ` solved so the batter's feet and a 12 m length land at fixed screen fractions
+  (portrait .55/.8 of H, landscape .42/.82 of h; the horizon may sit above the screen). `unprojGround` is `proj`'s inverse on the
+  ground (the marker drag). Chase camera, replays and fielders' shadows (60 m) work from it unchanged.
   While the menu is up (`MENU.on`, set by `showScreen`), `menuCam` (08) shows the whole ground from outside the stands:
   celebration-style framing (stands' back edge `RT`, camera at 1.45·RT, 0.62·RT high, `F`/`HZ` from W and H, centred higher in
   portrait), sweeping ±25° (up to 3°/s, fixed with reduced motion) along the off side, the sunlit side, 30° clear of the
@@ -215,8 +224,8 @@ planet preview) + boot.
   it into charge/back/across weights that scale lengths and lines (`FOOT_LEN`, `FOOT_LINE`: shorter and wider vs chargers,
   fuller vs back-foot players, straighter and yorkers vs moving across), and the plan text then names it (`FOOT_NOTE`).
 - **Field AI:** each over, moves up to N ring fielders deep into the sectors where the batter scored most (`fieldFor`).
-- **AI innings:** simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier (T20: per-phase weights `AI_T20`,
-  times the planet's `t20` and `DIFF.t20`).
+- **AI innings:** short formats: simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier. T20: played ball by
+  ball by the AI batters against the player's bowling (below).
 - **T20 chase** (4th `LENGTHS` entry, `M.t20`, its own menu mode `t20` started by `startT20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
   - `makeAttack`: 5 named bowlers per planet from `ARCH` archetypes (always a death specialist and a spinner); each carries a
     profile (`pace` x DIFF range or spin `v`, swing, `turn`/`dir`, `wrong`, `slow`, `acc`, `wide`, `len` bias) that `makeDelivery` reads.
@@ -234,19 +243,62 @@ planet preview) + boot.
     power, edges, fends, hook risk in `evalSwing` and `aimSwing`, but no sweeps and no body hits in `beaten`), Hold (`commit` ->
     `S.hold` -> `holdEnd` -> `recordBall`) and the non-striker (`nsTick`). Tests only: sweeps, duck/`bodyHit`, conditions, the radar's
     square-root scale. The captain has no tail-ender plans in T20.
-  - Targets (option B, owner): never fall as difficulty rises (~157 / ~166 / ~184 on Earth; `DIFF.t20` .85 / .9 / 1; lower than
-    before strike rotation because the tail now bats), so
-    win rates spread (standard bot ~98% / ~50% / ~5%). Planet `t20` = measured T20 scoring vs Earth (the short-format `ai`
-    multipliers don't carry over to 20 overs). Re-measure both after any T20 logic change.
-  - Save/resume: `t20Save` writes `cc_t20` after every ball and after each over is picked (attack names + archetypes, `M.st`, zones,
-    foot trend, current bowler/plan/field, over chips; `v:2`: lineup and strike are in `M.st`, v1 saves are not offered). `overNo*6 > balls` means the saved over is under way (resume continues it),
-    else a new over is picked. The hub's Continue banner (`#resumeT20`) resumes it; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
+  - Target = the first innings (player bowling, below) + 1. Option B (owner) still holds: totals rise with difficulty.
+  - Save/resume: `t20Save` writes `cc_t20` after every ball and after each over is picked. `v:3` (v1/v2 are not offered): `inn`,
+    the AI attack (names + archetypes; the player's is rebuilt, seeded), `i1` (the first innings with its over's bowler, plan and
+    field), `optK`/`mkB` (remembered deliveries and markers), over chips; in the chase also its `st`, zones, foot trend, bowler,
+    plan and field. Innings 1: `i1.bi >= 0` resumes the over under way, else the picker; a finished innings resumes at the break
+    card. Chase: `overNo*6 > balls` means the saved over is under way (resume continues it), else a new over is picked. The hub's Continue banner (`#resumeT20`) resumes it; quitting keeps it (that is what resume is for), match end or restart clears it, a new T20 overwrites it.
   - HUD: a full-width `#t20Slab` (phase chip, required vs current rate, the batters as in `#scenSlab` (`batCard`), bowler figures O-M-R-W and overs left, pace marker vs the
     straight line to the target, i.e. half by over 10). Over-break banner: bowler change + field line (`fieldLine`). Radar: inner
     circle, gold rings on fielders outside it (all modes). Pause: `t20Card` scorecard (batting with how out, yet to bat, bowling,
     fall of wickets, runs per over).
   - Close catchers (slip, gully, short leg, silly point) are drawn; from the portrait batting camera they are out of frame, and
     in landscape silly point/short leg stand clear of the batter and the ball's line, so none were moved.
+- **T20 first innings: the player bowls** (owner, 2026-10-14; every T20 is a full match; design, numbers, sources and rejected
+  options in docs/t20-mode.md). Pure logic in logic.js (step 1); game side in 04d (step 2).
+  - Sides: `myAttack(pk)` = the XI's 7-11 with archetypes seeded per planet (`makeAttack` rules), each with `opts` (`bowlOpts`,
+    max 5 from `OPTS`: stock/out/in-swinger, yorker, bouncer, slower ball, cutter; spin stock, flighted, quicker, wrong'un, arm
+    ball). `aiXI(pk,attack)` = six planet-named batters + the AI attack, tiers as `XI`. State `newInn1(mine,xi,diff,pk)`: `newT20`'s
+    shapes (no target; `bw` = the player's figures) plus `bi`/`pid`/`field`, `bm` (the batters' read of the attack), `Z`, `foot`, `ll`.
+  - Per over: `legalBowlers(st,o)` (quota, not the last bowler, `canFinish`), `planIds(bw,pp)` (the bowler type's legal templates),
+    `inn1Suggest` (captainPick + planPick, preselected), `inn1Set(st,bi,pid)` (field = the template). Per ball: option, marker
+    `{x,z}` (pitch point; `optSpot` suggests one, `spotFor` aims a line) and release `rel` -1..1 on the meter (`bowlWindow`: good
+    half-width .16/.11/.075 x acc/0.85; null = no tap) -> `bowlDelivery` (shares `launch` with `makeDelivery`; early fuller,
+    late shorter, as in real bowling; errors scale with ((zr-z)/(zr-5.4))^2; very bad = wide, full toss or long hop; above 1.85 m at the popping
+    crease = wide) -> `aiBat(st,b,field)` (a `sw` as the player's, or `{leave,bp}`) -> resolve with `evalSwing(...,BOWL_D,...)`
+    /`beaten` (`aiResult`) -> `inn1Record` (t20Record + learning; true at the over's end, `st.bi=-1`). `simRest` plays it out.
+  - Medium physics (`BOWL_D`) for the player's deliveries and the AI's shots on every level: difficulty is the meter and the
+    batter (`AIB`: timing spread, pace read, misreads, footwork); planet `t20` scales the AI timing spread (measured, ~50% medium
+    matches on each planet). The batters learn the attack (`st.bm`): a repeated length is easier to time, step to and aim.
+  - Flow (04d, `M.bowl` true, `M.inn` 1): `startT20` (04b) -> `inn1Enter` (M.st = M.i1 = `newInn1`, M.attack = M.mine, kits) ->
+    intro card ("You bowl first", their XI, your attack) -> per over `newOver` -> `bowlOver`: phase `pick`, the picker `#overPick`
+    (your 5 with figures and overs left, illegal ones disabled with the reason; `planIds` templates; `inn1Suggest` preselected; the
+    chosen plan previews on the ground and radar; Simulate rest) -> `inn1Set` + save -> `bowlOverGo` (banner, wind) -> per ball
+    `nextBall` -> `bowlReady` (phase `ready` waits, `readyDur` Infinity) -> Bowl -> `runup` (1.6 s pace, 1.3 s spin) ->
+    `releaseBall` -> `bowlRelease` (`bowlDelivery` with the chip's option, `M.mk` and the tapped `rel`, then `aiBat`) -> flight ->
+    `commit` -> `bowlRecord` (`inn1Record`, chips, save) -> `afterResult` -> `bowlAfter` (replay of a four or six, next ball or
+    over, or at 10 wickets/120 balls `inningsBreak`: `inn2Enter`, save, the break card with top scorers and your bowling, "Chase
+    N") -> the chase as below against `M.aiAtk`, target = total + 1. `physD()` = `BOWL_D` while bowling for `evalSwing`,
+    `aimSwing` windows and fielder speed. No Hold while bowling (the AI's strike rotates by the rules).
+  - Controls: delivery chips `#optChips` (the bowler's `opts`; the choice per bowler `M.optK`; a chip moves the marker to its
+    `optSpot`), the marker `M.mk` (per bowler `M.mkB`; dragged anywhere, offset so the finger never covers it, a tap on the ground
+    puts it there, clamped x -1.2..1.4, z 0.3..11.5; drawn with `proj` plus its length name), Bowl `#bowlBtn` (starts the run-up,
+    then reads Release). The meter (`S.meter`) sweeps -1..1 over the last `METER_T` = 1 s of the run-up, so it ends as the ball
+    leaves the hand; a tap on Release, the canvas or Space sets `rel` from the event's own timestamp (`gameTimeAt(perfOf(e))`);
+    taps before the sweep are ignored, no tap = `rel` null. Feedback (`relText`): Perfect/Good release, "Early: fuller", "Late:
+    shorter", way off = wide/full toss/long hop. Keys: 1-5 chips, arrows/WASD move the marker, Space/Enter Bowl and release.
+    Loft, Hold, the stick and the slingshot are off (`ctlUI`); `drawTimingBar` is skipped; the radar turns round (batter up).
+  - AI batter: `aiTick` (08 `update`, before `flightUpdate`) sets `S.swing`/`S.bat` at `tc - SWING_DELAY` exactly as the
+    slingshot's `release` does (backlift from release, leave = no swing), so `doSwing`, pads, pose, `aimSwing`/`bend`, `ballNow`,
+    `recContact` and replays need no AI branch; `footUpdate` walks `S.bpos` to `sw.bp` at the stick's speeds until the ball pitches.
+  - Kits per innings (`setKits`, 07-render3d; `kitBatter`, 07-skin): bowling, the fielders and bowler are Earth humans
+    (`spApply('earth', KIT.you)`) and both batters wear the planet team's kit (shirt, its trousers as trim, a darkened shirt
+    helmet; materials shared by the SkeletonUtils clone); otherwise as before. `newMatch` and `quitToMenu` reset it. The
+    procedural fallback batter keeps KIT.you.
+  - HUD (`bowlHUD`): `#t20Slab` with phase chip, plan name, the AI batters (`batCard`), your bowler's figures and overs left; run
+    rate and projection in `#targetSlab`; `#tBar` hidden. Pause: `t20Card(st,attack)` of innings 1 plus Simulate rest (`#simBtn`,
+    a second tap confirms); in the chase the same card with `inn1Line` on top. End text names their total.
 - **Scenarios** (Tests; `settings.mode` `scen`, `M.sc` = the scenario, `M.st` = `newTest`; design, numbers and departures in
   docs/scenarios-mode.md). Pure logic in logic.js (step 1: `SCEN`, `TIER`, `testBall`/`testRecord`, `scenEnd`/`scenStars`/`stageNext`),
   flow in 04c:
@@ -291,8 +343,9 @@ planet preview) + boot.
 - **Planets** (`PLANETS` in logic.js): physics (`g`, `air`, `swing`, `spin`, `bounce`, `pace`, `boundary`, `wind`, `ai`)
   plus `vis` for the look. `setPlanet` derives `ENV.carry`, `ENV.acc` (ground deceleration), `ENV.run` (fielder speed).
   Wind is rolled per over and drifts lofted shots. 3D lighting and fog per planet live in `LOOK3D` (07-render3d.js).
-  If you change planet physics, re-run the balance test and update that planet's `ai` (and T20 `t20`) multiplier to the measured
-  "scoring vs Earth" ratio (the test checks they stay within 0.8-1.25 of each other).
+  If you change planet physics, re-run the balance test and update that planet's `ai` multiplier to the measured
+  "scoring vs Earth" ratio (the test checks they stay within 0.8-1.25 of each other), and its T20 `t20` (AI batter timing spread
+  x) until its medium full match is ~50%.
 - **Chase camera:** on fours and sixes the camera follows the ball (`updateCam`), and the banner and score reveal are
   deferred until the ball crosses the rope (`S.deferred`). The batter is hidden while the chase camera is active.
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
@@ -357,8 +410,12 @@ planet preview) + boot.
 - Footwork payoff: a timing-window and shot-fit `gain` from leaving the good-length zone. Shot fit alone (1:1 effective
   length, also tried 2-3x) gave a length-reading bot under 3%, because drives tolerate length; with `gain` it gets ~+15%.
 - T20 targets: option B (owner), never falling with difficulty, over the original 70/50/30% win-rate calibration (which made
-  hard targets lower than easy ones). A per-planet `t20` multiplier, because the short-format `ai` ratios left Moon/Mercury/Mars
-  at >90% and Venus/Saturn/Neptune at ~20% over 20 overs.
+  hard targets lower than easy ones). Since 2026-10-14 the target is the first innings the player bowls; the simulated target
+  (`DIFF.t20`, `AI_T20`, planet target multipliers) was removed.
+- T20 player bowling (owner, 2026-10-14): replaces the simulated chase target; marker + release meter over swipe bowling or a
+  marker without a meter; "Simulate rest" over bowling all 20 or only a star bowler's 4; no toss. Per-planet `t20` now scales
+  the AI batter's timing, because its scoring follows planet physics less than the batting bot's (it reads swing and lofts by
+  carry), so medium matches ran 25-80% without it.
 - T20 strike (owner, 2026-10-14): you bat both, the XI in order with tiers, Hold and the non-striker, over "always on strike"
   (v1): it adds keep-the-strike planning (Hold at the death), at the cost of balls the tail faces.
   Targets were re-calibrated (`DIFF.t20`), and Moon/Mercury/Mars `t20` re-measured (their top order bats longer than Earth's).
@@ -371,11 +428,19 @@ planet preview) + boot.
 - Main menu (owner, 2026-10-14): a hub over the live stadium (a slowly sweeping camera, mode cards, a sheet per mode, planets previewed
   live) over a hub on a static background (no venue preview, and a second look to keep in step with the game) and over polishing
   the single long form card (still one scrolling form, every mode's options mixed). The live background costs a wide render at 30 fps.
+- T20 bowling, step 2: release direction early = fuller, late = shorter (real bowling and the cited guide; step 1 had it reversed).
+  Camera end-on behind the bowler's arm with a solved lens (batter and marker range the same size on any screen) over the batting
+  camera turned round (the batter tiny, the near pitch under the HUD). Run-up started by Bowl, not a countdown (the player sets
+  up the ball first); the meter sweep ends at the release so the bowling animation never waits for the tap. A chip always moves
+  the marker to its suggested spot (predictable), dragging fine-tunes it; the marker is dragged with an offset rather than
+  under the finger. The AI batter feeds the same swing structures at the swing's own time rather than a separate AI path, so
+  pose, contact and replays stay one code path. Kits swapped per innings, not per frame.
 - Kneeling sweeps need a pose parameter (`qKN`) for the back knee's IK pole: the pole follows the toe, which points back when
   kneeling. The crouch starts in the backlift while a sweep is aimed, so the 75 ms downswing doesn't drop the batter in one jump.
 
 ## Known gaps / backlog (ranked as discussed)
-1. Bowling: let the player bowl (line, length, pace, variations) to an AI batter, so a match is two real innings.
+1. Bowling outside T20 (done in T20, 2026-10-14): the short formats still chase a simulated total. Unverified on a phone: the
+   meter's 1 s sweep and window widths, marker drag precision, the bowling camera's framing on real screens.
 2. Career: ladder of AI teams, coins from wins, batter upgrades (timing window, power).
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
@@ -384,5 +449,5 @@ planet preview) + boot.
    non-striker: ~172 calls, ~190k triangles). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
 - No wicket-keeper is drawn (it would block the batter from this camera); the keeper still exists in fielding logic,
-  and stumpings just knock the bails off.
+  and stumpings just knock the bails off. The T20 bowling view looks at the empty spot behind the stumps.
 - Sun/moons/stars are screen-space with a yaw shift; Saturn's rings don't rotate with the chase camera.

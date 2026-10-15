@@ -33,7 +33,12 @@ function skinInit(gl){
   for(const B of [G3.bat,G3.ns]){for(const p of ['shoe','thigh','pad','uarm','sleeve','farm','glove'])B[p].forEach(m=>m.visible=false);
     for(const p of ['pelvis','torso','neck','head','helmet','grille'])B[p].visible=false;}
   const r2=skClone(root);SKN.b2=SKB.map(n=>r2.getObjectByName(n));G3.ns.g.add(r2);
-  G3.bat.g.add(root);SKN.root=root;SKN.on=true;
+  G3.bat.g.add(root);SKN.root=root;SKN.mat=M;SKN.on=true;kitBatter();
+}
+// both batters share these materials: the planet team's kit while the player bowls (KS.you), else the player's
+function kitBatter(){
+  const m=SKN.mat;if(!m)return;const ai=KS.you,k=ai?aiKit():KIT.you;
+  m.shirt.color.set(k.shirt);m.trim.color.set(ai?k.pants:k.trim);m.pants.color.set(k.pants);m.helmet.color.set(ai?k.shirt:k.helmet);if(ai)m.helmet.color.multiplyScalar(.45);
 }
 function skinLoad(){
   if(!glOK||typeof MODEL_DATA==='undefined'||!MODEL_DATA.batter)return;

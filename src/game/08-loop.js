@@ -27,10 +27,10 @@ function updateCam(dt){
     setCam(lerp(cam.x,tx,k),lerp(cam.y,ty,k),lerp(cam.z,tz,k),cam.yaw+angDiff(yaw,cam.yaw)*k);
     HZ=lerp(HZ,H*0.5,k);F=lerp(F,followF,k);
     S.trail3.push({x:b.x,y:b.y,z:b.z});if(S.trail3.length>14)S.trail3.shift();
-  }else if(cam.x!==0||cam.y!==CAM_Y||cam.z!==CAM_Z||cam.yaw!==0||HZ!==baseHZ||F!==baseF){setCam(0,CAM_Y,CAM_Z,0);HZ=baseHZ;F=baseF;S.trail3=[];}
+  }else if(cam.x!==0||cam.y!==HOME.y||cam.z!==HOME.z||cam.yaw!==HOME.yaw||HZ!==baseHZ||F!==baseF){setCam(0,HOME.y,HOME.z,HOME.yaw);HZ=baseHZ;F=baseF;S.trail3=[];}
 }
 function update(dt){
-  updateCam(dt);updateFx(dt);footUpdate(dt);
+  updateCam(dt);updateFx(dt);footUpdate(dt);if(M&&M.bowl){aiTick();bowlKeys(dt);}
   if(S.hold&&clock>=S.hold.until)holdEnd(false);
   if(S.deferred&&clock>=S.deferred.at){showOutcome(S.deferred.res,S.deferred.b);S.deferred=null;}
   switch(S.phase){

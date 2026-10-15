@@ -12,7 +12,8 @@ function preview(k){
   if(PLANETS[k]===shownP)return;
   applyPlanet(setPlanet(k));const a=$('#app');a.classList.remove('swap');void a.offsetWidth;a.classList.add('swap');
 }
-const recText=(r,none)=>r&&(r.p||r.hs)?settings.diff[0].toUpperCase()+settings.diff.slice(1)+': won '+r.w+' of '+r.p+' · best '+r.hs:none;
+const recText=(r,none,hs)=>r&&(r.p||r.hs)?settings.diff[0].toUpperCase()+settings.diff.slice(1)+': won '+r.w+' of '+r.p+' · '+(hs||'best')+' '+r.hs:none;
+const ovShort=b=>b%6?oversText(b):String(b/6);
 function refreshMenu(){
   const m=sheetMode,PP=PLANETS[settings.planet]||PLANETS.earth,v=PP.vis,L=LENGTHS[settings.len]||LENGTHS[1],rd=records[settings.diff]||{};
   $('#planetGrid').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===settings.planet)));
@@ -20,18 +21,19 @@ function refreshMenu(){
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.key;seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(settings[k])===b.dataset.v)));});
   $('#scenOpt').hidden=m!=='scen';$('#venueOpt').hidden=$('#diffOpt').hidden=$('#sgo').hidden=m==='scen';$('#lenOpt').hidden=m!=='quick';$('#netsOpt').hidden=m!=='nets';
   $('#lenBlurb').textContent=m==='quick'?L.overs+(L.overs>1?' overs, ':' over, ')+L.w+' wickets. Chase the '+PP.team+'’s total.'
-    :m==='t20'?'20 overs, 10 wickets, against a five-bowler attack with real fielding restrictions. Saved after every ball.'+(t20Saved()?' A new one replaces your saved T20.':'')
+    :m==='t20'?'A full match. Bowl 20 overs as captain (pick the bowler and field each over, then line, length and release), then chase their total. Saved after every ball.'+(t20Saved()?' A new one replaces your saved T20.':'')
     :m==='nets'?'No target: face pace and spin in turn and work on your shots.':'';
   $('#optAssist').checked=settings.assist;$('#optSound').checked=settings.sound;
   $('#artQuick').style.background='linear-gradient(180deg,'+v.sky[0]+','+v.sky[1]+' 58%,'+v.ground[0]+' 58%,'+v.ground[1]+')';
   $('#recQuick').textContent=recText(rd.short,'Chase a target in 1, 2 or 5 overs');
-  $('#recT20').textContent=recText(rd.t20,'20 overs against a five-bowler attack');
+  $('#recT20').textContent=recText(rd.t20,'Bowl 20 overs, then chase','best chase');
   const n=SCEN.reduce((a,s)=>a+scStars(s.id),0),N=SCEN.length*3;$('#recScen').textContent=n+' of '+N+' stars';$('#scenBar').style.width=n/N*100+'%';
   $('#artScen').innerHTML=[1,2,3,4,5].map(t=>{const ss=SERIES.filter(s=>s.test===t);
     return '<i class="'+(ss.some(s=>scStars(s.id))?'on':'')+'" style="background:'+PLANETS[ss[0].planet].vis.sw+'"></i>';}).join('');
   const sv=t20Saved(),ss=scenSaved(),rb=$('#resumeT20'),cs=$('#contScen');rb.hidden=!sv;cs.hidden=!ss;
   $('#cont').hidden=!sv&&!ss;$('#cont').classList.toggle('two',!!sv&&!!ss);
-  if(sv)rb.innerHTML='<i class="cic">20</i><span><b>Continue T20</b><small>'+PLANETS[sv.pk].name+' · '+sv.st.runs+'/'+sv.st.wkts+' after '+oversText(sv.st.balls)+' overs, chasing '+sv.target+'</small></span><em></em>';
+  if(sv){const st=sv.inn===1?sv.i1:sv.st;rb.innerHTML='<i class="cic">20</i><span><b>Continue T20</b><small>'+PLANETS[sv.pk].name+' · '+
+    (sv.inn===1?'Bowling: ':'Chasing '+st.target+': ')+st.runs+'/'+st.wkts+' after '+ovShort(st.balls)+(st.balls===6?' over':' overs')+'</small></span><em></em>';}
   if(ss){const t=scenResumeText(ss);cs.innerHTML='<i class="cic red"></i><span><b>Continue: '+t[0]+'</b><small>'+t[1]+'</small></span><em></em>';}
 }
 // id: the sheet element; m: the mode it is set up for (mode sheet only)
@@ -79,7 +81,15 @@ $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.targ
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
 if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,cam:()=>({yaw:cam.yaw,y:cam.y,F,HZ,base:F===baseF&&HZ===baseHZ,planet:curPlanet,menu:MENU.on,sheet:sheetMode}),t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
   ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),
-  s:M.st.s,ns:M.st.ns,bat:JSON.stringify(M.st.bat),hold:!!S.hold,ns3d:LV.ns.on}:null,
+  s:M.st.s,ns:M.st.ns,bat:JSON.stringify(M.st.bat),hold:!!S.hold,ns3d:LV.ns.on,inn:M.inn,aiAtk:M.attack===M.aiAtk,i1:M.i1?M.i1.runs+'/'+M.i1.wkts:'',kit:KS.you}:null,
+  // T20 first innings: state, the over picker, the last ball's inputs; bowlTap(rel) taps the meter at the game time that gives rel
+  bowl:()=>M&&M.bowl?{inn:M.inn,phase:S.phase,runs:M.st.runs,wkts:M.st.wkts,balls:M.st.balls,bi:M.st.bi,pid:M.st.pid,s:M.st.s,ns:M.st.ns,overNo:M.overNo,
+    bw:JSON.stringify(M.st.bw),bat:JSON.stringify(M.st.bat),mk:M.mk&&M.mk.x.toFixed(3)+','+M.mk.z.toFixed(3),optK:M.optK.join(),mkB:JSON.stringify(M.mkB),chips:M.overBalls.map(c=>c.t).join(' '),
+    pick:{bi:OPK.bi,pid:OPK.pid,sg:OPK.sg,legal:legalBowlers(M.st,Math.floor(M.st.balls/6)),dis:[...document.querySelectorAll('#opBowlers button:disabled')].map(b=>+b.dataset.i)},
+    ball:S.ball&&{opt:S.ball.opt,mk:S.ball.mk,rel:S.ball.rel,mark:S.ball.mark,zb:S.ball.zb,len:S.ball.len},ai:S.ai&&{leave:!!S.ai.sw.leave,defend:!!S.ai.sw.defend,tc:S.ai.sw.tc,go:S.ai.go},
+    swing:!!S.swing,meter:S.meter&&{tap:S.meter.tap},rel:S.relFb&&S.relFb.txt,mkScreen:M.mk&&(q=>q&&[q.x,q.y])(proj(M.mk.x,0,M.mk.z)),fieldOk:fieldOk(M.field,phaseOf(Math.floor(M.st.balls/6))==='pp'),
+    kit:KS.you}:null,
+  bowlTap:rel=>{const m=S.meter;bowlTap(clockPerf+(m.t0+(rel+1)/2*m.T-clock)*1000);return S.meter.tap;},
   scen:()=>M&&M.sc?{id:M.sc.id,runs:M.st.runs,wkts:M.st.wkts,balls:M.st.balls,s:M.st.s,ns:M.st.ns,ob:M.st.ob,hold:!!S.hold,pid:M.pid,ok:fieldOkTest(M.field),
     bi:M.bi,overNo:M.overNo,chips:M.overBalls.map(c=>c.t).join(' '),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),bat:JSON.stringify(M.st.bat),
     md:M.md.join(),hud:['#sOvers','#sTarget','#cObj','#cCond','#cBat0','#cBat1','#cBowl'].map(q=>$(q).textContent).join(' | '),

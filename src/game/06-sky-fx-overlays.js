@@ -91,14 +91,15 @@ function drawAim(){
 function drawRadar(bp){
   if(!M)return;
   // Tests: a square-root radial scale opens up the close catchers (slips, short leg, silly point) around the bat
-  const R=LAND?clamp(H*0.14,36,58):clamp(W*0.12,36,58),cx=W-SAFE.r-R-10,cy=radarTop+R+10,k=R/(BOUNDARY+3),tst=!!M.sc;
+  // bowling (T20 first innings): turned round to match the camera at the bowler's end (batter at the top, off side on the left)
+  const R=LAND?clamp(H*0.14,36,58):clamp(W*0.12,36,58),cx=W-SAFE.r-R-10,cy=radarTop+R+10,tst=!!M.sc,fl=M.bowl?-1:1,k=fl*R/(BOUNDARY+3);
   const P=tst?(x,z)=>{const d=Math.hypot(x,z),s=d>1e-3?R*Math.sqrt(d/(BOUNDARY+3))/d:0;return [cx+x*s,cy-z*s];}:(x,z)=>[cx+x*k,cy-z*k];
   ctx.save();ctx.fillStyle='rgba(18,52,30,.72)';ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();
-  ctx.strokeStyle='rgba(244,239,225,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cx,cy,tst?R*Math.sqrt(BOUNDARY/(BOUNDARY+3)):BOUNDARY*k,0,7);ctx.stroke();
-  const rc=27.43*BOUNDARY/65;if(!tst){ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.arc(cx,cy,rc*k,0,7);ctx.stroke();ctx.setLineDash([]);}
+  ctx.strokeStyle='rgba(244,239,225,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cx,cy,tst?R*Math.sqrt(BOUNDARY/(BOUNDARY+3)):BOUNDARY*Math.abs(k),0,7);ctx.stroke();
+  const rc=27.43*BOUNDARY/65;if(!tst){ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.arc(cx,cy,rc*Math.abs(k),0,7);ctx.stroke();ctx.setLineDash([]);}
   ctx.fillStyle='#d8c08a';
   if(tst){ctx.beginPath();[[-1.5,-1],[1.5,-1],[1.5,21],[-1.5,21]].forEach(([x,z],i)=>{const [a,b]=P(x,z);i?ctx.lineTo(a,b):ctx.moveTo(a,b);});ctx.fill();}
-  else{const [px,py]=P(-1.5,21);ctx.fillRect(px,py,3*k+1,22*k);}
+  else{const [ax,ay]=P(-1.5,21),[bx,by]=P(1.5,-1);ctx.fillRect(Math.min(ax,bx),Math.min(ay,by),Math.abs(bx-ax)+1,Math.abs(by-ay));}
   ctx.strokeStyle='#f2b134';ctx.lineWidth=1.2;
   S.fpos.forEach((p,i)=>{const f=M.field[i];if(!f)return;const [x,y]=P(p.x,p.z),fx=f.n==='keeper'||f.n==='bowler';ctx.fillStyle=fx?'rgba(239,232,210,.55)':'#efe8d2';ctx.beginPath();ctx.arc(x,y,tst&&!fx&&Math.hypot(f.x,f.z)<18?1.8:2.2,0,7);ctx.fill();
     if(M.t20&&!fx&&Math.hypot(f.x,f.z)>rc){ctx.beginPath();ctx.arc(x,y,4.2,0,7);ctx.stroke();}});
@@ -108,7 +109,7 @@ function drawRadar(bp){
     const [x,y]=S.trail[S.trail.length-1];ctx.fillStyle='#ff5a4a';ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill();}
   ctx.fillStyle='#ff5a4a';ctx.beginPath();ctx.arc(cx,cy,2.4,0,7);ctx.fill();
   const wv=Math.hypot(WIND.x,WIND.z);
-  if(wv>0.5){const ux=WIND.x/wv,uz=WIND.z/wv,ax=cx-ux*R*0.55,ay=cy+uz*R*0.55,bx=cx+ux*R*0.55,by=cy-uz*R*0.55,an=Math.atan2(by-ay,bx-ax);
+  if(wv>0.5){const ux=fl*WIND.x/wv,uz=fl*WIND.z/wv,ax=cx-ux*R*0.55,ay=cy+uz*R*0.55,bx=cx+ux*R*0.55,by=cy-uz*R*0.55,an=Math.atan2(by-ay,bx-ax);
     ctx.strokeStyle='#9fe3ff';ctx.fillStyle='#9fe3ff';ctx.lineWidth=2;line(ax,ay,bx,by);
     ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-Math.cos(an-0.5)*7,by-Math.sin(an-0.5)*7);ctx.lineTo(bx-Math.cos(an+0.5)*7,by-Math.sin(an+0.5)*7);ctx.fill();
     ctx.font='700 12.5px "Barlow",system-ui,sans-serif';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';
@@ -116,7 +117,7 @@ function drawRadar(bp){
   ctx.restore();
 }
 function drawTimingBar(){
-  const T=S.timing;if(!T||!M)return;
+  const T=S.timing;if(!T||!M||M.bowl)return;
   const we=windows(M.diff,true,T.win),wl=windows(M.diff,false,T.win),bw=LAND?Math.min(300,W*0.34):Math.min(320,W*0.8),x0=(W-bw)/2,y=LAND?H-SAFE.b-22:H-40,h=10;
   const ppx=bw/(we.edge+wl.edge),c0=x0+we.edge*ppx,X=t=>c0+t*ppx;
   const zones=[[-we.edge,-we.ok,'#8b3a3a'],[-we.ok,-we.good,'#d99a2b'],[-we.good,-we.perfect,'#9bc53d'],[-we.perfect,wl.perfect,'#3ec46d'],
@@ -134,7 +135,8 @@ function drawTimingBar(){
 function drawInfo(){
   if(!M||S.aim)return;let txt='';
   const pace=M.bowlerType==='pace';
-  if(S.phase==='ready')txt='Next ball in '+Math.max(1,Math.ceil(S.readyDur-S.t));
+  if(M.bowl&&(S.phase==='ready'||S.phase==='runup'||S.phase==='pick'))txt=S.phase==='ready'?'Pick a delivery, drag the marker, then Bowl':S.phase==='runup'?'Tap as the bar crosses the green':'';
+  else if(S.phase==='ready')txt='Next ball in '+Math.max(1,Math.ceil(S.readyDur-S.t));
   else if(S.phase!=='result')txt=bowlerLabel();
   else if(S.ball)txt=(pace?'Pace':'Spin')+', '+S.ball.kmh+' km/h';
   if(!txt)return;ctx.save();ctx.font='700 15px "Barlow",system-ui,sans-serif';ctx.textAlign='left';

@@ -35,14 +35,34 @@ function resize(){
   // landscape: a short view needs a longer lens so the batter isn't tiny; framed from the bowler's release down to the
   // stumps' base above the timing bar (H minus the home indicator). The chase and spider cameras keep the portrait lens.
   followF=Math.min(W*2.4,H*1.15);CX=W/2;
-  if(LAND){const h=H-SAFE.b;F=baseF=h*1.55;HZ=baseHZ=h*0.235;}else{F=baseF=followF;HZ=baseHZ=H*0.31;}
-  const hud=$('#hud');hudBottom=hud.hidden?70:hud.getBoundingClientRect().bottom-r.top;
-  radarTop=LAND&&!hud.hidden?$('#targetSlab').getBoundingClientRect().bottom-r.top:hudBottom;
+  if(M&&M.bowl){if(LAND)bowlLens(H-SAFE.b,0.42,0.82);else bowlLens(H,0.55,0.8);}
+  else{Object.assign(HOME,{y:CAM_Y,z:CAM_Z,yaw:0});if(LAND){const h=H-SAFE.b;F=baseF=h*1.55;HZ=baseHZ=h*0.235;}else{F=baseF=followF;HZ=baseHZ=H*0.31;}}
+  hudMeasure();
   skc.width=Math.round(W*dpr);skc.height=Math.round(H*dpr);glSize();
   sk.setTransform(dpr,0,0,dpr,0,0);
   if(S.cel)celCam(clock-S.cel.t0);else if(MENU.on)menuCam();
 }
 const cam={x:0,y:CAM_Y,z:CAM_Z,yaw:0,fx:0,fz:1,rx:1,rz:0};
+// where the camera rests between balls: behind the batter, or (T20 first innings) behind the bowler's arm
+const HOME={y:CAM_Y,z:CAM_Z,yaw:0};
+// bowling view: end-on from behind the bowler's arm, raised, looking down the pitch (yaw 180: screen right is the leg side).
+// No pitch, like every camera here: the lens and horizon are solved so the batter's feet (z 1.05) and a bouncer's length
+// (z 12) land at fixed fractions yb, yn of the height h, so the batter and the marker's range stay the same size on any screen
+const BOWL_CAM={y:6,z:34.1};
+function bowlLens(h,yb,yn){
+  const db=BOWL_CAM.z-BATS_Z,dn=BOWL_CAM.z-12;
+  F=baseF=(yn-yb)*h/(BOWL_CAM.y*(1/dn-1/db));HZ=baseHZ=yb*h-BOWL_CAM.y*F/db;Object.assign(HOME,{y:BOWL_CAM.y,z:BOWL_CAM.z,yaw:180});
+}
+// screen point -> ground point (y 0), the inverse of proj(); null above the horizon
+// the HUD's bottom edge (info text, replay tag) and the radar's top; again after a T20 HUD update (its slab changes height)
+function hudMeasure(){
+  const hud=$('#hud'),r=cvs.getBoundingClientRect();hudBottom=hud.hidden?70:hud.getBoundingClientRect().bottom-r.top;
+  radarTop=LAND&&!hud.hidden?$('#targetSlab').getBoundingClientRect().bottom-r.top:hudBottom;
+}
+function unprojGround(sx,sy){
+  if(sy-HZ<1)return null;const zc=cam.y*F/(sy-HZ),xc=(sx-CX)*zc/F;
+  return {x:cam.x+xc*cam.rx+zc*cam.fx,z:cam.z+xc*cam.rz+zc*cam.fz};
+}
 function setCam(x,y,z,yaw){cam.x=x;cam.y=y;cam.z=z;cam.yaw=yaw;const a=yaw*D2R;cam.fx=Math.sin(a);cam.fz=Math.cos(a);cam.rx=Math.cos(a);cam.rz=-Math.sin(a);}
 function toCam(x,y,z){const dx=x-cam.x,dz=z-cam.z;return [dx*cam.rx+dz*cam.rz,y-cam.y,dx*cam.fx+dz*cam.fz];}
 function projC(c){if(c[2]<0.25)return null;const s=F/c[2];return {x:CX+c[0]*s,y:HZ-c[1]*s,s};}

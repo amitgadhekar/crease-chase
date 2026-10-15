@@ -18,46 +18,46 @@ const PLANETS={
   vis:{sw:'radial-gradient(circle at 35% 35%,#8fd0ff,#2b78c2 55%,#2d6b3c)',sky:['#5d9ccf','#cfe5f2'],ground:['#3c8a45','#2f7a39'],stripe:.055,
    pitch:['#e3cf9c','#cdb27a'],crease:'rgba(255,255,255,.92)',rope:'#f4efe1',standsH:14,stands:'#34424f',roof:'#d8d3c3',crowd:CROWD,
    boards:['#1d3a2b','#efe8d2','#f2b134'],ads:['Play straight','Crease Chase'],bodies:[],kit:{shirt:'#7a1f2b',pants:'#f1ece0'}}},
- moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:2.16,
+ moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:0.98,
   blurb:'One-sixth gravity and no air. Lofted shots fly for ages, so mistimed ones hang up to be caught. No swing at all.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#e4e4df,#8d8d88 60%,#5c5c58)',sky:['#000004','#0d0f1a'],stars:1,ground:['#9a9a96','#74736d'],stripe:.03,
    pitch:['#d6d3ca','#b2ada1'],crease:'rgba(255,255,255,.95)',rope:'#e6e9ef',standsH:8,stands:'#22262e',roof:'#aab4c0',
    crowd:['#e9edf2','#c4ccd6','#8fa3b8','#f2b134','#ffffff','#5d6b7a'],boards:['#14181f','#d9e2ec','#7fc8ff'],ads:['One-sixth gravity','Mind the craters'],
    bodies:[{t:'earth',x:.5,y:.5,r:.075}],kit:{shirt:'#dfe3e8',pants:'#9aa4b0',skin:'#c8d2dc'}}},
- mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,t20:1.84,
+ mercury:{name:'Mercury',team:'Sunside XI',g:3.7,air:1.1,swing:0,spin:1.25,bounce:1.05,pace:1,boundary:82,wind:0,ai:1.27,t20:0.88,
   blurb:'Low gravity, no air and a giant sun. Spinners grip the scorched pitch.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#cfc3b8,#857a70 60%,#57504a)',sky:['#000000','#1a110a'],stars:.6,ground:['#7c7068','#5b524b'],stripe:.03,
    pitch:['#c4b59f','#9e8f7b'],crease:'rgba(255,255,255,.9)',rope:'#efe6da',standsH:7,stands:'#2b2522',roof:'#a99683',
    crowd:['#ffd9a8','#ffffff','#c96f3c','#7f8c99','#f2b134'],boards:['#1c1714','#ffe2b8','#ff9d3d'],ads:['Sunside Ground','Bring sunscreen'],
    bodies:[{t:'sun',x:.2,y:.6,r:.13,c:'#fff3c4'}],haze:{c:'255,214,150',a:.13},kit:{shirt:'#c25b1f',pants:'#efe2d0'}}},
- venus:{name:'Venus',team:'Cloud Deck XI',g:8.87,air:.72,swing:2.4,spin:.9,bounce:.85,pace:.88,boundary:54,wind:2,ai:0.92,t20:0.75,
+ venus:{name:'Venus',team:'Cloud Deck XI',g:8.87,air:.72,swing:2.4,spin:.9,bounce:.85,pace:.88,boundary:54,wind:2,ai:0.92,t20:1.18,
   blurb:'Soupy air slows the ball and makes it swing wildly. A small ground, but sixes are hard to clear.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#fbe6a6,#d9a441 60%,#9a6a1d)',sky:['#c98d2e','#f3d491'],clouds:1,ground:['#8a6a2c','#6a501f'],stripe:.03,
    pitch:['#c99d58','#a98140'],crease:'rgba(255,248,225,.9)',rope:'#fbe8b8',standsH:11,stands:'#4b3818',roof:'#e6c27a',
    crowd:['#ffd36b','#e8743b','#fff2c9','#b5651d','#ffffff'],boards:['#3b2a0e','#fde7b0','#ffcf5c'],ads:['Thick air, big swing','Cloud Deck Oval'],
    bodies:[],haze:{c:'240,196,92',a:.32},particles:{color:'#fff0b3',alpha:.3,size:1.6,vx:.01,vy:-.025,n:40},kit:{shirt:'#6b2f8a',pants:'#f3e3c0'}}},
- mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,t20:1.76,
+ mars:{name:'Mars',team:'Red Dust XI',g:3.71,air:1.05,swing:.35,spin:1.1,bounce:1.12,pace:1,boundary:82,wind:7,ai:1.24,t20:0.89,
   blurb:'A third of Earth\u2019s gravity on a hard, bouncy deck. Big carry and dusty gusts.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#f2a272,#c1502a 60%,#7a2c14)',sky:['#b9784e','#e8b98c'],ground:['#a4532d','#7c3b1f'],stripe:.04,
    pitch:['#d9a273','#ba7f53'],crease:'rgba(255,240,225,.9)',rope:'#f6dcc4',standsH:10,stands:'#3e231a',roof:'#c99872',
    crowd:['#f2c49b','#e8743b','#ffffff','#8a3b21','#f2b134'],boards:['#3a1a10','#f6dcc4','#ffb07a'],ads:['Red Dust Arena','Thin air, long carry'],
    bodies:[{t:'sun',x:.25,y:.45,r:.028,c:'#f7efe0'},{t:'disc',x:.62,y:.3,r:.009,c1:'#a8978a',c2:'#5e5248'},{t:'disc',x:.5,y:.62,r:.006,c1:'#a39282',c2:'#5e5248'}],
    haze:{c:'232,150,96',a:.15},particles:{color:'#efae7c',alpha:.55,size:2,vx:.07,vy:.012,n:70},kit:{shirt:'#2d4b7a',pants:'#e7d8c9'}}},
- jupiter:{name:'Jupiter',team:'Storm XI',g:24.79,air:1,swing:1.2,spin:.9,bounce:.72,pace:1,boundary:50,wind:13,ai:0.81,t20:0.77,
+ jupiter:{name:'Jupiter',team:'Storm XI',g:24.79,air:1,swing:1.2,spin:.9,bounce:.72,pace:1,boundary:50,wind:13,ai:0.81,t20:1,
   blurb:'Two and a half times Earth\u2019s gravity. The ball dips hard and keeps low, and storms gust across a small floating deck.',
   vis:{sw:'repeating-linear-gradient(170deg,#ecc89c 0 4px,#b5693c 4px 7px,#f3dcb6 7px 10px)',sky:['#a8592e','#ecc596'],bands:['#c47a46','#f0d3a8','#9e5a34','#e8b98a'],
    ground:['#5d6772','#454d57'],stripe:.06,pitch:['#d8cbb0','#b8aa8d'],crease:'rgba(255,255,255,.9)',rope:'#ffe3c2',standsH:6,stands:'#2d3138',roof:'#8e98a3',
    crowd:['#ffb37a','#ffffff','#e45d3a','#ffd36b','#9aa6b2'],boards:['#262a30','#ffe3c2','#ff8f5a'],ads:['Storm Deck','Heavy gravity, low bounce'],
    bodies:[{t:'disc',x:.7,y:.35,r:.02,c1:'#f2e28a',c2:'#b9952f'},{t:'disc',x:.45,y:.62,r:.012,c1:'#d9d2c4',c2:'#8b8072'}],
    lightning:1,haze:{c:'214,140,90',a:.15},kit:{shirt:'#b3421f',pants:'#f2e6d6'}}},
- saturn:{name:'Saturn',team:'Ringside XI',g:10.44,air:.85,swing:1.4,spin:1,bounce:.95,pace:.97,boundary:62,wind:10,ai:0.87,t20:0.7,
+ saturn:{name:'Saturn',team:'Ringside XI',g:10.44,air:.85,swing:1.4,spin:1,bounce:.95,pace:.97,boundary:62,wind:10,ai:0.87,t20:1.2,
   blurb:'Close to Earth gravity under the rings, with steady crosswinds that push lofted shots off line.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#f6e4b8,#c9a66a 60%,#8a6a3a)',sky:['#b89a5c','#f0e2bd'],rings:1,ground:['#5f6f66','#47544c'],stripe:.05,
    pitch:['#e2d6b8','#c3b694'],crease:'rgba(255,255,255,.9)',rope:'#fff4da',standsH:6,stands:'#30352f',roof:'#b9b29a',
    crowd:['#f6e3b0','#ffffff','#7fb38f','#e8c46a','#c06a3a'],boards:['#2c2f28','#fff1cf','#e8c46a'],ads:['Ringside Deck','Watch the gusts'],
    bodies:[{t:'disc',x:.14,y:.3,r:.018,c1:'#efd9a7',c2:'#a8865a'}],haze:{c:'240,220,170',a:.12},
    particles:{color:'#fffbe8',alpha:.55,size:1.4,vx:.035,vy:.006,n:35},kit:{shirt:'#3d6b4f',pants:'#f4ecd6'}}},
- neptune:{name:'Neptune',team:'Deep Blue XI',g:11.15,air:.8,swing:1.8,spin:1.1,bounce:1.12,pace:.95,boundary:60,wind:19,ai:0.82,t20:0.68,
+ neptune:{name:'Neptune',team:'Deep Blue XI',g:11.15,air:.8,swing:1.8,spin:1.1,bounce:1.12,pace:.95,boundary:60,wind:19,ai:0.82,t20:1.25,
   blurb:'Slightly heavier gravity, an icy skiddy pitch and the fastest winds in the solar system.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#9fd0ff,#2f6fd6 60%,#16337a)',sky:['#061a4a','#2a5fb0'],stars:.5,ground:['#2d6a85','#1d4a63'],stripe:.05,
    pitch:['#d4e9f0','#a9c9d6'],crease:'rgba(20,60,110,.85)',rope:'#e6f6ff',standsH:9,stands:'#0f2236',roof:'#6f9fc4',
@@ -77,9 +77,9 @@ function setPlanet(key){
 }
 function rollWind(p){if(!p.wind){WIND={x:0,z:0};return 0;}const a=Math.random()*Math.PI*2,v=p.wind*rnd(0.4,1);WIND={x:Math.sin(a)*v,z:Math.cos(a)*v};return v;}
 const DIFF={
-  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,t20:.85,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
-  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,t20:.9,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
-  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,t20:1,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
+  easy:  {pace:[29,34],  win:1.3, k:0.15,slower:0.03,wide:0.04, swing:0.05,catchMul:0.8, fSpeed:5.6,misfield:0.07,deep:1,acc:.7,spd:.95,turn:.85,ai:{0:.38,1:.3,2:.1,4:.1,6:.04,W:.08}},
+  medium:{pace:[33,38.5],win:1.0, k:0.5, slower:0.1, wide:0.025,swing:0.09,catchMul:1,   fSpeed:6.3,misfield:0.04,deep:2,acc:.85,spd:1,turn:1,ai:{0:.31,1:.3,2:.1,4:.14,6:.08,W:.07}},
+  hard:  {pace:[36.5,42],win:0.82,k:0.9, slower:0.17,wide:0.015,swing:0.13,catchMul:1.1, fSpeed:7,  misfield:0.02,deep:3,acc:1,spd:1.04,turn:1.1,ai:{0:.25,1:.28,2:.1,4:.19,6:.12,W:.06}}
 };
 // timing windows in seconds (late side is tighter: the ball is past you)
 const EARLY={perfect:.025,good:.055,ok:.095,edge:.14}, LATE={perfect:.025,good:.045,ok:.065,edge:.09};
@@ -151,15 +151,20 @@ function makeDelivery(plan,diffKey,sd,cond){
     eK=clamp(1+gauss()*BOUNCE_VAR[cond.day-1]*(inR?1.6:1),0.6,1.45)*(plan.var==='top'?1.15:plan.var==='arm'?0.92:1);
     T.rough=inR;
   }
-  const t1=(zr-zb)/v, vy0=(0.5*G*t1*t1-yr)/t1, vImpact=vy0-G*t1;
+  const b=launch(plan,v,zr,yr,xr,zb,xb,xt,dev,eK);
+  if(T){b.swC=T.swC;b.swR=T.swR;b.seam=T.seam;b.turn=T.turn;b.rough=T.rough;b.eK=eK;b.bouncer=ballPos(b,tAt(b,POPPING)).y>SHOULDER;}
+  return b;
+}
+// release (zr,yr,xr), pitch (zb,xb), line at the stumps (xt) and movement off the pitch (dev) -> flight, bounce, stumps, wide
+function launch(p,v,zr,yr,xr,zb,xb,xt,dev,eK){
+  const pace=p.type==='pace',t1=(zr-zb)/v, vy0=(0.5*G*t1*t1-yr)/t1, vImpact=vy0-G*t1;
   const full=clamp((zb-1)/10,0,1);
   const e=(pace?0.55+0.15*full:0.48+0.1*full)*ENV.bounce*eK;
-  const b={...plan,v,kmh:Math.round(v*3.6),zr,yr,xr,zb,xb,xt,dev,vz1:v,t1,vy0,vyB:-vImpact*e,vz2:v*(pace?0.88:0.8),full};
+  const b={...p,v,kmh:Math.round(v*3.6),zr,yr,xr,zb,xb,xt,dev,vz1:v,t1,vy0,vyB:-vImpact*e,vz2:v*(pace?0.88:0.8),full};
   b.tIdeal=tAt(b,CONTACT_Z); b.tStumps=tAt(b,0); b.tEnd=tAt(b,-2.2);
   const ps=ballPos(b,b.tStumps);
   b.onStumps=Math.abs(ps.x)<STUMP_HALF&&ps.y<STUMP_H;
   b.wide=Math.abs(xt)>0.92;
-  if(T){b.swC=T.swC;b.swR=T.swR;b.seam=T.seam;b.turn=T.turn;b.rough=T.rough;b.eK=eK;b.bouncer=ballPos(b,tAt(b,POPPING)).y>SHOULDER;}
   return b;
 }
 /* ---------- Test conditions: cond = {day 1-5, ballAge overs since the new ball, planet} ---------- */
@@ -425,11 +430,17 @@ function newT20(attack,diffKey,target){
 }
 // max 4 overs each, never two in a row, phase roles; a bowler going above par+3 an over (hard: +2) is rested unless the quotas
 // force him; on hard the best death bowler keeps 2 overs for overs 18-20
+// bowlers who may bowl over o (0-based): not the last over's bowler, overs left, and the rest of the innings still coverable
+function legalBowlers(st,o){
+  const q=st.bw.map(f=>4-f.o);
+  return q.map((v,i)=>i).filter(i=>i!==st.last&&q[i]>0&&canFinish(q.map((v,j)=>v-(j===i?1:0)),i,19-o));
+}
+// par: the chase's required rate; batting first (no target), the innings' own rate so far
 function captainPick(attack,o,st){
   const ph=phaseOf(o),hard=st.diff==='hard',q=attack.map((b,i)=>4-st.bw[i].o);
-  const legal=attack.map((b,i)=>i).filter(i=>i!==st.last&&q[i]>0&&canFinish(q.map((v,j)=>v-(j===i?1:0)),i,19-o));
+  const legal=legalBowlers(st,o);
   if(!legal.length)return -1;
-  const lim=st.par+(hard?2:3),best=attack.reduce((m,b,i)=>b.role.death>attack[m].role.death?i:m,0);
+  const lim=(st.par!=null?st.par:st.balls>=12?st.runs/st.balls*6:9)+(hard?2:3),best=attack.reduce((m,b,i)=>b.role.death>attack[m].role.death?i:m,0);
   const pref=legal.filter(i=>!(st.bw[i].o>0&&st.bw[i].r/st.bw[i].o>lim)&&!(hard&&o<17&&i===best&&q[i]<=2));
   const pool=pref.length?pref:legal,k=st.diff==='easy'?1:hard?3:2;
   return pick(pool,pool.map(i=>Math.pow(attack[i].role[ph],k)));
@@ -439,7 +450,7 @@ function planPick(bw,ph,st,ft){
   const d=DIFF[st.diff],pp=ph==='pp',def=Object.keys(bw.plans[ph])[0],w={...bw.plans[ph]},fp=footPlan(ft),ck=bw.type==='spin'?'CH':'SB';
   if(fp&&fp.ch>0)w[ck]=(w[ck]||0)+2.5*fp.ch;
   const left=120-st.balls,rrr=left>0?(st.target-st.runs)/left*6:0,lw=st.fow.length?st.fow[st.fow.length-1]:{runs:0},
-    attack=rrr>st.par*1.25||st.fow.filter(f=>f.balls>st.balls-18).length>=2,set=st.runs-lw.runs>=30;
+    attack=st.target!=null&&rrr>st.par*1.25||st.fow.filter(f=>f.balls>st.balls-18).length>=2,set=st.runs-lw.runs>=30;
   const ids=Object.keys(w).filter(id=>fieldOk(tplField(id),pp));
   const id=st.diff==='easy'&&ids.includes(def)&&Math.random()<0.6?def:pick(ids,ids.map(id=>
     w[id]*(attack?(TPL[id].atk?1.8:1):set?(TPL[id].atk?0.6:1.4):1)*Math.exp(-d.k*1.5*(bScore(st.mem,'b'+bw.i+':T:'+id)-1.2))));
@@ -790,14 +801,166 @@ function brainInsight(mem,type,ft){
   for(const L of lens){const s=mem[type+':'+L];if(!s||s.n<4)continue;const sc=bScore(mem,type+':'+L);if(sc<bs){bs=sc;best=L;}}
   return best&&bs<0.9?'Bowler\u2019s plan: more '+LEN_NAME[best]:'';
 }
-// T20 (overs===20): per-phase outcome weights, more boundaries and wickets in the powerplay and at the death
-const AI_T20={pp:{0:.36,1:.28,2:.07,4:.16,6:.07,W:.05},mid:{0:.3,1:.38,2:.12,4:.1,6:.06,W:.04},death:{0:.24,1:.27,2:.1,4:.18,6:.14,W:.08}};
 function simulateAI(overs,wkts,diffKey,mul){
-  const t20=overs===20,w0=DIFF[diffKey].ai,k0=Object.keys(w0);let runs=0,out=0,balls=0;
-  while(balls<overs*6&&out<wkts){
-    const w=t20?AI_T20[phaseOf(Math.floor(balls/6))]:w0,keys=t20?Object.keys(w):k0,o=pick(keys,keys.map(k=>w[k]));
-    balls++;if(o==='W')out++;else runs+=+o;}
-  return {runs:Math.round(runs*(mul||1)*(t20?DIFF[diffKey].t20:1)),wkts:out,balls};
+  const w=DIFF[diffKey].ai,keys=Object.keys(w);let runs=0,out=0,balls=0;
+  while(balls<overs*6&&out<wkts){const o=pick(keys,keys.map(k=>w[k]));balls++;if(o==='W')out++;else runs+=+o;}
+  return {runs:Math.round(runs*(mul||1)),wkts:out,balls};
+}
+/* ---------- T20 first innings: the player bowls, the AI bats ---------- */
+// the player's deliveries and the AI batter's shots use medium physics (pace, swing, timing windows, fielding) on every level:
+// difficulty is the release meter and the batter's skill (a harder DIFF would give the player faster bowlers and the batter
+// tighter windows, i.e. make bowling easier)
+const BOWL_D='medium',HEAD=1.85;
+// delivery options (max 5 per bowler). v: pace x; sd: swing direction (+1 away from the right-hander), sw: swing x; cut: seam
+// movement into the batter; tm: turn x; dir: turn direction x the bowler's (-1 wrong'un, 0 arm ball); L: suggested length
+const OPTS={stock:{name:'Stock ball'},out:{name:'Outswinger',sd:1,sw:1.2},in:{name:'Inswinger',sd:-1,sw:1.2},
+ yorker:{name:'Yorker',L:'Y'},bouncer:{name:'Bouncer',L:'B',v:1.03},slower:{name:'Slower ball',slower:1,L:'F'},cutter:{name:'Cutter',v:.88,cut:1},
+ flight:{name:'Flighted',v:.9,tm:1.25,L:'F'},quick:{name:'Quicker one',v:1.1,tm:.55},wrong:{name:'Wrong\u2019un',dir:-1},arm:{name:'Arm ball',v:1.05,dir:0}};
+function bowlOpts(bw){
+  const k=bw.type==='pace'?[...(bw.sw>=1.2?['out','in']:['stock']),'yorker','bouncer','slower',...(bw.slow>=1.5?['cutter']:[])]
+    :['stock','flight','quick',...(bw.wrong?['wrong']:[]),'arm'];
+  return k.map(k=>({k,...OPTS[k]}));
+}
+// the player's attack: the XI's lower order (7-11), archetypes seeded per planet (a death specialist and a spinner, the rest suited
+// to the conditions, as makeAttack picks the AI's)
+function myAttack(pk){return makeAttack(pk,BOWL_D,seeded(hashStr('XI:'+pk))).map((b,i)=>({...b,name:XI[6+i].name,opts:bowlOpts(b)}));}
+// the AI side's batting order: six batters named from the planet, then its five bowlers; tiers as the player's XI
+function aiXI(pk,attack){
+  const N=(NAMES[pk]||NAMES.earth).map(s=>s.split(' ')),one=a=>a[Math.floor(Math.random()*a.length)],names=new Set(attack.map(b=>b.name.slice(3))),bat=[];
+  while(bat.length<6){const sn=one(N[0])+one(N[1]);if(names.has(sn))continue;names.add(sn);bat.push({name:'ABCDEFGHJKLMNPRSTVWZ'[Math.floor(Math.random()*20)]+'. '+sn,tier:XI[bat.length].tier});}
+  return bat.concat(attack.map((b,i)=>({name:b.name,tier:XI[6+i].tier})));
+}
+// mean movement off the pitch of option o (m, + toward off)
+function optDev(bw,o){
+  const d=DIFF[BOWL_D];
+  return bw.type==='pace'?(o.sd!=null?o.sd*0.9:bw.swDir*0.5)*bw.sw*(o.sw||1)*d.swing*ENV.swing-(o.cut?0.1:0)
+    :o.dir===0?-bw.dir*0.05:(o.dir==null?1:o.dir)*bw.dir*(bw.turn[0]+bw.turn[1])/2*d.turn*(o.tm||1)*ENV.spin;
+}
+// the marker (pitch point) that sends option o from length z on to line xt at the stumps
+function spotFor(bw,o,z,xt){const p=bw.type==='pace',zr=p?19:19.3,xr=p?0.3:0.22;return {x:xr+(xt-optDev(bw,o)-xr)*(zr-z)/zr,z};}
+const LZ={Y:1.6,F:3.2,G:5.4,S:8,B:10.1};
+const optSpot=(bw,o)=>spotFor(bw,o,LZ[o.L||'G'],0.12);
+// release meter: rel in -1..1 (0 = centre); |rel| <= good is a good release, beyond bad a very bad one
+const BOWL_W={easy:.16,medium:.11,hard:.075};
+function bowlWindow(bw,diffKey){const w=BOWL_W[diffKey]*bw.acc/0.85;return {good:w,bad:3.5*w};}
+const lenCode=z=>z<2.1?'Y':z<4.2?'F':z<7?'G':z<9.2?'S':'B',lineCode=x=>x>0.47?'wide':x>0.12?'off':x>-0.07?'mid':'leg';
+// marker m = pitch point {x line at the bounce, z length}; rel = signed release error (early < 0 floats it up fuller, late > 0
+// drags it into the pitch, shorter; null = no tap, a poor release). Line scatter and lost pace grow with the error; a very bad
+// release is a wide, a full toss (early) or a long hop (late). Above head height at the popping crease is a wide (ICC playing conditions)
+function bowlDelivery(bw,o,m,rel,diffKey){
+  const d=DIFF[BOWL_D],pace=bw.type==='pace',W=bowlWindow(bw,diffKey);
+  if(rel==null)rel=(Math.random()<0.5?-1:1)*W.good*rnd(2,3);
+  const e=Math.abs(rel)/W.good,x=Math.max(0,e-1),sg=Math.sign(rel),zr=pace?19.0:19.3,yr=pace?2.15:1.95,xr=pace?0.3:0.22;
+  let v=(pace?rnd(d.pace[0]*bw.pace[0],d.pace[1]*bw.pace[1]):rnd(...bw.v)*d.spd)*(o.v||1)*(1-0.04*Math.min(x,2))*ENV.pace;
+  if(o.slower)v*=rnd(0.74,0.8);
+  // the same release error moves a full ball's pitch point further (flatter descent): length error x ((zr-z)/(zr-5.4))^2
+  const kz=clamp(((zr-m.z)/(zr-5.4))**2,0.5,2);
+  let zb=clamp(m.z+sg*(0.25*Math.min(e,1)+2*x)*kz+gauss()*0.12*kz,-1.2,11.5),xb=m.x+gauss()*(0.03+0.1*(1-bw.acc)+0.15*x),wide=false;
+  const dev=pace?clamp((o.sd!=null?o.sd*0.9+gauss()*0.45:bw.swDir*0.5+gauss())*bw.sw*(o.sw||1)*d.swing*ENV.swing-(o.cut?rnd(0.05,0.15):0),-0.65,0.65)
+    :o.dir===0?-bw.dir*rnd(0.02,0.08):clamp((o.dir==null?1:o.dir)*bw.dir*rnd(...bw.turn)*d.turn*(o.tm||1)*ENV.spin,-0.65,0.65);
+  if(e>3.5){if(Math.random()<0.5)wide=true;else zb=sg<0?rnd(-1.2,0.6):rnd(9.6,11);}
+  let xt=xr+(xb-xr)*zr/(zr-zb)+dev;
+  if(wide){xt=(Math.random()<0.7?1:-1)*rnd(1.0,1.25);xb=xr+(xt-dev-xr)*(zr-zb)/zr;}
+  const b=launch({type:bw.type,len:lenCode(zb),line:lineCode(xt),slower:!!o.slower,opt:o.k,mk:'b'+bw.i+':',rel},v,zr,yr,xr,zb,xb,xt,dev,1);
+  const y=ballPos(b,tAt(b,POPPING)).y;b.bouncer=y>SHOULDER;if(y>HEAD)b.wide=b.high=true;
+  return b;
+}
+// AI batter skill by difficulty: sig = timing spread (s; x the planet's t20, measured so a medium full match is ~50% on every
+// planet), read = share of a change of pace picked from the hand, mis = misreading of length and line x, foot = footwork x
+const AIB={easy:{sig:.071,read:.5,mis:1.15,foot:.85},medium:{sig:.064,read:.6,mis:1,foot:1},hard:{sig:.058,read:.7,mis:.85,foot:1.15}};
+const AI_LOFT={pp:.18,mid:.12,death:.3};
+// how open direction a is [along the ground, lofted]: lofted, no boundary rider within 18 degrees; along the ground, the angle
+// to the nearest fielder in the ring, less with a rider behind it
+function gapAt(field,a){
+  let gi=180,deep=false;
+  for(const f of field){if(f.n==='keeper')continue;const d=Math.hypot(f.x,f.z),g=Math.abs(angDiff(a,Math.atan2(f.x,f.z)/D2R));
+    if(d>BOUNDARY*0.6){if(g<18)deep=true;}else if(d>5&&g<gi)gi=g;}
+  return [(0.35+0.65*clamp((gi-6)/22,0,1))*(deep?0.7:1),deep?0.35:1];
+}
+// the aims the AI batter weighs for each of SHOTS, and their gaps cached on the field array (fields are replaced, never moved)
+const AIMS=SHOTS.map(s=>{const a=[];for(let x=s.lo+8;x<s.hi-4;x+=12)a.push(x);return a;});
+const gapsOf=field=>field.gp||(field.gp=AIMS.map(xs=>xs.map(x=>gapAt(field,x))));
+// the AI striker's input for delivery b, as a player's would be: {leave:true,bp} or the swing evalSwing takes
+// ({tc,aim,power,lofted,defend,bp}). Length is read at release and line at the bat with an error (more for swing), smaller for a
+// length the attack keeps bowling (st.bm: the batters learn the attack's lengths and each bowler's pace, so predictable bowling
+// is easier to time, to use the feet to and to aim into a gap). Good length and yorkers at the stumps are harder to time, loose
+// balls easier (half-volley, full toss, long hop, short and wide, on the pads); an unread slower ball makes it early. Footwork
+// is committed on the length as read, within the joystick's speed limits: back to short balls, forward to good length (down
+// the pitch to spin), across to off to flick an expected yorker. Shots: the best fit for the ball (SHOTS) toward a gap; lofts
+// by phase and carry, more at a loose ball, fewer after quick wickets, with a rider there or without a lofted shot that fits
+function aiBat(st,b,field){
+  const S=AIB[st.diff],bt=st.bat[st.s],ti='ABCDE'.indexOf(bt.tier),ph=phaseOf(Math.floor(st.balls/6)),k=st.bm,
+    a=clamp(((k.L[b.len]||0)-0.3)/0.4,0,1)*clamp(k.n/3,0,1),m=S.mis*(1-0.5*a),
+    careful=bt.balls<4||st.fow.filter(f=>f.balls>st.balls-12).length>=2,zp=b.zb+gauss()*0.9*m;
+  let bp=null;const fw=(0.55-0.1*ti)*S.foot;
+  if(zp<2.3){if(Math.random()<S.foot*(0.15+0.8*a))bp={x:Math.min(0.35,2*b.t1),z:0};}
+  else if(Math.random()<fw*(1+a)){
+    if(zp>(b.type==='spin'?6.5:6))bp={x:0,z:-Math.min(2*b.t1,0.5)};
+    else if(zp>3.6&&b.xb>-0.35&&b.xb<0.55)bp={x:0,z:clamp(zp-3.6,0,Math.min(2.5*b.t1,b.type==='spin'?1.5:0.4))};
+  }
+  const f=footAt(b,bp),xp=f.xc+gauss()*(0.08+(b.type==='pace'?1.5*Math.abs(b.dev):0))*m,fp=clamp(f.full+gauss()*0.05*m,0,1);
+  if(xp<-0.6||xp>0.85&&Math.random()<0.6)return {leave:true,bp};
+  const zm=b.zb-(bp?bp.z:0),slot=b.zb<0.9||zm>2.2&&zm<3.6||b.zb>9&&f.c.y<1.25||zm>6.5&&f.xc>0.45||zm<6&&f.xc<-0.08&&f.xc>-0.5,york=b.zb>=0.9&&b.zb<2.1?(Math.abs(b.xt)<0.3?1:0.5):0,
+    h=(1+(0.35*lenDanger(f.full)+0.45*york)*(1-a))*(slot?0.6:1)*(1-0.5*a),
+    tc=f.t-0.005+gauss()*S.sig*(PLANETS[st.pk]||PLANETS.earth).t20*h-(1-S.read)*f.t*(1-b.v/(k.v[st.bi]||(b.type==='pace'?35.7:22.5)*ENV.pace));
+  if(careful&&h>1.2&&Math.random()<0.5)return {tc,aim:0,power:0.3,lofted:false,defend:true,bp};
+  const best=[null,null],gw=0.15+0.75*a;
+  const GP=gapsOf(field);
+  SHOTS.forEach((s,i)=>{const ft=shotFit(s,fp,xp),p=ft**(3-a);AIMS[i].forEach((x,j)=>{for(const l of [0,1]){
+    const g=GP[i][j][l],v=p*(1-gw+gw*g)*(1+(Math.random()-0.5)*0.5*m);if(!best[l]||v>best[l].v)best[l]={x,v,g,ft};}});});
+  const lofted=Math.random()<AI_LOFT[ph]*ENV.carry*(1+0.1*ti)*(careful?0.5:1)*(slot?2.5:york?0.5:1)*(best[1].g===1?2:0.4)*clamp((best[1].ft-0.5)/0.3,0,1),c=best[lofted?1:0];
+  return {tc,aim:c.x+gauss()*14,power:lofted?rnd(0.85,1):rnd(0.55,0.85),lofted,defend:false,bp};
+}
+// resolves the AI batter's input as the game's flight does (Simulate rest, balance)
+function aiResult(b,sw,field,bat){
+  if(sw.leave)return beaten(b,sw.bp,false,bat);
+  const r=evalSwing(b,sw,BOWL_D,field,bat);return r.miss?beaten(b,r.bp||sw.bp,true,bat):r.res;
+}
+// first innings: the AI side bats its XI against the player's attack; shapes as newT20 (bw = the player's bowlers' figures, no
+// target), plus the over's bowler, plan and field (bi, pid, field), the batters' read of the attack (bm: length shares, each
+// bowler's pace), scoring zones (Z), footwork trend and recent lengths (ll) for the auto-captain and auto-bowler
+function newInn1(attack,xi,diffKey,pk){
+  return {pk,diff:diffKey,target:null,par:null,runs:0,balls:0,wkts:0,last:-1,bw:attack.map(()=>({o:0,b:0,r:0,w:0})),fow:[],ov:[],mem:{},
+    bat:xi.map(p=>({name:p.name,tier:p.tier,runs:0,balls:0,out:false})),s:0,ns:1,bi:-1,pid:null,field:null,bm:{n:0,L:{},v:{}},Z:[0,0,0,0,0,0,0,0],foot:{x:0,z:0},ll:[]};
+}
+const PLAN_IDS={pace:['PA','PC','OF','SB','WY','SY','SL'],spin:['PS','OA','OC','LA','LC','CH']};
+// the field plans offered for this bowler in this phase (all legal)
+const planIds=(bw,pp)=>PLAN_IDS[bw.type].filter(id=>fieldOk(tplField(id),pp));
+// the captain's suggestion for the next over: bowler (captainPick) and plan (planPick)
+function inn1Suggest(st,attack){const o=Math.floor(st.balls/6),bi=captainPick(attack,o,st);return {bi,pid:bi<0?null:planPick(attack[bi],phaseOf(o),st,st.foot).id};}
+function inn1Set(st,bi,pid){st.bi=bi;st.pid=pid;st.field=tplField(pid);}
+// one ball: figures and strike (t20Record), the batters' read of the attack, zones, footwork trend, the plan's learning. True at
+// the end of the over (st.bi is then -1 until the next over is set)
+function inn1Record(st,b,res,bp){
+  const k=st.bm,v=k.v[st.bi];
+  k.n++;k.v[st.bi]=v==null?b.v:v+(b.v-v)*0.35;for(const L of 'YFGSB')k.L[L]=(k.L[L]||0)*0.7+(L===b.len?0.3:0);
+  zoneAdd(st.Z,res.out?null:res.dir,res.wide?0:res.runs);footTrend(st.foot,bp);st.ll.push(b.len);if(st.ll.length>3)st.ll.shift();
+  brainLearn(st.mem,{...b,pid:st.pid},res.runs,!!res.out);
+  const done=t20Record(st,st.bi,res);if(done)st.bi=-1;return done;
+}
+// the auto-bowler (Simulate rest, balance): length, line and variation from the plan's mix, the bowler's lengths and what has cost
+// runs (planBall on the player's side's mem, learning at the hard rate), the marker allowing for movement, release error
+// ~ N(0, sig), default 0.09 (a human tap)
+function autoBowl(st,bw,sig){
+  const O=bw.opts,has=k=>O.find(o=>o.k===k),r=Math.random(),
+    p=planBall(st.mem,bw.type,'hard',{last:st.ll,pressure:phaseOf(Math.floor(st.balls/6))==='death',foot:st.foot,bw,plan:{id:st.pid,mix:TPL[st.pid]}});
+  const o=bw.type==='pace'?p.len==='Y'&&has('yorker')||p.len==='B'&&has('bouncer')||p.slower&&has('slower')||r<0.25&&has('cutter')||has(r<0.6?'out':'in')||has('stock')
+    :p.dir!==bw.dir&&has('wrong')||p.len==='F'&&r<0.5&&has('flight')||r<0.25&&has('quick')||r>0.9&&has('arm')||has('stock');
+  return {o,m:spotFor(bw,o,rnd(...LENS[p.len]),rnd(...LINES[p.line])),rel:gauss()*(sig==null?0.09:sig)};
+}
+function inn1Ball(st,bw,o,m,rel){
+  const b=bowlDelivery(bw,o,m,rel,st.diff),sw=aiBat(st,b,st.field),res=aiResult(b,sw,st.field,{tier:st.bat[st.s].tier,t20:1});
+  inn1Record(st,b,res,sw.bp);return {b,sw,res};
+}
+// plays the first innings out from wherever it stands (Simulate rest): auto-captain, auto-bowler, AI batter. The balance bots pass
+// their own bowl(st,bw) -> {o,m,rel} and plan(st,bw,phase) -> template id
+function simRest(st,attack,bowl,plan){
+  const P=PLANETS[st.pk]||PLANETS.earth;
+  while(st.balls<120&&st.wkts<10){
+    if(st.bi<0){rollWind(P);const s=inn1Suggest(st,attack);inn1Set(st,s.bi,plan?plan(st,attack[s.bi],phaseOf(Math.floor(st.balls/6))):s.pid);}
+    const bw=attack[st.bi],c=bowl?bowl(st,bw):autoBowl(st,bw);inn1Ball(st,bw,c.o,c.m,c.rel);
+  }
+  return st;
 }
 function hitPos(h,t){
   let d,y=0;

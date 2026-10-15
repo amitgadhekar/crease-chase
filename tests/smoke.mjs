@@ -160,8 +160,93 @@ if (planets.includes('earth')) {
   await page.evaluate(() => localStorage.removeItem('cc_t20'));
   await page.reload();
   await startMode(page, 't20', {planet: 'earth'});
+  // First innings, the player bowls: intro, the over picker (captain's pick preselected, last over's bowler disabled), per ball a
+  // delivery chip, a marker drag, a meter tap at a known rel (and a no-tap ball and a real tap), checked on the delivery; the AI
+  // swings and every ball is recorded. Then save, reload and resume mid-over, Simulate rest, the innings break and the chase
+  // against the AI attack with target = total + 1.
+  if (!/bowl first/i.test(await page.textContent('#iTitle'))) errors.push('T20: no bowling intro, title ' + await page.textContent('#iTitle'));
+  await page.screenshot({path: `${shots}earth-t20-intro.png`});
+  await page.click('#chaseBtn');
+  const bNow = () => page.evaluate(() => __t.bowl());
+  const toReady = async () => { await page.waitForFunction(() => ['ready', 'pick'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+    let b = await bNow();
+    if (b.phase === 'pick') {
+      const last = await page.evaluate(() => __t.getM().st.last);
+      if (last >= 0 && !b.pick.dis.includes(last)) errors.push(`T20 bowling: last over's bowler ${last} not disabled in the picker ${JSON.stringify(b.pick)}`);
+      if (b.pick.bi !== b.pick.sg.bi || b.pick.pid !== b.pick.sg.pid || b.pick.dis.length !== 5 - b.pick.legal.length) errors.push('T20 bowling: picker ' + JSON.stringify(b.pick));
+      if (b.overNo === 1) { await page.waitForTimeout(300); await page.screenshot({path: `${shots}earth-t20-pick.png`}); }
+      // a different legal bowler than suggested in over 2: his default plan is offered, and it is legal
+      if (b.overNo === 2) { const alt = b.pick.legal.find(i => i !== b.pick.sg.bi); if (alt != null) await page.click(`#opBowlers button[data-i="${alt}"]`); }
+      if (!(await bNow()).fieldOk) errors.push('T20 bowling: picker previews an illegal field');
+      await page.click('#opGo');
+      await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+      await page.evaluate(() => { __t.S.t = Math.max(__t.S.t, __t.S.breakDur - 0.1); });
+      await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+    }
+    return bNow(); };
+  const bowlOne = async (i, tap) => {
+    let b = await toReady();
+    if (!b.kit) errors.push('T20 bowling: fielders not in the player\'s kit');
+    const chips = await page.$$('#optChips button'), ci = i % chips.length;
+    await chips[ci].click();
+    const k = await chips[ci].getAttribute('data-k');
+    b = await bNow();
+    const [mx, my] = b.mkScreen;
+    await page.mouse.move(mx + 30, my + 30); await page.mouse.down(); await page.mouse.move(mx + 30 + [12, -15, 6, -8][i % 4], my + 30 - [18, 10, -14, 22][i % 4], {steps: 4}); await page.mouse.up();
+    const b1 = await bNow();
+    if (b1.mk === b.mk) errors.push('T20 bowling: marker drag did not move the marker');
+    if (i === 0) await page.screenshot({path: `${shots}earth-t20-bowl.png`});
+    if (i === 0) await camCheck('bowling view');
+    await page.click('#bowlBtn');
+    await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > __t.S.runupDur - 0.6, null, {timeout: 30000, polling: 20});
+    if (tap === 'mouse') await page.mouse.click(60, 300);
+    else if (tap != null) await page.evaluate(r => __t.bowlTap(r), tap);
+    if (i === 0) await page.screenshot({path: `${shots}earth-t20-meter.png`});
+    await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 20});
+    const f = await bNow(), [mkx, mkz] = b1.mk.split(',').map(Number);
+    if (f.ball.opt !== k || f.ball.mk !== 'b' + f.bi + ':' || Math.abs(f.ball.mark.x - mkx) > 1e-3 || Math.abs(f.ball.mark.z - mkz) > 1e-3) errors.push('T20 bowling: delivery ' + JSON.stringify([k, b1.mk, f.ball]));
+    if (tap === null ? f.meter.tap !== null || Math.abs(f.ball.rel) < 0.1 : tap === 'mouse' ? f.meter.tap == null || f.ball.rel !== f.meter.tap : Math.abs(f.ball.rel - tap) > 1e-6)
+      errors.push(`T20 bowling: release ${tap} gave ${JSON.stringify([f.meter, f.ball.rel])}`);
+    await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 20});
+    const r = await page.evaluate(() => ({res: __t.S.res, swing: !!__t.S.swing, b: __t.bowl()}));
+    if (!f.ai.leave && !r.swing) errors.push('T20 bowling: the AI batter did not swing ' + JSON.stringify(f.ai));
+    if (r.b.balls !== f.balls + (r.res.wide ? 0 : 1) || r.b.runs !== f.runs + r.res.runs || r.b.chips.split(' ').length !== (f.chips ? f.chips.split(' ').length + 1 : 1) && r.b.balls % 6)
+      errors.push('T20 bowling: ball not recorded ' + JSON.stringify([f.balls, f.runs, f.chips, r.res.label, r.b.balls, r.b.runs, r.b.chips]));
+    seenB.add(r.res.label + (f.ai.leave ? ' (left)' : f.ai.defend ? ' (blocked)' : ''));
+    await page.waitForFunction(() => ['ready', 'pick', 'replay', 'break'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
+    if (await page.evaluate(() => __t.S.phase === 'replay')) { await page.waitForTimeout(400); await page.mouse.click(195, 500); }
+  };
+  const seenB = new Set();
+  const taps = [0, -0.2, null, 0.15, 'mouse', 0.05, -0.05, 0.3];
+  for (let i = 0; i < 8; i++) await bowlOne(i, taps[i]);
+  let bw1 = await toReady();
+  if (bw1.overNo < 2 || JSON.parse(bw1.bw).filter(f => f.o || f.b).length < 2) errors.push('T20 bowling: no second bowler ' + bw1.bw);
+  await page.click('#pauseBtn');
+  await page.screenshot({path: `${shots}earth-t20-bowl-pause.png`});
+  await page.click('#resumeBtn');
+  const sv1 = await bNow();
+  await page.reload();
+  if (!/Bowling: /.test(await page.textContent('#resumeT20').catch(() => ''))) errors.push('T20: Continue banner after reload in the first innings: ' + await page.textContent('#resumeT20').catch(() => '(none)'));
+  await page.click('#resumeT20');
+  bw1 = await toReady();
+  for (const k of ['runs', 'wkts', 'balls', 'bi', 'pid', 's', 'ns', 'bat', 'bw', 'overNo', 'optK', 'mkB', 'chips', 'mk']) if (sv1[k] !== bw1[k]) errors.push(`T20 bowling resume: ${k} was ${sv1[k]}, resumed ${bw1[k]}`);
+  await bowlOne(9, 0);
+  console.log(`earth    ok  T20 bowling ${bw1.runs}/${bw1.wkts} after ${bw1.balls} balls, resumed mid-over ${bw1.overNo}; results: ${[...seenB].join(', ')}`);
+  // Simulate rest from the pause screen (two taps), the innings break, then the chase
+  await toReady();
+  await page.click('#pauseBtn');
+  await page.click('#simBtn');
+  if (!await page.isVisible('#pause')) errors.push('T20: one tap on Simulate rest did not wait for a confirmation');
+  await page.click('#simBtn');
+  await page.waitForFunction(() => document.querySelector('#intro').classList.contains('on'), null, {timeout: 10000, polling: 50});
+  const brk = await page.evaluate(() => { const M = __t.getM(); return {i1: M.i1.runs, w: M.i1.wkts, b: M.i1.balls, target: M.target, btn: document.querySelector('#chaseBtn').textContent, kit: __t.t20().kit}; });
+  if (brk.target !== brk.i1 + 1 || brk.btn !== 'Chase ' + brk.target || !(brk.w >= 10 || brk.b >= 120) || brk.kit) errors.push('T20 innings break ' + JSON.stringify(brk));
+  await page.screenshot({path: `${shots}earth-t20-break.png`});
+  console.log(`earth    ok  T20 simulated rest: ${brk.i1}/${brk.w} in ${brk.b} balls, chase ${brk.target}`);
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  { const c = await page.evaluate(() => __t.t20());
+    if (c.target !== brk.target || !c.aiAtk || c.kit || c.inn !== 2) errors.push('T20 chase start ' + JSON.stringify(c)); }
   // a hot off-side scoring zone, so the captain has a reason to move a fielder (after a boundary, and for the next over)
   await page.evaluate(() => { __t.getM().zones[5] = 20; });
   const skip = () => { const S = __t.S; if (S.phase === 'ready') S.t = Math.max(S.t, S.readyDur - 0.1); if (S.phase === 'break') S.t = Math.max(S.t, S.breakDur - 0.1);
@@ -211,9 +296,10 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.evaluate(() => localStorage.getItem('cc_t20') === null || document.querySelector('#resumeT20').hidden)) errors.push('T20: save lost on quit (Resume must stay available)');
-  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('cc_t20')); s.v = 1; delete s.st.bat; localStorage.setItem('cc_t20', JSON.stringify(s)); });
+  if (!/Chasing \d+: /.test(await page.textContent('#resumeT20'))) errors.push('T20: Continue banner in the chase: ' + await page.textContent('#resumeT20'));
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('cc_t20')); s.v = 2; localStorage.setItem('cc_t20', JSON.stringify(s)); });
   await page.reload();
-  if (await page.isVisible('#resumeT20')) errors.push('T20: a v1 save is offered for resume');
+  if (await page.isVisible('#resumeT20')) errors.push('T20: a v2 save is offered for resume');
 }
 if (planets.includes('earth')) {
   // Scenarios: the list, a briefing, a survive scenario (forced duck under a bouncer, forced swings, then a forced end: result card
@@ -460,7 +546,32 @@ if (planets.includes('earth')) {
   await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await land.waitForTimeout(100);
   if (await land.isVisible('#end')) await land.click('#menuBtn');
+  await land.evaluate(() => localStorage.removeItem('cc_t20'));
   await startMode(land, 't20');
+  // bowling first: the over picker, the bowling view (chips, Bowl, HUD and radar apart), the meter in the run-up
+  await land.click('#chaseBtn');
+  await land.waitForFunction(() => __t.S.phase === 'pick', null, {timeout: 30000, polling: 30});
+  await land.screenshot({path: `${shots}landscape-t20-pick.png`});
+  const pk = await land.evaluate(() => { const r = document.querySelector('#overPick').getBoundingClientRect(), g = document.querySelector('#opGo').getBoundingClientRect();
+    return {bottom: r.bottom, vh: innerHeight, go: g.bottom <= r.bottom + 1 && g.top >= r.top}; });
+  if (pk.bottom > pk.vh || !pk.go) errors.push('landscape: over picker ' + JSON.stringify(pk));
+  await land.click('#opGo');
+  await land.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+  await land.waitForTimeout(2700);
+  await land.screenshot({path: `${shots}landscape-t20-bowl.png`});
+  const bl = await land.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(), c = [...document.querySelectorAll('#optChips button')].map(b => b.getBoundingClientRect());
+    return {chipsR: Math.max(...c.map(b => b.right)), chipsL: Math.min(...c.map(b => b.left)), chipsT: Math.min(...c.map(b => b.top)), chipsB: Math.max(...c.map(b => b.bottom)), bowl: r('#bowlBtn').left,
+      slab: r('#t20Slab').bottom, vh: innerHeight, mk: __t.bowl().mkScreen}; });
+  if (bl.chipsR > bl.bowl || bl.chipsT < bl.slab || bl.chipsB > bl.vh || bl.chipsL < 0 || bl.mk[1] > bl.chipsT) errors.push('landscape bowling layout overlaps: ' + JSON.stringify(bl));
+  await land.click('#bowlBtn');
+  await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > __t.S.runupDur - 0.5, null, {timeout: 30000, polling: 20});
+  await land.screenshot({path: `${shots}landscape-t20-meter.png`});
+  { const e = await land.evaluate(() => __t.cam3()); camErr = Math.max(camErr, e); if (!(e < 0.5)) errors.push(`camera parity landscape bowling: ${e} px`); }
+  console.log(`land     ok  T20 bowling layout ${JSON.stringify(bl)}`);
+  await land.click('#pauseBtn');
+  await land.click('#simBtn');await land.click('#simBtn');
+  await land.waitForFunction(() => document.querySelector('#intro').classList.contains('on'), null, {timeout: 10000, polling: 50});
+  await land.screenshot({path: `${shots}landscape-t20-break.png`});
   await land.click('#chaseBtn');
   // a spinner's run-up is only 1.1 s
   await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 0.5, null, {timeout: 30000, polling: 30});

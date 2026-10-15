@@ -71,7 +71,7 @@ function scenBrief(sc,done){
   $('#gCond').innerHTML=[P.name,condTag(sc.day,sc.ballAge,spin),sc.diff[0].toUpperCase()+sc.diff.slice(1)+' bowling'].map(t=>'<span>'+t+'</span>').join('');
   $('#gPair').innerHTML='<span><b>On strike</b> '+batTag(L[sc.striker])+(L[sc.striker].runs?' '+L[sc.striker].runs+'*':'')+'</span><span><b>Non-striker</b> '+batTag(L[sc.nonStriker])+(L[sc.nonStriker].runs?' '+L[sc.nonStriker].runs+'*':'')+'</span>';
   $('#gPlay').textContent=done?'Start the session':'Play';$('#gBack').textContent=done?'Quit to scenarios':'Back';
-  M=null;S.paused=true;S.phase='idle';S.cel=null;S.chase=null;S.hold=null;updateCam(0);$('#hud').hidden=$('#loftBtn').hidden=$('#stick').hidden=$('#holdBtn').hidden=true;showScreen('brief');scenBrief.sc=sc;
+  M=null;S.paused=true;S.phase='idle';S.cel=null;S.chase=null;S.hold=null;updateCam(0);$('#hud').hidden=$('#holdBtn').hidden=true;ctlUI(false);showScreen('brief');scenBrief.sc=sc;
 }
 
 /* --- match start, overs, balls --- */

@@ -68,7 +68,7 @@ function surround(c,v,lk,r0){
 // per planet: canvas textures are redrawn, the stadium and crowd rebuilt, lights, environment and fog retuned
 function build3D(){
   if(!glOK)return;
-  const v=VIS,R=BOUNDARY,r27=27*R/65,G=G3,lk=LOOK3D[curPlanet]||LOOK3D.earth,k=aiKit();
+  const v=VIS,R=BOUNDARY,r27=27*R/65,G=G3,lk=LOOK3D[curPlanet]||LOOK3D.earth;
   paintGround(GCV,v,R+7,R);G.groundTex.needsUpdate=true;paintPitch(PCV,v);G.pitchTex.needsUpdate=true;paintAds(ADV,v);G.adsTex.needsUpdate=true;
   DET.uDetRep.value=2*(R+7)/1.6;
   fillGeo(G.ring.geometry,GB.ann(r27-0.07,r27+0.07,120,true));mT(G.ground,[0,0,0],R+7,1,R+7);
@@ -77,7 +77,7 @@ function build3D(){
   A.halo.forEach((p,i)=>{hp.position.array.set(p,i*3);hp.color.array.set([1,.93,.8,.55*gl],i*4);});
   G.halo.geometry.setDrawRange(0,A.halo.length);hp.position.needsUpdate=hp.color.needsUpdate=true;G.panels.material.color.setScalar(.45+.55*gl);
   crowdBuild(A.rows,v,R,A.screen);qApply();
-  surround(WDV,v,lk,(R+7+1.15*v.standsH)/1800);G.wide.material.map.needsUpdate=true;CRWD.u.uHaze.value.set(lk.fog?lk.fog[0]:v.sky[1]);col(G.pm.shirt,k.shirt);col(G.pm.pants,k.pants);spApply(curPlanet);
+  surround(WDV,v,lk,(R+7+1.15*v.standsH)/1800);G.wide.material.map.needsUpdate=true;CRWD.u.uHaze.value.set(lk.fog?lk.fog[0]:v.sky[1]);kitApply();
   const d=G.dir=sunDir(lk);T3.sun.color.set(lk.sun[0]);T3.sun.intensity=lk.sun[1];Object.assign(T3.sun.shadow,{intensity:lk.sh,radius:lk.shr});
   T3.r.toneMappingExposure=lk.exp;T3.scene.environmentIntensity=lk.env;RIM.value.set(v.sky[1]).multiplyScalar(lk.rim);envBuild(v,lk,d);
   T3.scene.fog=lk.fog?T3.fog:null;if(lk.fog)T3.fog.color.set(lk.fog[0]);
@@ -197,7 +197,7 @@ const BK={mid:[.63,0],block:[.6,0],edge:[.6,.05],toe:[.8,.02],top:[.36,.03],miss
 function aimSwing(b){
   const sw=S.swing;PB.a0=PB.a;PB.b0=PB.b;PB.fin=!sw||!M;if(PB.fin)return;
   const fa=footAt(b,S.bpos),dt=sw.tc-fa.t,a=Math.abs(dt),sh=shotOf(sw.aim,b),T=M.st&&M.st.bat&&TIER[M.st.bat[M.st.s].tier];
-  const w=windows(M.diff,dt<0,(1+.35*fa.gain)*(T?sw.defend?Math.pow(T.win,.3):T.win*(sh.sweep?sh.tw:1):1));
+  const w=windows(physD(),dt<0,(1+.35*fa.gain)*(T?sw.defend?Math.pow(T.win,.3):T.win*(sh.sweep?sh.tw:1):1));
   const hit=fa.xc<.98&&fa.xc>REACH_LEG&&fa.c.y<2.05&&a<=w.edge&&!(b.onStumps&&!padHit(b,S.bpos)&&b.tStumps<sw.tc);
   const k=!hit?'miss':a>w.ok?'edge':sw.defend?'block':'mid',L=PB.L=sw.defend?FAM.block:FAM[sh.sweep?'sweep':SHOT_FAM[SHOTS.indexOf(sh)]],N=facePt(PB.a0,[0,0,0,0,0,0,0,0,0],.63,0,0);
   const pv=t=>{const q=ballPos(b,t);return [q.x,q.y+.05,q.z];},T0=sw.tc-.05,T1=sw.tc+.14;
@@ -340,8 +340,13 @@ function personRig(G){const g=rig(),P=SPG.earth,m=G.pm,p=(x,y)=>part(x,y,g);
   const r={g,thigh:pair(()=>p(P.thigh,m.pants)),shin:pair(()=>p(P.shin,m.pants)),foot:pair(()=>p(P.foot,m.shoe)),torso:p(G.torso,m.torso),
     uarm:pair(()=>p(P.uarm,m.shirt)),farm:pair(()=>p(P.farm,m.skin)),head:p(P.head,m.skin),ex:p(P.ex,m.ex)};shade(g);return r;}
 let SPX=null;
-function spApply(key){
-  const G=G3,B=spBuild(SPECIES[key]?key:'earth'),P=SPX=B.P,m=G.pm,k=aiKit(),sk=m.skin,tc=m.torso.map.image,g=tc.getContext('2d');
+// kits per innings (T20): bowling first, the fielders and bowler are the player's side (humans in KIT.you) and the batters wear
+// the planet team's kit; otherwise the planet's species in its kit and the batters in KIT.you. Set per innings, not per frame
+const KS={you:false};
+function setKits(you){if(KS.you===you)return;KS.you=you;if(glOK)kitApply();kitBatter();}
+function kitApply(){const k=KS.you?KIT.you:aiKit();col(G3.pm.shirt,k.shirt);col(G3.pm.pants,k.pants);spApply(KS.you?'earth':curPlanet,k);}
+function spApply(key,k){
+  const G=G3,B=spBuild(SPECIES[key]?key:'earth'),P=SPX=B.P,m=G.pm,sk=m.skin,tc=m.torso.map.image,g=tc.getContext('2d');
   g.fillStyle=k.shirt;g.fillRect(0,0,16,64);g.fillStyle=k.pants;g.fillRect(0,0,16,14);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(0,13,16,1);m.torso.map.needsUpdate=true;
   sk.map=B.tex.map;sk.emissiveMap=B.tex.em;sk.roughnessMap=B.tex.rough;
   const ring=P.exM==='ring';col(m.ex,ring?'#f4dea2':k.shirt);m.ex.emissive.set(ring?'#c9a050':'#000');Object.assign(m.ex,{roughness:ring?.3:.88,metalness:ring?.4:0});
@@ -499,7 +504,7 @@ function bowlerState(){
   let z=S.bowlerZ,arm=null,run=0,running=false;const pace=M.bowlerType==='pace';
   if(S.phase==='runup'){const p=S.t/S.runupDur;z=lerp(pace?31:25.5,BZR[M.bowlerType],p);run=S.t*(pace?13:10);running=true;
     if(p>0.72)arm=lerp(0,Math.PI,(p-0.72)/0.28);}
-  else if(S.phase==='ready'||S.phase==='break'){z=pace?31:25.5;}
+  else if(S.phase==='ready'||S.phase==='break'||S.phase==='pick'){z=pace?31:25.5;}
   else if(S.phase==='flight'||S.phase==='result'){const t=S.phase==='flight'?clock-S.ball.start:S.t+0.8;
     z=Math.max(17.6,BZR[M.bowlerType]-t*2.4);arm=Math.min(2*Math.PI,Math.PI+t*12);run=t*8;running=t<0.9;}
   S.bowlerZ=z;return {z,arm,run,running};
@@ -514,7 +519,7 @@ function liveView(){
   const V=LV,ph=S.phase;
   V.pose=poseTick();V.ball=ballNow();
   V.st=S.stumps?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;
-  V.mk=!settings.assist?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
+  V.mk=!settings.assist||M&&M.bowl?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
   V.nf=0;
   if(M){
     const bs=bowlerState(),bb=S.ball||S.pending;V.bz=bs.z;V.arm=bs.arm;V.brun=bs.run;V.brn=bs.running;V.bx=(bb?bb.xr:M.bowlerType==='pace'?.3:.22)+.2*(SPX?SPX.tw:1);
@@ -553,7 +558,7 @@ function qTick(){
    Casters project onto their own shadows in light space, so covering the visible ground covers them too. --- */
 const SHB={x:[1,0,0],y:[0,1,0],x0:0,x1:0,y0:0,y1:0};
 function fitShadow(d){
-  const z=[-d[0],d[1],d[2]],x=V3.norm([z[2],0,-z[0]]),y=V3.cross(z,x),far=S.cel||MENU.on?Math.hypot(cam.x,cam.z)+BOUNDARY+12:wideCam()?60:46;
+  const z=[-d[0],d[1],d[2]],x=V3.norm([z[2],0,-z[0]]),y=V3.cross(z,x),far=S.cel||MENU.on?Math.hypot(cam.x,cam.z)+BOUNDARY+12:wideCam()||M&&M.bowl?60:46;
   const dn=Math.max(.5,H-HZ>1?cam.y*F/(H-HZ):.5);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   for(const dd of [dn,far])for(const sx of [-CX,W-CX]){const l=sx*dd/F,gx=-(cam.x+cam.fx*dd+cam.rx*l),gz=cam.z+cam.fz*dd+cam.rz*l,a=x[0]*gx+x[2]*gz,b=y[0]*gx+y[2]*gz;
     x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,b);y1=Math.max(y1,b);}
@@ -605,5 +610,5 @@ function draw(V){
   if(V.trail)V.trail.forEach((t,i)=>{const q=proj(t.x,t.y,t.z);if(!q)return;ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.03)+')';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(2,0.05*q.s),0,7);ctx.fill();});
   drawFx();
   if(S.phase==='replay')rpGlow(bp);
-  if(!S.cel&&S.phase!=='replay'){drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
+  if(!S.cel&&S.phase!=='replay'){drawBowl();drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
 }

@@ -6,6 +6,7 @@ function updateHUD(){
   const chips=$('#chips');chips.innerHTML='';
   for(const c of M.overBalls){const e=document.createElement('span');e.className='chip '+(c.cls||'');e.textContent=c.t;chips.appendChild(e);}
   if(M.sc)scenHUD();
+  else if(M.bowl)bowlHUD();
   else if(M.mode==='chase'){
     $('#sOvers').textContent=oversText(M.balls)+' of '+M.overs+' overs';
     $('#sTargetLbl').textContent='Target';$('#sTarget').textContent=M.target;
@@ -17,6 +18,7 @@ function updateHUD(){
     $('#sTargetLbl').textContent='Strike rate';$('#sTarget').textContent=M.balls?Math.round(M.runs/M.balls*100):0;
     $('#sNeed').textContent=isFinite(M.wktsMax)?(M.wktsMax-M.wkts)+(M.wktsMax-M.wkts===1?' wicket left':' wickets left'):M.fours+' fours, '+M.sixes+' sixes';
   }
+  if(M.t20)hudMeasure();
 }
 // T20 rows: phase and its restriction, required vs current rate, the batters (as in Scenarios), bowler figures, and the pace
 // marker against the chase benchmark "half the target by over 10" (a straight line from 0 to the target over 120 balls)

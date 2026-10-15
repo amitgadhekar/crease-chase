@@ -89,7 +89,33 @@ body{height:100%;margin:0;overflow:hidden;background:var(--board-edge);color:var
 #rpSkip{position:absolute;right:14px;bottom:84px;min-width:84px;height:44px;padding:0 18px;border-radius:22px;border:2px solid var(--chalk);
   background:rgba(29,58,43,.82);color:var(--chalk);font:700 16px "Barlow",system-ui,sans-serif;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 @media (prefers-reduced-motion: reduce){#rpTag b::before{animation:none}}
-#loftBtn[hidden],#hud[hidden],#stick[hidden],#rpTag[hidden],#rpSkip[hidden],#t20Slab[hidden],#resumeT20[hidden],#contScen[hidden],#scenSlab[hidden],#holdBtn[hidden],#eStars[hidden],#nextBtn[hidden],#scenResume[hidden]{display:none}
+/* T20 first innings: delivery chips along the bottom, Bowl (then Release) where Loft is, the over picker as a bottom panel */
+#bowlBtn{position:absolute;right:14px;bottom:14px;width:74px;height:74px;border-radius:50%;border:3px solid #fff3d0;background:var(--ball);color:#fff;
+  font:900 20px/1 "Big Shoulders Display","Arial Narrow",Impact,sans-serif;letter-spacing:.5px;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+#bowlBtn.off{opacity:.4;pointer-events:none}
+#optChips{position:absolute;left:10px;right:100px;bottom:12px;display:flex;flex-wrap:wrap;align-content:flex-end;gap:6px}
+#optChips.off{visibility:hidden}
+#optChips button{min-height:44px;padding:0 13px;border-radius:22px;border:2px solid rgba(239,232,210,.65);background:rgba(29,58,43,.86);color:var(--chalk);
+  font:600 14.5px "Barlow",system-ui,sans-serif;cursor:pointer;touch-action:manipulation;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#optChips button[aria-pressed="true"]{background:var(--gold);border-color:#fff3d0;color:#1a1a1a}
+#overPick{position:absolute;left:8px;right:8px;bottom:8px;max-height:62%;overflow:auto;overscroll-behavior:contain;background:var(--panel);color:var(--ink);
+  border-radius:14px;padding:10px 12px 12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.ophead{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px}
+#opTitle{font:900 26px/1 "Big Shoulders Display","Arial Narrow",Impact,sans-serif}
+#overPick .tchip{background:var(--seg);color:var(--ink)}
+#overPick .lbl{margin:6px 0 4px}
+#opBowlers{display:grid;gap:4px}
+#opBowlers button{display:block;min-height:44px;padding:5px 10px;border:0;border-radius:9px;background:var(--seg);color:var(--ink);text-align:left;cursor:pointer;font:500 12.5px/1.3 "Barlow",system-ui,sans-serif}
+#opBowlers b{display:block;font-size:14.5px;font-weight:700}#opBowlers b i{font-style:normal;font-weight:600;font-size:11.5px;color:var(--star);margin-left:4px}
+#opBowlers small{font-size:12.5px;color:var(--ink-dim)}#opBowlers small::after{content:"\00a0\00b7\00a0"}
+#opBowlers button[aria-pressed="true"]{background:var(--seg-on);color:var(--seg-on-ink)}#opBowlers button[aria-pressed="true"] small,#opBowlers button[aria-pressed="true"] b i{color:inherit}
+#opBowlers button:disabled{opacity:.45;cursor:default}
+#opPlans{display:flex;flex-wrap:wrap;gap:5px}
+#opPlans button{min-height:44px;padding:0 12px;border:0;border-radius:9px;background:var(--seg);color:var(--ink);font:600 13.5px "Barlow",system-ui,sans-serif;cursor:pointer}
+#opPlans button[aria-pressed="true"]{background:var(--seg-on);color:var(--seg-on-ink)}
+.opgo{position:sticky;bottom:-12px;display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin:2px -12px -12px;padding:8px 12px 12px;background:var(--panel)}.opgo>button{margin:0}
+.opgo .secondary.confirm,#simBtn.confirm{border-color:var(--ball);color:var(--ball)}
+#loftBtn[hidden],#hud[hidden],#stick[hidden],#rpTag[hidden],#rpSkip[hidden],#t20Slab[hidden],#resumeT20[hidden],#contScen[hidden],#scenSlab[hidden],#holdBtn[hidden],#eStars[hidden],#nextBtn[hidden],#scenResume[hidden],#bowlBtn[hidden],#optChips[hidden],#overPick[hidden],#simBtn[hidden],#tBar[hidden]{display:none}
 
 /* overlays */
 .screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--veil);padding:14px;overflow:auto;-webkit-overflow-scrolling:touch}
@@ -253,7 +279,10 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
   #targetSlab{grid-column:3;grid-row:1}
   #pauseBtn{grid-column:4;grid-row:1}
   #stick{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b))}
-  #loftBtn,#rpSkip{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}
+  #loftBtn,#rpSkip,#bowlBtn{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}
+  #optChips{left:calc(14px + var(--sa-l));right:calc(100px + var(--sa-r));bottom:calc(14px + var(--sa-b));flex-wrap:nowrap;justify-content:center}
+  #overPick{left:calc(396px + var(--sa-l));right:calc(170px + var(--sa-r));top:8px;bottom:calc(8px + var(--sa-b));max-height:none}
+  #opBowlers{grid-template-columns:1fr 1fr}
   #rpSkip{bottom:calc(29px + var(--sa-b))}
   #holdBtn{right:calc(100px + var(--sa-r));bottom:calc(29px + var(--sa-b))}
   #rpTag{left:calc(12px + var(--sa-l))}
@@ -291,6 +320,7 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
   #t20Slab .trow span,#scenSlab .trow span{max-width:100%}
   .trow.pair span{flex:none;width:100%}
   #banner{top:12%;left:calc(var(--sa-l) + 244px);right:calc(var(--sa-r) + 176px)}
+  #overPick{left:calc(240px + var(--sa-l))}
   #bMain{font-size:clamp(40px,14vh,68px)}
   #banner.small #bMain{font-size:clamp(28px,9vh,44px)}
   #bSub{font-size:14px;padding:0 8px}

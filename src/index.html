@@ -48,10 +48,18 @@
   <div id="hint"></div>
   <button id="loftBtn" aria-pressed="false" hidden>Loft</button>
   <button id="holdBtn" hidden>Hold</button>
+  <button id="bowlBtn" hidden>Bowl</button>
+  <div id="optChips" role="group" aria-label="Delivery" hidden></div>
   <div id="rpTag" hidden><b>Replay</b><span>Tap to skip</span></div>
   <button id="rpSkip" hidden>Skip</button>
   <div id="stick" hidden aria-label="Footwork: drag to move your feet, or use the arrow keys"><i></i></div>
   <div id="safe" aria-hidden="true"></div>
+  <section id="overPick" aria-label="Next over" hidden>
+    <div class="ophead"><b id="opTitle"></b><span id="opPhase" class="tchip"></span></div>
+    <span class="lbl">Bowler</span><div id="opBowlers"></div>
+    <span class="lbl">Field plan</span><div id="opPlans"></div>
+    <div class="opgo"><button class="secondary" id="opSim" data-t="Simulate rest">Simulate rest</button><button class="primary" id="opGo">Bowl the over</button></div>
+  </section>
 
   <section id="menu" class="screen on" aria-label="Main menu">
     <div class="hub" id="hub">
@@ -124,6 +132,7 @@
   <section id="intro" class="screen" aria-label="Innings break">
     <div class="card">
       <div class="board"><h2 id="iTitle"></h2><p id="iText"></p></div>
+      <div class="cbody" id="iBody"></div>
       <button class="primary" id="chaseBtn">Start the chase</button>
       <button class="secondary" id="introBack">Back to menu</button>
     </div>
@@ -146,6 +155,7 @@
       <div class="board"><h2>Paused</h2><p id="pText"></p></div>
       <div class="cbody" id="pCard"></div>
       <button class="primary" id="resumeBtn">Resume</button>
+      <button class="secondary" id="simBtn" data-t="Simulate the rest of the innings" hidden>Simulate the rest of the innings</button>
       <button class="secondary" id="restartBtn">Restart</button>
       <button class="secondary" id="quitBtn">Quit to menu</button>
     </div>

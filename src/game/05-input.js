@@ -6,12 +6,13 @@ function perfOf(e){const n=performance.now(),t=e.timeStamp;return (t>0&&t<=n+5&&
 function gameTimeAt(p){return clock+(p-clockPerf)/1000;}
 function canAim(){return M&&!S.paused&&!S.swing&&(S.phase==='ready'||S.phase==='runup'||S.phase==='flight'||S.phase==='break');}
 cvs.addEventListener('pointerdown',e=>{
+  if(M&&M.bowl)return bowlDown(e);
   if(!canAim())return;e.preventDefault();
   const r=cvs.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   S.aim={id:e.pointerId,x0:x,y0:y,x,y};try{cvs.setPointerCapture(e.pointerId);}catch(_){}
   S.bat={mode:'backlift',t0:clock,from:batAngleNow(),aim:0};
 });
-cvs.addEventListener('pointermove',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const r=cvs.getBoundingClientRect();S.aim.x=e.clientX-r.left;S.aim.y=e.clientY-r.top;});
+cvs.addEventListener('pointermove',e=>{if(S.mkDrag)return bowlMove(e);if(!S.aim||e.pointerId!==S.aim.id)return;const r=cvs.getBoundingClientRect();S.aim.x=e.clientX-r.left;S.aim.y=e.clientY-r.top;});
 function release(ts,a){
   if(S.phase!=='flight'||S.swing||S.ball.duck){S.bat={mode:'stance',t0:clock,from:null,aim:0};if(S.phase==='ready'||S.phase==='runup'||S.phase==='break')hint('Too soon. Let go as the ball reaches you.');return;}
   const dx=a.x-a.x0,dy=a.y-a.y0,L=Math.hypot(dx,dy),Lm=dragMax(),defend=L<14;
@@ -19,16 +20,17 @@ function release(ts,a){
   S.swing={tc:gameTimeAt(ts)-S.ball.start+SWING_DELAY,aim,power:clamp(L/Lm,0.3,1),lofted:!defend&&S.loft,defend,done:false};if(!defend)sfx.swing(S.swing.power);
   S.bat={mode:defend?'block':'swing',t0:gameTimeAt(ts),from:batAngleNow(),aim};
 }
-cvs.addEventListener('pointerup',e=>{if(!S.aim||e.pointerId!==S.aim.id)return;const a=S.aim;S.aim=null;if(!M||S.paused)return;release(perfOf(e),a);});
-cvs.addEventListener('pointercancel',()=>{S.aim=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};});
+cvs.addEventListener('pointerup',e=>{if(S.mkDrag)return bowlUp(e);if(!S.aim||e.pointerId!==S.aim.id)return;const a=S.aim;S.aim=null;if(!M||S.paused)return;release(perfOf(e),a);});
+cvs.addEventListener('pointercancel',()=>{S.mkDrag=null;if(M&&M.bowl)return;S.aim=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};});
 function skipCelebration(){if(S.phase!=='celebrate'||S.paused||clock-S.cel.t0<0.5)return false;showEnd();return true;}
 addEventListener('pointerdown',e=>{if(skipCelebration())e.preventDefault();else if(rpSkip(e)){e.preventDefault();e.stopPropagation();}},true);
 window.addEventListener('keydown',e=>{
   if(skipCelebration())return;
   if(S.phase==='replay'&&e.key!=='p'&&e.key!=='Escape'){if(!e.repeat&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!['Shift','Meta','Control','Alt','Tab'].includes(e.key))rpSkip(e);return;}
   if(FW_KEYS[e.code]&&!e.metaKey&&!e.ctrlKey&&!e.altKey){KEYS[e.code]=1;if(M)e.preventDefault();return;}
-  if((e.key==='l'||e.key==='L')&&M&&!S.paused){setLoft(!S.loft);return;}
   if(e.key==='p'||e.key==='Escape'){if(M&&!S.paused)pause();return;}
+  if(M&&M.bowl){bowlKey(e);return;}
+  if((e.key==='l'||e.key==='L')&&M&&!S.paused){setLoft(!S.loft);return;}
   if(e.code==='Space'&&canAim()){e.preventDefault();S.bat.from=batAngleNow();release(performance.now(),{x0:0,y0:0,x:0,y:0});}
 });
 window.addEventListener('keyup',e=>{delete KEYS[e.code];});
@@ -48,8 +50,10 @@ function footUpdate(dt){
   const p=S.bpos,free=footFree();
   if(S.phase==='ready'||S.phase==='break'){const d=Math.hypot(p.x,p.z),m=Math.min(d,FOOT_V.back*dt);if(d>0){p.x-=p.x/d*m;p.z-=p.z/d*m;}}
   let vx=0,vz=0;
-  if(S.stick&&Math.hypot(...S.stick.v)>0.15){vx=S.stick.v[0];vz=-S.stick.v[1];}
-  for(const k in KEYS){vx+=FW_KEYS[k][0];vz+=FW_KEYS[k][1];}
+  // T20 first innings: the AI striker moves toward its chosen footwork (aiBat's bp) at the stick's speeds
+  if(M&&M.bowl){const t=S.ai&&S.ai.sw.bp;if(t&&free&&dt>0){vx=clamp((t.x-p.x)/(FOOT_V.side*dt),-1,1);vz=clamp((t.z-p.z)/((t.z>p.z?FOOT_V.fwd:FOOT_V.back)*dt),-1,1);}}
+  else{if(S.stick&&Math.hypot(...S.stick.v)>0.15){vx=S.stick.v[0];vz=-S.stick.v[1];}
+    for(const k in KEYS){vx+=FW_KEYS[k][0];vz+=FW_KEYS[k][1];}}
   const L=Math.hypot(vx,vz);if(L>1){vx/=L;vz/=L;}
   // Tests: the stick pulled back after a short ball has pitched ducks under it (or sways out of its way); already held back at the pitch is footwork
   if(M&&M.sc&&S.phase==='flight'&&!S.swing&&clock-S.ball.start>=S.ball.t1){const b=S.ball;if(b.noDuck==null)b.noDuck=vz<-0.5;if(vz<-0.5&&!b.noDuck&&!b.duck&&/[SB]/.test(b.len))b.duck=clock-b.start;}

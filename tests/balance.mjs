@@ -39,13 +39,55 @@ function bot(pk,diff,sigma,loftP,n,fb){
   return {rpb:runs/balls,bpo:balls/Math.max(1,outs),rpw:runs/Math.max(1,outs),fours:fours/balls,sixes:sixes/balls,how,outs};
 }
 globalThis.PLANET_ORDER=PLANET_ORDER;globalThis.PLANETS=PLANETS;globalThis.DIFF=DIFF; // top-level consts are not context properties
-function aiTarget(diff,overs,wkts,pk){const P=setPlanet(pk),m=overs===20?P.t20:P.ai;let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,m).runs;return t/2000+1;}
+function aiTarget(diff,overs,wkts,pk){const P=setPlanet(pk);let t=0;for(let i=0;i<2000;i++)t+=simulateAI(overs,wkts,diff,P.ai).runs;return t/2000+1;}
 
-// T20 chase: the AI innings sets the target, then the bot bats 120 balls / 10 wickets against captain, plans and fields, as
-// whoever is on strike (the XI's tiers, strike rotation in t20Record; no Hold). It keeps batting after reaching the target so
-// every innings measures a full 20 overs; the win is runs >= target.
-function t20Chase(pk,diff,loft,A){
-  const P=setPlanet(pk),target=simulateAI(20,10,diff,P.t20).runs+1,attack=makeAttack(pk,diff),st=newT20(attack,diff,target),
+// T20 first innings: the player's attack (bowled by a bot) against the AI batters, through simRest. Bowling bots: std = the
+// auto-bowler (plan's mix, marker allowing for movement, release error sd 0.09 of the meter, a human tap); acc = the same with
+// sd 0.05; careless = random option and marker, sd 0.2; yorker / bouncer / spot = the same ball every time (spinners: stock
+// yorker, quicker one short, stock on a good length)
+function bowlBot(kind){
+  if(kind==='std')return null;
+  if(kind==='acc')return (st,bw)=>autoBowl(st,bw,0.05);
+  if(kind==='careless')return (st,bw)=>({o:bw.opts[Math.floor(Math.random()*bw.opts.length)],m:{x:rnd(-0.6,0.9),z:rnd(1,11)},rel:gauss()*0.2});
+  const one=(k,z,xt)=>(st,bw)=>{const o=bw.opts.find(o=>o.k===k)||bw.opts[0];return {o,m:spotFor(bw,o,z,xt),rel:gauss()*0.09};};
+  if(kind==='yorker')return one('yorker',1.6,0.05);
+  if(kind==='bouncer')return (st,bw)=>bw.type==='pace'?one('bouncer',10.1,0)(st,bw):one('quick',8,0)(st,bw);
+  if(kind==='spot')return one('stock',5.4,0.12);
+}
+// one first innings; legality of the auto-captain's picks (bowler, field) is checked every over
+function inn1Sim(pk,diff,kind,A){
+  setPlanet(pk);const mine=myAttack(pk),st=newInn1(mine,aiXI(pk,makeAttack(pk,diff)),diff,pk);
+  simRest(st,mine,bowlBot(kind),(st,bw,ph)=>{
+    const o=Math.floor(st.balls/6),bi=mine.indexOf(bw),id=planPick(bw,ph,st,st.foot).id;
+    if(!legalBowlers(st,o).includes(bi)||st.bw[bi].o>=4)A.bad.captain++;
+    A.fields++;if(!fieldOk(tplField(id),ph==='pp'))A.bad.field++;
+    return id;});
+  if(st.bw.some(f=>f.o>4))A.bad.quota++;
+  A.n++;A.runs+=st.runs;A.wk+=st.wkts;A.balls+=st.balls;A.s.push(st.runs);
+  for(let o=0;o<20;o++)if(st.ov[o]){const p=phaseOf(o);A.ph[p].r+=st.ov[o].r;A.ph[p].b+=6;if(o&&st.ov[o-1]&&st.ov[o-1].b===st.ov[o].b)A.bad.consec++;}
+  return st;
+}
+function newAcc(){const A={n:0,runs:0,wk:0,balls:0,tg:0,win:0,s:[],plan:{},fields:0,bad:{captain:0,field:0,quota:0,consec:0},ph:{}};for(const p of ['pp','mid','death'])A.ph[p]={r:0,b:0,w:0,f:0,s:0,t:{}};return A;}
+function bowlRun(pk,diff,kind,n){const A=newAcc();for(let i=0;i<n;i++)inn1Sim(pk,diff,kind,A);return A;}
+// field plans: every ball of std innings is also played, with the same random numbers, against a random legal field for the
+// over (same delivery and bowling plan; the AI batter sees that field). Paired, so a few per cent shows above the noise
+function fieldPair(pk,diff,n){
+  const R={cap:{r:0,w:0},rnd:{r:0,w:0},n:0},R0=Math.random;
+  for(let i=0;i<n;i++){setPlanet(pk);const mine=myAttack(pk),st=newInn1(mine,aiXI(pk,makeAttack(pk,diff)),diff,pk);let rf=null;
+    simRest(st,mine,(st,bw)=>{
+      const o=Math.floor(st.balls/6);if(!rf||rf.o!==o){const ids=planIds(bw,o<6);rf={o,f:tplField(ids[Math.floor(Math.random()*ids.length)])};}
+      const c=autoBowl(st,bw),seed=Math.floor(Math.random()*4294967296);
+      for(const [k,f] of [['cap',st.field],['rnd',rf.f]]){Math.random=seeded(seed);const b=bowlDelivery(bw,c.o,c.m,c.rel,st.diff),res=aiResult(b,aiBat(st,b,f),f,{tier:st.bat[st.s].tier,t20:1});R[k].r+=res.runs;R[k].w+=res.out?1:0;}
+      Math.random=R0;R.n++;return c;});
+  }
+  return R;
+}
+
+// T20 chase: the bot bats 120 balls / 10 wickets against captain, plans and fields, as whoever is on strike (the XI's tiers,
+// strike rotation in t20Record; no Hold), to the target set by the first innings. It keeps batting after reaching the target
+// so every innings measures a full 20 overs; the win is runs >= target.
+function t20Chase(pk,diff,loft,A,target){
+  const P=setPlanet(pk),attack=makeAttack(pk,diff),st=newT20(attack,diff,target),
     Z=[0,0,0,0,0,0,0,0],ft={x:0,z:0},last=[];let prev=-1;
   for(let o=0;o<20&&st.wkts<10;o++){
     rollWind(P);
@@ -72,10 +114,10 @@ function t20Chase(pk,diff,loft,A){
 }
 // the standard T20 bot lofts 30% of balls on average, like the short-format bot, but more at the death as a chaser would
 const LOFT_STD={pp:.3,mid:.25,death:.45},LOFT_ALL={pp:1,mid:1,death:1};
-function t20Run(pk,diff,loftP,n){
-  const A={n:0,runs:0,wk:0,balls:0,tg:0,win:0,s:[],plan:{},fields:0,bad:{captain:0,field:0,quota:0},ph:{}};
-  for(const p of ['pp','mid','death'])A.ph[p]={r:0,b:0,w:0,f:0,s:0,t:{}};
-  for(let i=0;i<n;i++)t20Chase(pk,diff,loftP===1?LOFT_ALL:LOFT_STD,A);
+// full matches: the std bowling bot's first innings sets each target (I = its accumulator), then the chase
+function t20Run(pk,diff,loftP,n,I){
+  const A=newAcc();
+  for(let i=0;i<n;i++)t20Chase(pk,diff,loftP===1?LOFT_ALL:LOFT_STD,A,inn1Sim(pk,diff,'std',I||newAcc()).runs+1);
   return A;
 }
 // Scenario bots. std: the short-format bot (swings at everything; lofts 30% when surviving, more as the asking rate climbs; in a
@@ -173,14 +215,16 @@ function testFieldFuzz(n){
 // the band is measured with the play the objective asks for: careful for survive, the standard bot otherwise
 const bandBot=sc=>sc.obj.type==='survive'?'careful':'std';
 globalThis.SCEN=SCEN;globalThis.TPL=TPL;globalThis.TIER=TIER;globalThis.NEW_BALL=NEW_BALL;globalThis.bandBot=bandBot;
-// random attacks, pars and per-over economies: the captain must always find a legal bowler for all 20 overs
+// random attacks, pars and per-over economies: the captain must always find a legal bowler for all 20 overs. Batting first (the
+// player's attack, no target), the player may pick any bowler legalBowlers offers: random legal picks must never run out
 function captainFuzz(n){
   let bad=0;const ds=['easy','medium','hard'];
   for(let k=0;k<n;k++){
-    const d=ds[k%3],a=makeAttack(PLANET_ORDER[k%8],d),st=newT20(a,d,60+Math.random()*300);let prev=-1;
+    const d=ds[k%3],pk=PLANET_ORDER[k%8],mine=k%2,a=mine?myAttack(pk):makeAttack(pk,d),st=mine?newInn1(a,XI,d,pk):newT20(a,d,60+Math.random()*300);let prev=-1;
     for(let o=0;o<20;o++){
-      const bi=captainPick(a,o,st);if(bi<0||bi===prev||st.bw[bi].o>=4){bad++;break;}
-      prev=st.last=bi;st.bw[bi].o++;st.bw[bi].r+=Math.floor(Math.random()*(Math.random()<.3?36:16));
+      const L=legalBowlers(st,o),bi=mine&&k%4===1?L[Math.floor(Math.random()*L.length)]:captainPick(a,o,st);
+      if(bi==null||bi<0||bi===prev||st.bw[bi].o>=4){bad++;break;}
+      prev=st.last=bi;st.bw[bi].o++;const r=Math.floor(Math.random()*(Math.random()<.3?36:16));st.bw[bi].r+=r;st.runs+=r;st.balls+=6;
     }
   }
   return bad;
@@ -189,6 +233,7 @@ function fieldFuzz(n){
   let bad=0;const ids=Object.keys(TPL);
   for(let k=0;k<n;k++){
     setPlanet(PLANET_ORDER[k%8]);const pp=k%3===0,ok=ids.filter(id=>fieldOk(tplField(id),pp));
+    for(const t of ['pace','spin'])for(const id of planIds({type:t},pp))if(!fieldOk(tplField(id),pp))bad++;
     let f=tplField(ok[k%ok.length]);
     for(let j=0;j<6;j++){f=adjust(f,Array.from({length:8},()=>Math.random()<.4?Math.random()*20:0),{pp,n:1+j%2}).field;if(!fieldOk(f,pp))bad++;}
   }
@@ -233,53 +278,72 @@ for (const pk of ctx.PLANET_ORDER) {
   check(`${pk} six rate`, r.sixes * 100, 1, 35);
 }
 
-const T20N = +process.env.T20_N || 600, t0 = Date.now();
+const T20N = +process.env.T20_N || 300, t0 = Date.now();
 const pct = v => `${(v * 100).toFixed(0).padStart(3)}%`;
 const rpo = p => (p.r / Math.max(1, p.b) * 6).toFixed(1).padStart(5);
+const mean = A => A.runs / A.n;
+const bfmt = A => { const m = mean(A), sd = Math.sqrt(A.s.reduce((a, x) => a + (x - m) * (x - m), 0) / A.n);
+  return `total ${m.toFixed(0).padStart(3)} (sd ${sd.toFixed(0).padStart(2)})  wkts ${(A.wk / A.n).toFixed(1).padStart(4)}  balls ${(A.balls / A.n).toFixed(0).padStart(3)}  per over: PP ${rpo(A.ph.pp)} mid ${rpo(A.ph.mid)} death ${rpo(A.ph.death)}`; };
 const t20fmt = A => `win ${pct(A.win / A.n)}  target ${(A.tg / A.n).toFixed(0).padStart(3)}  runs ${(A.runs / A.n).toFixed(0).padStart(3)}  wkts ${(A.wk / A.n).toFixed(1).padStart(4)}  ` +
   `balls/wkt ${(A.balls / Math.max(1, A.wk)).toFixed(0).padStart(3)}  per over: PP ${rpo(A.ph.pp)} mid ${rpo(A.ph.mid)} death ${rpo(A.ph.death)} (${deathGain(A).toFixed(1).padStart(4)} same batters)  ` +
   `4s ${pct((A.ph.pp.f + A.ph.mid.f + A.ph.death.f) / (A.balls || 1))} 6s ${pct((A.ph.pp.s + A.ph.mid.s + A.ph.death.s) / (A.balls || 1))}`;
-// the DIFF t20 multiplier that would put this row's win rate at `want`, from the same innings
-const fitMul = (A, m, want) => {
-  let lo = 0.5, hi = 2;
-  for (let i = 0; i < 30; i++) { const x = (lo + hi) / 2, w = A.s.filter(([s, t]) => s >= Math.round((t - 1) * x / m) + 1).length / A.n; if (w > want) lo = x; else hi = x; }
-  return lo;
-};
 // the tail bats more of the death overs, so the death is compared with the middle overs tier by tier (weighted by death balls)
 const deathGain = A => { const D = A.ph.death.t, Md = A.ph.mid.t; let g = 0, n = 0;
   for (const k in D) if (Md[k] && Md[k].b) { g += D[k].r - D[k].b * Md[k].r / Md[k].b; n += D[k].b; } return g / Math.max(1, n) * 6; };
-const bad = {captain: 0, field: 0, quota: 0};
-const addBad = A => { for (const k in bad) bad[k] += A.bad[k]; };
-console.log(`\nT20 chases on Earth (20 overs, 10 wkts), ${T20N} innings each; std = 45 ms spread, lofts 30% (25% middle, 45% death); loft = always lofted:`);
-// option B (owner): targets never fall as difficulty rises (~200 / ~215 / ~230 on Earth), so win rates spread wide
+const bad = {captain: 0, field: 0, quota: 0, consec: 0};
+const addBad = A => { for (const k in bad) bad[k] += A.bad[k] || 0; };
+const DS = ['easy', 'medium', 'hard'];
+
+console.log(`\nT20 first innings on Earth: the player's attack (bot) vs the AI batters, ${T20N} innings per row (variants ${T20N >> 1});` +
+  ` std = auto-bowler, release sd 0.09 of the meter; acc 0.05; careless = random option, marker, sd 0.2; yorker/bouncer/spot = same ball every time:`);
+const B = {};
+for (const d of DS) {
+  B[d] = {std: ctx.newAcc()};
+  B[d].match = ctx.t20Run('earth', d, 0.3, T20N, B[d].std); addBad(B[d].std); addBad(B[d].match);
+  const kinds = d === 'easy' ? [] : [...(d === 'medium' ? ['acc', 'careless'] : []), 'yorker', 'bouncer', 'spot'];
+  for (const k of kinds) { B[d][k] = ctx.bowlRun('earth', d, k, T20N >> 1); addBad(B[d][k]); }
+  for (const k in B[d]) if (k !== 'match') console.log(`  ${d.padEnd(7)}${k.padEnd(10)}${bfmt(B[d][k])}`);
+}
+// option B (owner): first-innings totals, i.e. targets, never fall as difficulty rises; the old fixed targets were ~157 / ~166 / ~184
+check('Earth medium AI total (std bowling)', mean(B.medium.std), 140, 200);
+check('Earth AI totals easy <= medium <= hard', Math.min(mean(B.medium.std) - mean(B.easy.std), mean(B.hard.std) - mean(B.medium.std)), 0, 1e9);
+check('accurate bowling vs careless (total ratio)', mean(B.medium.acc) / mean(B.medium.careless), 0, 0.9);
+for (const d of ['medium', 'hard']) for (const k of ['yorker', 'bouncer', 'spot']) check(`${d}: always ${k} minus standard (runs conceded)`, mean(B[d][k]) - mean(B[d].std), 0.01, 1e9);
+for (const d of ['medium', 'hard']) {
+  const R = ctx.fieldPair('earth', d, T20N >> 1), f = k => `${(R[k].r / R.n).toFixed(3)} runs, ${(R[k].w / R.n * 100).toFixed(2)}% wickets per ball`;
+  console.log(`  ${d.padEnd(7)}field plans, ${R.n} balls each: captain's ${f('cap')}; random legal field ${f('rnd')}`);
+  check(`${d}: random legal field minus captain's plan (runs per ball, same deliveries)`, (R.rnd.r - R.cap.r) / R.n, 0.01, 9);
+}
+
+console.log(`\nT20 full matches on Earth: std bowling bot innings, then the chase; std = 45 ms spread, lofts 30% (25% middle, 45% death); loft = always lofted:`);
 const BAND = {easy: [75, 100], medium: [40, 60], hard: [0, 25]};
-for (const d of ['easy', 'medium', 'hard']) {
-  const std = ctx.t20Run('earth', d, 0.3, T20N), loft = ctx.t20Run('earth', d, 1, T20N);
-  addBad(std); addBad(loft);
-  console.log(`  ${d.padEnd(7)}std  ${t20fmt(std)}${d === 'medium' ? `  (DIFF t20 for 50%: ${fitMul(std, ctx.DIFF[d].t20, 0.5).toFixed(3)})` : ''}`);
-  console.log(`  ${''.padEnd(7)}loft ${t20fmt(loft)}`);
+for (const d of DS) {
+  const std = B[d].match, loft = d === 'easy' ? null : ctx.t20Run('earth', d, 1, T20N);
+  if (loft) addBad(loft);
+  console.log(`  ${d.padEnd(7)}std  ${t20fmt(std)}`);
+  if (loft) console.log(`  ${''.padEnd(7)}loft ${t20fmt(loft)}`);
   check(`T20 ${d} standard win rate`, std.win / std.n * 100, ...BAND[d]);
-  // both rows are scored against the same pooled targets, so target noise can't flip a small gap (hard: ~6% vs ~3%)
-  const T = [...std.s, ...loft.s].map(x => x[1]), pw = A => A.s.reduce((w, [r]) => w + T.filter(t => r >= t).length, 0) / (A.n * T.length);
-  if (d !== 'easy') check(`T20 ${d} always-loft minus standard win rate (pooled targets)`, (pw(loft) - pw(std)) * 100, -100, -0.01);
-  // not on hard: the bot's top order is rarely still in at the death there (under a ball per innings), too noisy to check
+  // both rows are scored against the same pooled targets, so target noise can't flip a small gap
+  if (loft) { const T = [...std.s, ...loft.s].map(x => x[1]), pw = A => A.s.reduce((w, [r]) => w + T.filter(t => r >= t).length, 0) / (A.n * T.length);
+    check(`T20 ${d} always-loft minus standard win rate (pooled targets)`, (pw(loft) - pw(std)) * 100, -100, -0.01); }
+  // not on hard: the bot's top order is rarely still in at the death there, too noisy to check
   if (d !== 'hard') check(`T20 ${d} death minus middle runs per over, same batters`, deathGain(std), 0.01, 99);
   const ov = Object.values(std.plan).reduce((a, b) => a + b, 0);
-  if (d === 'medium') console.log(`  plans (share of overs): ${Object.entries(std.plan).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v / ov * 100).toFixed(0)}%`).join(', ')}`);
+  if (d === 'medium') console.log(`  AI plans in the chase (share of overs): ${Object.entries(std.plan).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v / ov * 100).toFixed(0)}%`).join(', ')}`);
 }
-console.log(`\nT20 by planet (medium, std), ${T20N >> 1} innings each; mean targets easy / medium / hard:`);
-let eRuns = 0;
+const PN = Math.round(T20N * 2 / 3);
+console.log(`\nT20 by planet, ${PN} each: full matches on medium; first-innings totals (std bowling) easy / medium / hard:`);
 for (const pk of ctx.PLANET_ORDER) {
-  const A = ctx.t20Run(pk, 'medium', 0.3, T20N >> 1);addBad(A);
-  if (pk === 'earth') eRuns = A.runs / A.n;
-  const ratio = A.runs / A.n / eRuns, m = ctx.PLANETS[pk].t20, tg = ['easy', 'medium', 'hard'].map(d => ctx.aiTarget(d, 20, 10, pk));
-  console.log(`  ${pk.padEnd(8)} ${t20fmt(A)}  scoring vs Earth ${ratio.toFixed(2)}  T20 multiplier ${m}  targets ${tg.map(t => t.toFixed(0)).join(' / ')}`);
-  check(`${pk} T20 multiplier vs measured scoring ratio`, m / ratio, 0.8, 1.25);
-  check(`${pk} T20 targets easy <= medium <= hard`, Math.min(tg[1] - tg[0], tg[2] - tg[1]), 0, 1e9);
+  const I = {}, A = pk === 'earth' ? null : ctx.t20Run(pk, 'medium', 0.3, PN, I.medium = ctx.newAcc());
+  if (A) { addBad(A); addBad(I.medium); for (const d of ['easy', 'hard']) { I[d] = ctx.bowlRun(pk, d, 'std', PN); addBad(I[d]); } }
+  const M = A || B.medium.match, tg = DS.map(d => mean(pk === 'earth' ? B[d].std : I[d]));
+  console.log(`  ${pk.padEnd(8)} ${t20fmt(M)}  totals ${tg.map(t => t.toFixed(0)).join(' / ')}`);
+  if (A) check(`${pk} T20 medium standard win rate`, A.win / A.n * 100, 35, 65);
+  check(`${pk} T20 totals easy <= medium <= hard`, Math.min(tg[1] - tg[0], tg[2] - tg[1]), 0, 1e9);
 }
 const cf = ctx.captainFuzz(20000), ff = ctx.fieldFuzz(5000);
-console.log(`  captain: 20000 random innings, ${cf} without a legal bowler; fields: 30000 random adjustments, ${ff} illegal`);
-console.log(`  restrictions in simulated play: ${bad.field} illegal fields, ${bad.captain} illegal bowler picks, ${bad.quota} quota breaches`);
+console.log(`  captain: 20000 random innings (half of them the player's attack, a quarter random legal picks), ${cf} without a legal bowler; fields: 30000 random adjustments and every offered plan, ${ff} illegal`);
+console.log(`  restrictions in simulated play: ${bad.field} illegal fields, ${bad.captain} illegal bowler picks, ${bad.consec} consecutive overs, ${bad.quota} quota breaches`);
 check('captain fuzz failures', cf, 0, 0); check('field fuzz failures', ff, 0, 0);
 for (const k in bad) check(`T20 ${k} violations`, bad[k], 0, 0);
 console.log(`  T20 section took ${((Date.now() - t0) / 1000).toFixed(1)} s (T20_N=${T20N}; set T20_N to change)`);
@@ -288,7 +352,7 @@ console.log(`  T20 section took ${((Date.now() - t0) / 1000).toFixed(1)} s (T20_
 const t1 = Date.now();
 // Short formats and T20 must not change when Test code is added: the same seeded rows hash the same as before the Test code.
 // Update FP only when short-format or T20 balance is changed on purpose.
-const FP = 'f18c8567';
+const FP = 'bb5bfa7a';
 {
   const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const SM = Object.create(Math); SM.random = mulberry(20261014);

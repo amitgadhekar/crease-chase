@@ -1,18 +1,119 @@
-# T20 chase mode: design
+# T20 mode: design
 
-Status: steps 1-4 implemented (2026-10-13), strike rotation (decision 1 revised) 2026-10-14; step 5 (tuning on the owner's
-phone) is open. The owner accepted all recommendations below. The working model is summarised in CLAUDE.md (T20 chase); this doc keeps the reasoning and rejected options.
+Status: chase steps 1-4 implemented (2026-10-13), strike rotation 2026-10-14. Player bowling (below, 2026-10-14): step 1 (pure
+logic, balance test) and step 2 (camera, controls, flow, HUD, save/resume, smoke) done. The working model is summarised in
+CLAUDE.md; this doc keeps the reasoning and rejected options.
+
+## Player bowling: owner decisions (2026-10-14)
+
+- **Every T20 is a full match.** The player bowls the first innings (20 overs, 10 wickets) to an AI batting side, then chases
+  that score + 1 with the existing batting (strike rotation, tiers, Hold). The simulated-target chase is replaced. Short formats
+  and Scenarios are untouched.
+- **Captaincy:** before each over the player picks the bowler (5 in the attack, max 4 overs each, never consecutive) and a field
+  plan (a `TPL` template legal for the phase); the captain's suggestion is preselected. **Simulate rest** finishes the innings.
+- **Per ball:** pick a delivery from the bowler's options, place a marker on the pitch (line and length, continuous), tap a release
+  meter in the run-up. Good release: near the marker at full pace. Early: fuller; late: shorter (as in real bowling, see Sources;
+  the owner did not choose a direction); line scatter grows with the error;
+  a very bad release is a wide, a long hop or a full toss. Narrower sweet spot on harder levels, scaled by the bowler's accuracy.
+  No tap = a poor release.
+- **The AI batter plays the same shot physics** as the player (`evalSwing`, `beaten`, pads, stumpings, fielding).
+- **Not in v1:** toss, no-balls and free hits, run-outs, DRS, dragging fielders.
+
+## Player bowling: as built (step 1)
+
+- **Attack:** the XI's 7-11 (Quarry, Ashby, Marlow, Tenby, Gage), archetypes from `makeAttack`'s rules seeded per planet (a death
+  specialist and a spinner, the rest suited to the conditions; Earth: death, cutter, express, off-spin, left-arm orthodox). Options
+  per bowler (max 5): pace = stock (swing bowlers: outswinger and inswinger instead), yorker, bouncer, slower ball, cutter (`slow`
+  >= 1.5); spin = stock, flighted, quicker one, wrong'un (`wrong`), arm ball. Each is a pace/swing/seam/turn variation with a
+  suggested length; the marker decides where it pitches. The AI side bats six planet-named batters and its five bowlers, tiers as
+  the player's XI.
+- **Release meter:** `rel` -1..1, good half-width .16 / .11 / .075 (easy / medium / hard) x `acc`/0.85. Inside it the length moves
+  up to 0.25 m; beyond, 2 m per window of error, and the line scatters 0.15 m per window. A release error moves a full ball's
+  pitch point further (flatter descent): length errors x ((zr - z)/(zr - 5.4))^2, 0.5-2. Beyond 3.5 windows: a wide, else a full
+  toss (early) or a long hop (late). No tap: 2-3 windows, random side. Above head height (1.85 m) at the popping crease is a wide
+  (ICC playing conditions call it a wide, https://en.wikipedia.org/wiki/Bouncer_(cricket); the T20I limit of one bouncer per
+  over is not modelled, as no-balls are out of v1, https://icc-cricket.com/news/mens-t20i-match-clause-21-no-ball). Measured on medium
+  (standard plans, 1000 innings, before the direction was flipped to early = fuller): perfect release 171, a human tap (sd 0.09 of the meter) 176, sloppy (sd 0.2) 184: the meter
+  matters, but where the marker goes matters more.
+- **Same physics, difficulty elsewhere:** the player's deliveries and the AI's shots use medium physics (`BOWL_D`) on every level;
+  a harder `DIFF` would give the player faster bowlers and the batter tighter windows, i.e. make bowling easier. Difficulty is the
+  meter and the batter (`AIB`): timing spread 71 / 64 / 58 ms, share of a pace change read from the hand .5 / .6 / .7, misreads
+  and footwork.
+- **AI batter (`aiBat`):** reads length at release and line at the bat with errors (larger for swing); commits footwork on the
+  length as read within the joystick's limits (back to short, forward or down the pitch to good length, across to an expected
+  yorker); good length and yorkers at the stumps are harder to time, loose balls (half-volley, full toss, long hop, short and
+  wide, on the pads) easier; an unread slower ball makes it early. Shots: the best fit (`SHOTS`/`shotFit`) toward a gap; lofts by
+  phase (18 / 12 / 30%) x carry, more at loose balls, fewer after quick wickets, with a rider there or without a lofted shot that
+  fits; blocks some hard balls when new or after a collapse. It returns the same `sw` the player's slingshot produces.
+- **The batters learn the attack** (`st.bm`, mirrors the bowler `mem`): the share of each length in recent balls and each
+  bowler's pace. A length the attack keeps bowling is read better, timed better (spread x up to 0.5), stepped to and aimed into a
+  gap. This is what makes predictability expensive; per-bowler memory was tried first and let "always yorker" pay on hard.
+- **Captain:** `captainPick` (batting first, par = the innings' own rate) and `planPick` suggest; the field is the template as is.
+  Moving fielders deep into hot zones (`adjust`) for the suggestion was tried and conceded more: this batter mostly scores along
+  the ground, so ring fielders matter more than riders. A zone-coverage plan pick was tried and made no difference.
+- **Simulate rest (`simRest`):** auto-captain, auto-bowler (`autoBowl`: `planBall` with the plan's mix and the side's `mem`,
+  learning at the hard rate; marker allowing for movement; release sd 0.09) and the AI batter, ball by ball, from wherever the
+  innings stands.
+- **Calibration (balance test, T20_N=300):** Earth first-innings totals vs the standard bowling bot ~132-140 / ~165-175 / ~205-210
+  (easy / medium / hard; the old fixed targets were ~157 / ~166 / ~184: easy is lower and hard higher, both still in band). Full
+  matches (that innings, then the standard batting bot chases): ~96% / ~45-55% / ~5-10%. Medium on every planet ~45-60% after a
+  per-planet `t20` factor on the AI timing spread (Moon .98, Mercury .88, Venus 1.18, Mars .89, Jupiter 1, Saturn 1.2,
+  Neptune 1.25): without it, medium matches ran 25-80% (the AI reads swing and lofts by carry, so its scoring follows the
+  planets less than the batting bot's). Bowling skill: accurate bot ~155-170, careless (random option and marker, sd 0.2)
+  ~220-240. Exploits on medium / hard: always yorker ~270 / ~275, always bouncer ~300 / ~315, same spot ~405 / ~380, vs
+  standard ~170 / ~205. Field plans: a random legal field (captain's bowling kept) concedes ~3% more per ball than the captain's
+  plan on the same deliveries (paired comparison; small, because this batter seeks gaps). Section runtime ~30 s.
+- **Sources for the control model.** A review of a mobile cricket game with a tap-timed bowling meter: the idea is fine but the
+  lag between tap and meter makes precise timing impossible, and its pitch placement felt unresponsive
+  (https://www.digitallydownloaded.net/?p=53984): step 2 must timestamp the tap (`gameTimeAt`) and not the frame. A console
+  game's bowling guide ties length to the release point (https://planetcricket.org/forums/threads/bowling-guide.89045/post-2747859);
+  it says early = fuller and late = shorter, as in real bowling (letting go early floats the ball up; holding on drags it into
+  the pitch), and the game follows it: the sign of `sg` in `bowlDelivery` (step 1 had it the other way round; flipped 2026-10-14,
+  the balance numbers above stayed in their bands, and the fingerprint `FP` changed because it covers the bowled first innings). The third link (https://www.planetcricket.org/forums/goto/post?id=3639715) is about how long the batting pitch
+  marker stays visible, not bowling marker accuracy, so it does not support the marker design either way.
+
+## Player bowling: as built (step 2)
+
+- **Flow:** T20 Play -> "You bowl first" (their XI with tiers, your attack) -> per over the picker (bowler, field plan, Simulate
+  rest) -> the over's banner -> per ball: chip, marker, Bowl, meter tap in the run-up -> the AI plays it -> after 10 wickets or 20
+  overs the innings break (their total, top scorers, your bowling, "Chase N") -> the existing chase against the AI attack.
+- **Camera:** end-on from behind the bowler's arm, 14 m behind the bowling crease and 6 m up, the lens solved so the batter's
+  feet sit at 55% of the screen height and a 12 m length at 80% (landscape 42% / 82% of the height above the home indicator).
+  The bowler runs in from below the frame and is seen from behind at release. Rejected: the batting camera turned round (the
+  batter small and far, the near pitch under the HUD), a higher broadcast camera (the batter shrinks, the marker range gets
+  too short to drag precisely on a phone).
+- **Meter:** the cursor sweeps the meter over the last second of the run-up and ends as the ball leaves the hand, so the tap
+  window is ±55 ms on medium (±80 easy, ±37 hard, x the bowler's accuracy). The tap is timestamped from the event
+  (`gameTimeAt(perfOf(e))`), never the frame (the reviewed game's lag complaint). Rejected: a sweep centred on the release
+  (a late tap would hold the ball in the hand, or come after it is gone), a countdown run-up (no time to set the ball up).
+- **Marker:** a chip moves it to the delivery's suggested spot (`optSpot`, allowing for its movement); dragging moves it by the
+  finger's offset, so the finger never covers it; a tap on the ground puts it there. Each bowler keeps his last delivery and
+  spot. Rejected: keeping a dragged marker when a chip is picked (the chip would then do nothing visible).
+- **AI batter:** `aiBat` at release; its footwork drives `S.bpos` at the stick's speeds until the ball pitches; at `tc -
+  SWING_DELAY` it fills `S.swing`/`S.bat` as the slingshot does, so contact targeting, the pose, pads, fielding and replays are
+  the batting game's code. Medium physics (`BOWL_D`) for the shot, as in the balance test.
+- **Sides on screen:** the player's fielders and bowler are humans in the player's kit; both batters wear the planet team's kit.
+  Swapped per innings. The chase restores the planet's species.
+- **Save `v:3`:** both innings, mid-over in either; remembered deliveries and markers; v1/v2 saves are not offered (their
+  targets were simulated).
+- **Records:** `records[diff].t20` keeps `{w, p, hs}` (wins, played, best chase score); the T20 card reads "won 3 of 7 · best
+  chase 187".
+
+## Player bowling: rejected options
+
+- **Keep the simulated-target chase alongside the full match:** the owner chose to replace it.
+- **A toss:** more flows (bat or bowl first) for little play; the player always bowls first.
+- **Only a star bowler's 4 overs by the player:** little bowling per match.
+- **All 20 overs with no shortcut:** too long on a phone; "Simulate rest" finishes the innings with the same logic.
+- **Marker without a meter:** no release skill; the marker alone would make every ball land where aimed.
+- **Swipe bowling:** imprecise on phones, and it collides with the slingshot's mental model.
+- **Captain-set fields and dragging fielders:** templates only in v1 (legal by construction, no field editor).
 
 ## As built: departures and details
 
-- **Targets: option B** (see "Target and difficulty"). With strike rotation (2026-10-14) `DIFF.t20` .85 / .9 / 1 gives mean Earth
-  targets ~157 / ~166 / ~184 (were ~201 / ~213 / ~230 with the player always on strike: the tail now bats, the bot loses ~9.4
-  wickets on medium). The standard bot wins ~98% / ~50% / ~5% (3000 innings each: 98.1 / 50.5 / 5.5): the bands hold, but hard
-  is near-unwinnable for the bot, so tune it on the phone.
-- **Per-planet `t20` multiplier** (measured T20 scoring vs Earth): Moon 2.16, Mercury 1.84, Mars 1.76, Jupiter 0.77, Venus 0.75,
-  Saturn 0.70, Neptune 0.68. Moon, Mercury and Mars were re-measured with strike rotation (were 1.75 / 1.57 / 1.53): their top
-  order bats through, Earth's tail does not, so the ratio rose (Moon fell out of the 0.8-1.25 band). Medium-bot win rates per
-  planet ~45-60%.
+- **Targets: option B** (see "Target and difficulty"). Superseded 2026-10-14: the target is now the first innings the player
+  bowls. The simulated targets (`DIFF.t20` .85 / .9 / 1, ~157 / ~166 / ~184 on Earth; planet target multipliers Moon 2.16 ...
+  Neptune 0.68; `AI_T20` per-phase weights) were removed with the checks on them.
 - **Strike rotation** (owner decision 1, 2026-10-14): the player bats the XI of the Scenarios series (`XI`: four A, two B, two C,
   one D, two E), whoever is on strike, with `newTest`'s state shapes and the shared `batRecord`/`swapStrike` (odd runs, over end,
   new batter on strike). Tiers apply as in Tests (`{tier,t20:1}`) without sweeps or body hits; Hold and the non-striker as in
@@ -35,8 +136,8 @@ phone) is open. The owner accepted all recommendations below. The working model 
 
 ## Decisions
 
-1. **What it is.** A new chase length, "T20": the AI bats first (simulated instantly, as today), and the player then bats
-   up to 20 overs with 10 wickets to reach the target. Bowling stays AI and is not visualised beyond what exists.
+1. **What it is.** A new chase length, "T20": the AI bats first (simulated instantly; since 2026-10-14 the player bowls it), and
+   the player then bats up to 20 overs with 10 wickets to reach the target. Bowling stays AI and is not visualised beyond what exists.
    No new 3D models; the planet's species team supplies the bowlers and fielders.
 2. **A real bowling attack.** Each AI team has 5 named bowlers (original names, per planet) with archetypes
    (express pace, swing/seam, hit-the-deck/cutters, death specialist, off-spin, leg-spin, left-arm orthodox). Max 4 overs each,
@@ -158,7 +259,7 @@ per ball:   length/line = planBall(mem, bowler, plan.mix, ctx)       // existing
 
 ## Target and difficulty
 
-- `simulateAI` gains a T20 model: per-phase outcome weights (powerplay and death more boundaries and more wickets) instead of one
+- (Superseded 2026-10-14: the first innings is played, see Player bowling.) `simulateAI` gains a T20 model: per-phase outcome weights (powerplay and death more boundaries and more wickets) instead of one
   flat table, still scaled by the planet `ai` multiplier.
 - **Owner decision (2026-10-13, option B): targets must never fall as difficulty rises** (roughly easy ~200, medium ~215, hard ~230
   on Earth). Hard is then genuinely harder, and win rates spread wider. Test bands: easy ≥ 75%, medium 40-60%, hard ≤ 25% for the
@@ -215,6 +316,6 @@ per ball:   length/line = planBall(mem, bowler, plan.mix, ctx)       // existing
 
 - **A separate T20 mode screen:** more UI for the same flow (see open question 3).
 - **Fixed real-world targets (160-210):** too easy at the game's scoring rate unless batting is slowed, which hurts batting feel.
-- **Visualising the AI innings:** the owner asked for simulated bowling only. Instant simulation stays.
+- **Visualising the AI innings:** the owner asked for simulated bowling only (superseded 2026-10-14: the player bowls it).
 - **Modelling the slow over-rate penalty:** the AI never runs late, so the rule would never trigger.
 - **Left-handed field mirroring:** the batter is right-handed only.

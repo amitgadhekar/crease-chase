@@ -71,7 +71,7 @@ function scenBrief(sc,done){
   $('#gCond').innerHTML=[P.name,condTag(sc.day,sc.ballAge,spin),sc.diff[0].toUpperCase()+sc.diff.slice(1)+' bowling'].map(t=>'<span>'+t+'</span>').join('');
   $('#gPair').innerHTML='<span><b>On strike</b> '+batTag(L[sc.striker])+(L[sc.striker].runs?' '+L[sc.striker].runs+'*':'')+'</span><span><b>Non-striker</b> '+batTag(L[sc.nonStriker])+(L[sc.nonStriker].runs?' '+L[sc.nonStriker].runs+'*':'')+'</span>';
   $('#gPlay').textContent=done?'Start the session':'Play';$('#gBack').textContent=done?'Quit to scenarios':'Back';
-  M=null;S.paused=true;S.phase='idle';S.cel=null;S.chase=null;S.hold=null;updateCam(0);$('#hud').hidden=$('#holdBtn').hidden=true;ctlUI(false);showScreen('brief');scenBrief.sc=sc;
+  M=null;S.paused=true;S.phase='idle';S.cel=null;S.chase=S.thr=null;S.hold=null;updateCam(0);$('#hud').hidden=$('#holdBtn').hidden=true;ctlUI(false);showScreen('brief');scenBrief.sc=sc;
 }
 
 /* --- match start, overs, balls --- */
@@ -148,9 +148,8 @@ function scenRecord(res,b,held,quiet){
 }
 function scenAfter(){
   holdEnd(false);
-  const e=scenEnd(M.st);if(e)return scenFinish(e);
-  const nx=M.overDone?newOver:nextBall;M.overDone=false;
-  if(S.res.boundary&&S.chase&&REC.n>1)rpStart(nx);else nx();
+  const e=scenEnd(M.st);if(e)return rpThen(rpCatch(),()=>scenFinish(e));
+  const nx=M.overDone?newOver:nextBall;M.overDone=false;rpThen(rpWant(),nx);
 }
 // stars are saved per scenario id (each session of a staged chase has its own); a drawn session carries on into the next one
 function scenFinish(e){

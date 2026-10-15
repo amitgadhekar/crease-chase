@@ -15,6 +15,11 @@ const page = await browser.newPage({viewport: {width: 390, height: 844}});
 const errors = [];
 let scenGood = null; // a valid scenario save, for the landscape menu
 page.on('pageerror', e => errors.push(e.stack || String(e)));
+// a wait that times out: the game state on every page and the errors so far, instead of a bare stack
+process.on('uncaughtException', async e => { console.log('\n' + (e.stack || e));
+  for (const pg of browser.contexts().flatMap(c => c.pages())) console.log(pg.viewportSize(), await pg.evaluate(() => window.__t && JSON.stringify({phase: __t.S.phase, paused: __t.S.paused,
+    res: __t.S.res && __t.S.res.label, rp: __t.rp() && {t: __t.rp().t, end: __t.rp().end, cls: __t.rp().cls}, M: __t.getM() && {wkts: __t.getM().wkts, max: __t.getM().wktsMax}, screen: document.querySelector('.screen.on')?.id})).catch(x => String(x)));
+  console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); });
 page.on('console', m => { if (m.type() === 'error' && !/ERR_NAME_NOT_RESOLVED|fonts\.g/.test(m.text())) errors.push('console: ' + m.text()); });
 
 // three's camera must put world points on the same pixels as proj(), which the 2D overlays (aim, trail, glow) use.
@@ -40,7 +45,22 @@ const PLAYS = {
   deep: {sw: {aim: 10, power: 0.3, loft: 1}, cam: 'chase', field: 1,
     pred: "r.out&&r.catcher!=null&&Math.hypot(f[r.catcher].x,f[r.catcher].z)>BOUNDARY*.6&&r.fplay.some(e=>e.i===r.catcher&&e.o==='catch'&&Math.hypot(f[e.i].x-e.x,f[e.i].z-e.z)>3)",
     key: "e=>e.o==='catch'"},
-  four: {sw: {aim: 30, power: 1}, pred: "r.boundary===4&&r.fplay.some(e=>e.k==='dive'&&e.o==='miss')", key: "e=>e.k==='dive'"}
+  four: {sw: {aim: 30, power: 1}, pred: "r.boundary===4&&r.fplay.some(e=>e.k==='dive'&&e.o==='miss')", key: "e=>e.k==='dive'"},
+  // throws (noPose: only the play is forced, throwCheck looks at the throw): a standing stop in the ring, a stop in the deep (long-on/long-off back), mid-on or mid-off stopping an AI drive (T20 bowling)
+  thr: {sw: {aim: 30, power: 1}, noPose: 1, field: 'PC', pred: "!r.out&&!r.boundary&&!r.lofted&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&Math.hypot(f[e.i].x,f[e.i].z)<35)",
+    key: "e=>e.k==='stop'&&e.o==='stop'"},
+  thrDeep: {sw: {aim: 8, power: 0.5, loft: 1}, field: 1, noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&e.t1<3.6&&Math.hypot(f[e.i].x,f[e.i].z)>BOUNDARY*.6)",
+    key: "e=>e.k==='stop'&&e.o==='stop'"},
+  // a diving stop in the ring (its throw lands in the next ball's countdown), an AI drive stopped or fetched in the deep on the off side (T20 bowling: to the keeper)
+  thrDive: {sw: {aim: 30, power: 1}, noPose: 1, pred: "!r.lofted&&!r.boundary&&!r.out&&r.fplay.some(e=>e.k==='dive'&&e.o==='stop'&&e.t1>0.8&&Math.hypot(f[e.i].x,f[e.i].z)<35)",
+    key: "e=>e.k==='dive'&&e.o==='stop'"},
+  thrFetch: {noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>(e.o==='stop'||e.k==='run'&&!e.o)&&e.z<35&&Math.hypot(e.x,e.z)>BOUNDARY*.55)",
+    key: "e=>(e.o==='stop'||e.k==='run'&&!e.o)&&e.z<35&&Math.hypot(e.x,e.z)>BOUNDARY*.55"},
+  // caught wickets for the catch replays: an edge to the keeper or the cordon, caught and bowled (opt: may not come up), an AI drive caught in the ring
+  slipCatch: {sw: {aim: 20, edge: 1}, noPose: 1, pred: "r.out&&r.catcher!=null&&/^(keeper|slip|gully)/.test(f[r.catcher].n)", key: "e=>e.o==='catch'"},
+  cab: {sw: {aim: 0, power: 0.5, loft: 1}, noPose: 1, opt: 1, pred: "r.out&&r.catcher!=null&&f[r.catcher].n==='bowler'", key: "e=>e.o==='catch'"},
+  aiCatch: {noPose: 1, pred: "r.out&&r.catcher!=null&&!/^(keeper|slip|gully|bowler)/.test(f[r.catcher].n)&&r.fplay.some(e=>e.i===r.catcher&&e.o==='catch')", key: "e=>e.o==='catch'"},
+  thrMid: {noPose: 1, pred: "!r.out&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&['midon','midoff'].includes(f[e.i].n))", key: "e=>e.k==='stop'&&e.o==='stop'"}
 };
 const armPlay = (p, play) => p.evaluate(pl => {
   const want = new Function('r', 'f', 'return ' + pl.pred), ev0 = evalSwing; window.__fp = 0;
@@ -50,8 +70,8 @@ const fieldPlay = async (p, name, play, ai) => {
   for (let n = 0; n < 4; n++) {
     if (!ai) {
       await p.waitForFunction(() => __t.S.phase === 'ready' || __t.S.phase === 'runup', null, {timeout: 30000, polling: 20});
-      // long-off and long-on back on the rope for the deep catch
-      if (play.field) await p.evaluate(() => __t.fieldSet(tplField(Object.keys(TPL).find(k => TPL[k].f.includes('longoff') && TPL[k].f.includes('longon')))));
+      // long-off and long-on back on the rope for the deep catch (field: 1), or a field template by name
+      if (play.field) await p.evaluate(t => __t.fieldSet(tplField(t === 1 ? Object.keys(TPL).find(k => TPL[k].f.includes('longoff') && TPL[k].f.includes('longon')) : t)), play.field);
       await p.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 10});
       await armPlay(p, play);
       await p.evaluate(sw => { const S = __t.S, fa = footAt(S.ball, S.bpos), w = windows(__t.getM().diff, true, 1 + 0.35 * fa.gain);
@@ -63,6 +83,7 @@ const fieldPlay = async (p, name, play, ai) => {
       return e && {...e, n: f[e.i].n || '', label: __t.S.res.label + ', ' + (__t.S.res.sub || ''), view: __t.view()}; }, play.key);
     if (!ev) { if (ai) return null; await p.waitForFunction(() => __t.S.phase !== 'result', null, {timeout: 30000, polling: 20}); continue; }
     if (play.cam && !ev.view[play.cam]) errors.push(`fielding ${name}: expected the ${play.cam} camera, got ${JSON.stringify(ev.view)}`);
+    if (play.noPose) return ev;
     await p.waitForFunction(t => __t.clk() - __t.S.f0 >= t || __t.S.phase !== 'result', ev.t1 + 0.04, {timeout: 20000, polling: 5});
     // paused, frames are still drawn at the paused clock: the rig is read from one of those, not from the frame before the pause
     await p.evaluate(() => { __t.S.paused = true; });
@@ -78,7 +99,106 @@ const fieldPlay = async (p, name, play, ai) => {
       errors.push(`fielding ${name}: hands ${hd.toFixed(2)} m from the ball at ${ev.o}`);
     return {...ev, up: st.b.up, hd};
   }
-  errors.push(`fielding ${name}: the play did not come up in 4 balls`); return null;
+  if (!play.opt) errors.push(`fielding ${name}: the play did not come up in 4 balls`); return null;
+};
+// Catch replays: after a forced catch the replay starts with the camera class wanted (close, cab, field), is paused at the catch
+// (R.t >= R.tk): the catcher drawn taking it, the ball at his hands, ball and catcher on screen, camera parity, a screenshot; then
+// a tap skips it. Returns the phase it moved on to
+const catchReplay = async (p, name, cls) => {
+  const r = await p.waitForFunction(() => __t.S.phase === 'replay' ? 'replay' : !['result', 'flight'].includes(__t.S.phase) && __t.S.phase, null, {timeout: 20000, polling: 20}).then(h => h.jsonValue());
+  if (r !== 'replay') { errors.push(`catch replay ${name}: none, went to ${r}`); return null; }
+  const R = await p.evaluate(() => { const R = __t.rp(); return {cls: R.cls, tc: R.tc, tk: R.tk, end: R.end, i: R.ct ? R.ct.i : -1}; });
+  if (!R.cls || cls && R.cls !== cls) errors.push(`catch replay ${name}: camera class ${R.cls}, expected ${cls}`);
+  if (!R.cls) return null;
+  await p.waitForFunction(() => { const R = __t.rp(); if (R && R.t < R.tk) return false; __t.S.paused = true; return true; }, null, {timeout: 20000, polling: 'raf'});
+  await p.waitForTimeout(150);
+  const s = await p.evaluate(i => { const f = __t.fv()[i], n = __t.getM().field[i].n, r = __r.body(n === 'bowler' ? -1 : i), b = __t.vb().b,
+      on = q => !!q && q.x >= 0 && q.x <= innerWidth && q.y >= 0 && q.y <= innerHeight;
+    return {n, ph: __t.S.phase, act: f && f.act, vis: r.vis, d: b ? +Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y, h[2] - b.z))).toFixed(3) : -1,
+      ball: !!b && on(__t.pj(b.x, b.y, b.z)), body: !!f && on(__t.pj(f.x, 1, f.z)), par: __t.cam3()}; }, R.i);
+  await p.screenshot({path: `${shots}${name}.png`});
+  await p.evaluate(() => { __t.S.paused = false; });
+  camErr = Math.max(camErr, s.par); if (!(s.par < 0.5)) errors.push(`camera parity ${name}: ${s.par} px`);
+  if (s.ph !== 'replay' || ![2, 3, 4, 5].includes(s.act) || !s.vis || !(s.d >= 0 && s.d < 0.2) || !s.ball || !s.body) errors.push(`catch replay ${name}: at the catch ${JSON.stringify(s)}`);
+  const vp = p.viewportSize();
+  if (await p.evaluate(() => __t.S.phase === 'replay')) { await p.waitForFunction(() => __t.S.phase !== 'replay' || __t.clk() - __t.rp().t0 >= 0.3, null, {timeout: 5000}); await p.mouse.click(vp.width / 2, vp.height * 0.6); }
+  const nx = await p.waitForFunction(() => __t.S.phase !== 'replay' && __t.S.phase, null, {timeout: 3000, polling: 20}).then(h => h.jsonValue()).catch(() => 'replay');
+  if (nx === 'replay') errors.push(`catch replay ${name}: a tap did not skip it`);
+  console.log(`replay   ok  ${name}: ${R.cls} camera, catch by ${s.n} drawn as action ${s.act}, ball ${s.d} m from his hands, on screen ${s.ball && s.body}, then ${nx}`);
+  return nx;
+};
+// Throws (show only): after a forced stop the fielder throws to the keeper or the bowler. Paused at set moments: the ball in the
+// thrower's hand in the wind-up, then in flight on the line from the release point to the take point (screenshot), then in the
+// receiver's hands (the keeper's is hidden with him in the batting view), before the next run-up (the take may fall in the next
+// ball's countdown). hit: a direct hit forced after planning (only at the stumps) knocks the bails off with no wicket and no "Out"
+// text. Returns the throw, or null if none was planned (batting, a long one that would land after the next run-up)
+const thrNow = p => p.evaluate(() => { const o = __t.S.thr; return o && {i: o.i, rv: o.rv, at: o.at, kind: o.kind, tg: o.tg, tr: o.tr, ta: o.ta, v: o.v, hit: o.hit,
+  bw: !!__t.S.fpos[o.i].bw, P0: o.P0, Pt: o.Pt}; });
+const pauseAt = (p, t) => p.waitForFunction(t => { const S = __t.S; if (S.thr && __t.clk() - S.f0 < t) return false; S.paused = true; return true; }, t, {timeout: 20000, polling: 'raf'})
+  .then(() => p.waitForTimeout(120));
+const resume = p => p.evaluate(() => { __t.S.paused = false; });
+const throwCheck = async (p, name, hit) => {
+  if (hit) await p.evaluate(() => { const o = __t.S.thr; if (o && o.at) o.hit = true; });
+  const o = await thrNow(p);
+  if (!o) return null;
+  const w0 = await p.evaluate(() => __t.getM().wkts);
+  // held in the wind-up (the first 0.25 s blend from the stop's own hold, whose hands may be short of a ball on the ground)
+  await pauseAt(p, Math.min(o.tr - 0.04, Math.max(o.tg + 0.3, o.tr - 0.2)));
+  let s = await p.evaluate(o => { const t = __t.clk() - __t.S.f0, f = __t.fv()[o.i], h = __r.body(o.bw ? -1 : o.i).hands[1], b = __t.vb().b;
+    return {t, act: f && f.act, d: b ? Math.hypot(h[0] - b.x, h[1] - b.y, h[2] - b.z) : -1}; }, o);
+  await resume(p);
+  if (s.t < o.tr && s.t >= o.tg + 0.25 && (s.act !== 7 || !(s.d >= 0 && s.d < 0.12))) errors.push(`throw ${name}: wind-up at ${s.t.toFixed(2)} s drawn as action ${s.act}, ball ${s.d.toFixed(2)} m from his hand`);
+  o.hand = s.t < o.tr && s.t >= o.tg + 0.25 ? s.d : null;
+  await pauseAt(p, (o.tr + o.ta) / 2);
+  s = await p.evaluate(o0 => { const t = __t.clk() - __t.S.f0, b = __t.vb().b, o = __t.S.thr || o0; let off = null;
+    if (b) { const dx = o.Pt.x - o.P0.x, dz = o.Pt.z - o.P0.z, L = Math.hypot(dx, dz), u = ((b.x - o.P0.x) * dx + (b.z - o.P0.z) * dz) / (L * L);
+      off = Math.max(Math.abs((b.x - o.P0.x) * dz - (b.z - o.P0.z) * dx) / L, u < 0 ? -u * L : u > 1 ? (u - 1) * L : 0); }
+    return {t, off, y: b && b.y, ph: __t.S.phase, par: __t.cam3()}; }, o);
+  await p.screenshot({path: `${shots}${name}.png`});
+  await resume(p);
+  camErr = Math.max(camErr, s.par); if (!(s.par < 0.5)) errors.push(`camera parity ${name}: ${s.par} px`);
+  if (s.t < o.ta && !(s.off != null && s.off < 0.05)) errors.push(`throw ${name}: in flight at ${s.t.toFixed(2)} s the ball is ${s.off == null ? 'not drawn' : s.off.toFixed(2) + ' m off its line'}`);
+  o.flight = s.ph;
+  const tk = o.ta + (o.hit ? 0.15 / o.v + 0.15 : 0);
+  await pauseAt(p, tk + 0.15);
+  s = await p.evaluate(o => { const t = __t.clk() - __t.S.f0, k = __t.fv().findIndex(f => f.kp), r = o.rv === 'bw' ? __r.body(-1) : k >= 0 ? __r.body(k) : null, vb = __t.vb(), b = vb.b;
+    return {t, ph: __t.S.phase, on: !!__t.S.thr, vis: !!r && r.vis, ball: vb.vis, d: r && b ? Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y, h[2] - b.z))) : -1,
+      st: vb.st, st2: vb.st2, out: !!(__t.S.res && __t.S.res.out), w: __t.getM().wkts, banner: document.querySelector('#banner').textContent}; }, o);
+  if (o.hit) await p.screenshot({path: `${shots}${name}-hit.png`});
+  await resume(p);
+  if (s.on && (s.vis ? !(s.d >= 0 && s.d < 0.2) : s.ball)) errors.push(`throw ${name}: at the take (${s.t.toFixed(2)} s) receiver drawn ${s.vis}, ball drawn ${s.ball}, ${s.d.toFixed(2)} m from his hands`);
+  o.take = s.vis ? s.d : 'hidden';o.takePh = s.ph;
+  if (!['result', 'ready', 'break', 'pick'].includes(s.ph)) errors.push(`throw ${name}: taken in the ${s.ph} phase`);
+  if (hit && !o.hit) errors.push(`throw ${name}: no direct hit forced (taken on the way back)`);
+  if (o.hit && (!(s.st && s.st.bails || s.st2) || s.out || s.w !== w0 || /out/i.test(s.banner))) errors.push(`throw ${name}: direct hit ${JSON.stringify(s)}`);
+  return o;
+};
+const thrText = o => o ? `${o.kind} to the ${o.rv === 'bw' ? (o.at ? 'bowler at his stumps' : 'bowler on his way back') : 'keeper'}${o.hit ? ', direct hit' : ''}: release ${o.tr.toFixed(2)} s, in ${o.ta.toFixed(2)} s, hand ${o.hand == null ? '-' : o.hand.toFixed(2)} m, flight seen in ${o.flight}, take ${typeof o.take === 'number' ? o.take.toFixed(2) + ' m' : o.take} in ${o.takePh}${o.after || ''}` : '(no throw planned)';
+// T20 bowling view, after a throw's take: the next ball waits. Bowl is off (and Space does nothing) while the receiver walks back
+// with the ball (screenshot), then on with the thrower and the receiver at their places and the bails on (a direct hit's are put back)
+const thrAfter = async (p, name, o) => {
+  await p.waitForFunction(() => __t.S.phase !== 'result', null, {timeout: 30000, polling: 20});
+  const rx = () => p.evaluate(rv => { const S = __t.S, r = S.fpos.find(f => rv === 'kp' ? f.kp : f.bw), M = __t.getM(), vb = __t.vb();
+    return {ph: S.phase, on: !!S.thr, off: document.querySelector('#bowlBtn').classList.contains('off'), x: r.x, z: r.z, act: r.act, hold: r.hold,
+      home: rv === 'kp' ? Math.hypot(r.x - r.bx, r.z - r.bz) : Math.abs(r.z - (M.bowlerType === 'pace' ? 31 : 25.5)), st: vb.st, st2: vb.st2,
+      far: Math.max(...S.fpos.filter(f => !f.bw).map(f => Math.hypot(f.x - f.bx, f.z - f.bz)))}; }, o.rv);
+  const a = await rx();
+  if (!a.on) { o.after = ', over before the next ball'; return; }
+  await p.waitForFunction(() => ['ready', 'pick'].includes(__t.S.phase) || !__t.S.thr, null, {timeout: 30000, polling: 20});
+  if (await p.evaluate(() => __t.S.phase === 'ready' && !!__t.S.thr)) {
+    if (!(await rx()).off) errors.push(`throw ${name}: Bowl on in the countdown while the throw is on`);
+    await p.keyboard.press('Space'); await p.waitForTimeout(100);
+    if (await p.evaluate(() => __t.S.phase) !== 'ready') errors.push(`throw ${name}: Space started the run-up during the throw`);
+  }
+  // half way back (receiver moving with the ball): screenshot
+  const b = await p.waitForFunction(rv => { const S = __t.S, r = S.fpos.find(f => rv === 'kp' ? f.kp : f.bw); if (!S.thr) return 'over'; if (!(S.phase !== 'result' && r.hold && r.mv > 0.5)) return false;
+    S.paused = true; return 'walk'; }, o.rv, {timeout: 20000, polling: 'raf'}).then(h => h.jsonValue());
+  if (b === 'walk') { await p.waitForTimeout(150); const w = await rx(); await p.screenshot({path: `${shots}${name}-walk.png`}); await resume(p);
+    if (w.ph === 'ready' && !w.off) errors.push(`throw ${name}: Bowl on while the receiver walks back`); }
+  await p.waitForFunction(() => !__t.S.thr, null, {timeout: 20000, polling: 'raf'});
+  const z = await rx();
+  if (z.ph === 'ready' && z.off || z.home > 0.06 || z.far > 0.06 || z.st || z.st2) errors.push(`throw ${name}: at its end ${JSON.stringify(z)}`);
+  o.after = `, walked back ${b === 'walk' ? 'with the ball' : '(not seen)'}, Bowl on with everyone at his place in ${z.ph}`;
 };
 const playText = e => e ? `${e.k} ${e.o || 'run'} by ${e.n || 'fielder ' + e.i} at t1 ${e.t1.toFixed(2)} s${e.up != null ? `, torso up ${e.up.toFixed(2)}, hands ${e.hd.toFixed(2)} m off` : ''} (${e.label})` : '(none)';
 const openPanel = async (p, btn, id) => { await p.click(btn);
@@ -195,6 +315,7 @@ if (planets.includes('earth')) {
   await startMode(page, 'nets', {netsW: 0, planet: 'earth'});
   const fp = {};
   for (const k of ['edge', 'ring', 'deep']) fp[k] = await fieldPlay(page, 'earth-field-' + k, PLAYS[k]);
+  if (fp.deep) await catchReplay(page, 'earth-catch-replay-deep', 'field');
   fp.four = await fieldPlay(page, 'earth-field-four', PLAYS.four);
   if (fp.four) {
     await page.waitForFunction(() => __t.S.phase === 'replay', null, {timeout: 20000, polling: 20}).catch(() => errors.push('fielding: no replay of the four'));
@@ -206,14 +327,47 @@ if (planets.includes('earth')) {
       if (b.up > 0.9) errors.push('fielding: the replayed diver is upright ' + b.up.toFixed(2)); fp.four.up = b.up; fp.four.hd = 0; }
   }
   for (const k in fp) console.log(`field    ok  ${k}: ${playText(fp[k])}`);
+  // batting: a ring stop and a diving stop throw to the bowler, taken before the next run-up (the dive's in the countdown: up to
+  // 4 tries); a deep stop may not be thrown (it would land after the next run-up)
+  for (const [k, play] of [['earth-throw', PLAYS.thr], ['earth-throw-dive', PLAYS.thrDive], ['earth-throw-deep', PLAYS.thrDeep]]) {
+    let o = null, e = null;
+    for (let n = 0; n < (k === 'earth-throw-dive' ? 4 : 1) && !(o && o.takePh === 'ready'); n++) {
+      const e1 = await fieldPlay(page, k + '-stop', k === 'earth-throw-dive' ? {...play, opt: 1} : play);
+      if (!e1) continue;
+      e = e1; o = await throwCheck(page, k);
+      if (o) o.after = ', ' + await (await page.waitForFunction(() => __t.S.phase === 'runup' ? 'still walking back at the run-up' : !__t.S.thr && 'both back before the run-up',
+        null, {timeout: 30000, polling: 'raf'})).jsonValue();
+    }
+    if (!e && k === 'earth-throw-dive') errors.push(`throw ${k}: no diving stop came up`);
+    if (e && !o && k !== 'earth-throw-deep') errors.push(`throw ${k}: none planned after ${playText(e)}`);
+    if (o && k === 'earth-throw-dive' && o.takePh !== 'ready') errors.push(`throw ${k}: no diving stop's throw landed in the countdown (${thrText(o)})`);
+    if (o && k === 'earth-throw-deep' && !['bounce', 'loop', 'flat'].includes(o.kind)) errors.push(`throw ${k}: a ${o.kind} throw from the deep`);
+    console.log(`throw    ok  ${k}: ${thrText(o)}`);
+  }
+  if (await fieldPlay(page, 'earth-catch-cordon', PLAYS.slipCatch)) await catchReplay(page, 'earth-catch-replay-cordon', 'close');
+  if (await fieldPlay(page, 'earth-catch-cab', PLAYS.cab)) await catchReplay(page, 'earth-catch-replay-cab', 'cab');
+  else console.log('replay   ok  (no caught and bowled came up in 4 balls)');
+  // the last wicket caught: the replay, then the end screen
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 20});
+  await page.evaluate(() => { const M = __t.getM(); M.wktsMax = M.wkts + 1; });
+  if (await fieldPlay(page, 'earth-catch-last', PLAYS.slipCatch)) { const nx = await catchReplay(page, 'earth-catch-replay-last', null);
+    if (!await page.isVisible('#end')) errors.push(`catch replay of the last wicket: no end screen after it (${nx})`); }
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
   await startMode(page, 'quick', {planet: 'earth', len: 1});
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
-  // Reach the target before the next ball; the real result flow then ends the chase with a win.
+  // Reach the target before the next ball; the real result flow then ends the chase with a win. The ball is a ring stop: its throw
+  // must not carry on into the celebration
   await page.evaluate(() => { const M = __t.getM(); M.runs = M.target; });
+  if (await fieldPlay(page, 'earth-throw-last', PLAYS.thr)) {
+    const t0 = await thrNow(page);
+    await page.waitForFunction(() => !['flight', 'result'].includes(__t.S.phase), null, {timeout: 20000, polling: 'raf'});
+    const c = await page.evaluate(() => ({ph: __t.S.phase, on: !!__t.S.thr}));
+    if (c.on) errors.push(`throw on the winning ball: still on in ${c.ph}`);
+    console.log(`throw    ok  winning ball: ${t0 ? 'throw planned, cleared at the ' + c.ph : 'no throw planned'}`);
+  }
   for (const [t, n] of [[1, 1], [3.5, 2]]) {
     await page.waitForFunction(t => __t.S.phase === 'celebrate' && __t.clk() - __t.S.cel.t0 >= t, t, {timeout: 20000, polling: 20});
     await page.screenshot({path: `${shots}earth-celebrate-${n}.png`});
@@ -256,8 +410,10 @@ if (planets.includes('earth')) {
       await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
     }
     return bNow(); };
+  const snap = () => page.evaluate(() => ({res: __t.S.res, swing: !!__t.S.swing, b: __t.bowl()}));
   const bowlOne = async (i, tap) => {
-    let b = await toReady();
+    // a throw runs into the next ball: this ball's result is read before it (r0), the throw's own checks after
+    let thrLog = null, r0 = null, b = await toReady();
     if (!b.kit) errors.push('T20 bowling: fielders not in the player\'s kit');
     const chips = await page.$$('#optChips button'), ci = i % chips.length;
     await chips[ci].click();
@@ -274,6 +430,15 @@ if (planets.includes('earth')) {
       if (leave) return {leave: true, bp: null}; const fa = footAt(b, null), w = windows(BOWL_D, true, 1 + 0.35 * fa.gain);
       return {...s, leave: false, defend: false, lofted: false, aim: 20, power: 0.8, bp: null, tc: fa.t - (w.ok + w.edge) / 2}; }; }, i === 5);
     if (i === 3) await armPlay(page, PLAYS.edge);
+    // ball 7: the AI drives toward mid-off, who stops it and throws to the bowler (a direct hit, forced); ball 9: an AI drive fetched
+    // in the deep on the off side, thrown to the keeper (the next ball waits for both)
+    // ball 8: the AI lofts a drive, caught in the ring, which gets a replay
+    if (i === 7) { await page.evaluate(() => { const ab = aiBat; window.aiBat = (st, b, f) => { window.aiBat = ab; const s = ab(st, b, f), fa = footAt(b, null);
+      return {...s, leave: false, defend: false, lofted: true, aim: 25, power: 0.7, bp: null, tc: fa.t + 0.002}; }; }); await armPlay(page, PLAYS.aiCatch); }
+    if (i === 6) { await page.evaluate(() => { const ab = aiBat; window.aiBat = (st, b, f) => { window.aiBat = ab; const s = ab(st, b, f), fa = footAt(b, null);
+      return {...s, leave: false, defend: false, lofted: false, aim: 14, power: 0.8, bp: null, tc: fa.t + 0.002}; }; }); await armPlay(page, PLAYS.thrMid); }
+    if (i === 8) { await page.evaluate(() => { const ab = aiBat; window.aiBat = (st, b, f) => { window.aiBat = ab; const s = ab(st, b, f), fa = footAt(b, null);
+      return {...s, leave: false, defend: false, lofted: false, aim: 65, power: 1, bp: null, tc: fa.t + 0.002}; }; }); await armPlay(page, PLAYS.thrFetch); }
     await page.click('#bowlBtn');
     await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > __t.S.runupDur - 0.6, null, {timeout: 30000, polling: 20});
     if (tap === 'mouse') await page.mouse.click(60, 300);
@@ -285,6 +450,12 @@ if (planets.includes('earth')) {
     if (tap === null ? f.meter.tap !== null || Math.abs(f.ball.rel) < 0.1 : tap === 'mouse' ? f.meter.tap == null || f.ball.rel !== f.meter.tap : Math.abs(f.ball.rel - tap) > 1e-6)
       errors.push(`T20 bowling: release ${tap} gave ${JSON.stringify([f.meter, f.ball.rel])}`);
     if (i === 3) { const e = await fieldPlay(page, 'earth-t20-bowl-field', {...PLAYS.edge, cam: null}, true); console.log(`field    ok  T20 bowling view: ${e ? playText(e) : '(no edge play came up: ball out of reach)'}`); }
+    if (i === 6) { const e = await fieldPlay(page, 'earth-t20-bowl-stop', {...PLAYS.thrMid, cam: null}, true); r0 = e && await snap(); const o = e && await throwCheck(page, 'earth-t20-bowl-throw', true);
+      if (e && (!o || o.rv !== 'bw')) errors.push(`throw T20 bowling: mid-on/off stop thrown ${o ? 'to the keeper' : 'nowhere'} (${playText(e)})`);
+      thrLog = [o, 'earth-t20-bowl-throw', `throw    ok  T20 bowling view: ${e ? '' : '(no stop by mid-on or mid-off came up)'}`]; }
+    if (i === 8) { const e = await fieldPlay(page, 'earth-t20-bowl-fetch', {...PLAYS.thrFetch, cam: null}, true); r0 = e && await snap(); const o = e && await throwCheck(page, 'earth-t20-bowl-fetch-throw');
+      if (e && (!o || o.rv !== 'kp')) errors.push(`throw T20 bowling: deep stop or fetch thrown ${o ? 'to the bowler' : 'nowhere'} (${playText(e)})`);
+      thrLog = [o, 'earth-t20-bowl-fetch-throw', `throw    ok  T20 bowling view, deep ${e ? e.o || 'fetch' : ''}: ${e ? '' : '(no deep stop or fetch came up)'}`]; }
     if (i === 5) {
       // the keeper (drawn in the bowling view) takes the ball at his gloves, which then hold it
       const g = await page.waitForFunction(() => { const S = __t.S, k = __t.fv().findIndex(f => f.kp);
@@ -299,17 +470,21 @@ if (planets.includes('earth')) {
         else console.log(`field    ok  T20 bowling view: keeper gathers, gloves ${k.d.toFixed(2)} m from the ball, ${k.info.calls} draw calls, ${k.info.tris} triangles`); }
     }
     await page.waitForFunction(() => __t.S.phase !== 'flight', null, {timeout: 30000, polling: 20});
-    const r = await page.evaluate(() => ({res: __t.S.res, swing: !!__t.S.swing, b: __t.bowl()}));
+    const r = r0 || await snap();
     if (!f.ai.leave && !r.swing) errors.push('T20 bowling: the AI batter did not swing ' + JSON.stringify(f.ai));
     if (r.b.balls !== f.balls + (r.res.wide ? 0 : 1) || r.b.runs !== f.runs + r.res.runs || r.b.chips.split(' ').length !== (f.chips ? f.chips.split(' ').length + 1 : 1) && r.b.balls % 6)
       errors.push('T20 bowling: ball not recorded ' + JSON.stringify([f.balls, f.runs, f.chips, r.res.label, r.b.balls, r.b.runs, r.b.chips]));
     seenB.add(r.res.label + (f.ai.leave ? ' (left)' : f.ai.defend ? ' (blocked)' : ''));
+    // a throw: the next ball waits for it (after this ball's own checks)
+    if (thrLog) { const [o, n, t] = thrLog; if (o) await thrAfter(page, n, o); console.log(t + thrText(o)); }
+    if (i === 7 && r.res.out && r.res.catcher != null) await catchReplay(page, 'earth-t20-bowl-catch-replay', null);
+    else if (i === 7) console.log(`replay   ok  T20 bowling: no ring catch came up (${r.res.label})`);
     await page.waitForFunction(() => ['ready', 'pick', 'replay', 'break'].includes(__t.S.phase), null, {timeout: 30000, polling: 30});
     if (await page.evaluate(() => __t.S.phase === 'replay')) { await page.waitForTimeout(400); await page.mouse.click(195, 500); }
   };
   const seenB = new Set();
-  const taps = [0, -0.2, null, 0.15, 'mouse', 0.05, -0.05, 0.3];
-  for (let i = 0; i < 8; i++) await bowlOne(i, taps[i]);
+  const taps = [0, -0.2, null, 0.15, 'mouse', 0.05, -0.05, 0.3, 0];
+  for (let i = 0; i < 9; i++) await bowlOne(i, taps[i]);
   let bw1 = await toReady();
   if (bw1.overNo < 2 || JSON.parse(bw1.bw).filter(f => f.o || f.b).length < 2) errors.push('T20 bowling: no second bowler ' + bw1.bw);
   await page.click('#pauseBtn');
@@ -619,6 +794,7 @@ if (planets.includes('earth')) {
   if (sh.bottom > sh.vh || sh.scroll > 0) errors.push('landscape: Quick match sheet does not fit ' + JSON.stringify(sh));
   await land.click('#sheet .x');
   await startMode(land, 'nets', {planet: 'earth'});
+  await land.evaluate(() => { __t.getM().wktsMax = Infinity; });
   await land.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
   await land.screenshot({path: `${shots}landscape-runup.png`});
   for (const [where, prep] of [['runup', null], ['shot', async () => {
@@ -636,6 +812,9 @@ if (planets.includes('earth')) {
   { const e = await fieldPlay(land, 'landscape-field-edge', PLAYS.edge); const c = await land.evaluate(() => __t.cam3());
     camErr = Math.max(camErr, c); if (!(c < 0.5)) errors.push(`camera parity landscape cordon: ${c} px`);
     console.log(`land     ok  cordon camera: ${playText(e)}`); }
+  { const e = await fieldPlay(land, 'landscape-throw-stop', PLAYS.thr), o = e && await throwCheck(land, 'landscape-throw');
+    console.log(`land     ok  throw: ${thrText(o)}`); }
+  if (await fieldPlay(land, 'landscape-catch-cordon', PLAYS.slipCatch)) await catchReplay(land, 'landscape-catch-replay', 'close');
   // T20 in the phone layout: the slab (with the batters) stays in its column above the stick, and the pause scorecard
   await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await land.waitForTimeout(100);

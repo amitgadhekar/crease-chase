@@ -106,7 +106,8 @@ function drawRadar(bp){
     if(M.t20&&!fx&&Math.hypot(f.x,f.z)>rc){ctx.beginPath();ctx.arc(x,y,4.2,0,7);ctx.stroke();}});
   if(S.aim){const dx=S.aim.x-S.aim.x0,dy=S.aim.y-S.aim.y0,L=Math.hypot(dx,dy);if(L>=14){const a=aimDeg(dx,dy)*D2R,len=clamp(L/dragMax(),0.3,1)*BOUNDARY;
     ctx.strokeStyle=S.loft?'#ffb627':'#fff';ctx.lineWidth=2;const [x,y]=P(Math.sin(a)*len,Math.cos(a)*len);line(cx,cy,x,y);}}
-  if(S.phase==='result'&&S.hit&&bp){S.trail.push(P(bp.x,bp.z));ctx.strokeStyle='rgba(255,120,100,.8)';ctx.lineWidth=1.5;ctx.beginPath();S.trail.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();
+  // the shot's line only: not the throw back
+  if(S.phase==='result'&&S.hit&&bp){if(!S.thr||clock-S.f0<S.thr.tg)S.trail.push(P(bp.x,bp.z));ctx.strokeStyle='rgba(255,120,100,.8)';ctx.lineWidth=1.5;ctx.beginPath();S.trail.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();
     const [x,y]=S.trail[S.trail.length-1];ctx.fillStyle='#ff5a4a';ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill();}
   ctx.fillStyle='#ff5a4a';ctx.beginPath();ctx.arc(cx,cy,2.4,0,7);ctx.fill();
   const wv=Math.hypot(WIND.x,WIND.z);

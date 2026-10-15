@@ -16,7 +16,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
+npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -148,7 +148,8 @@ planet preview) + boot.
 - **Time:** game clock `clock` only advances when not paused. Input timestamps are converted with `gameTimeAt()` so
   pausing never desyncs timing.
 - **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, `BALL_GAP` = 2 s) → `runup`
-  → `flight` → `result` → (`replay` after a four or six, unless the match/innings just ended) → back to `ready`, or `break`
+  → `flight` → `result` → (`replay` after a four or six, unless the match/innings just ended, or a catch, the last wicket's too:
+  its `nx` is then the end screen, innings break or scenario result; `rpThen(rpWant()|rpCatch(), nx)`) → back to `ready`, or `break`
   at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
   Stump checks and swing resolution are processed in chronological order within a frame (see `flightUpdate`).
   A chase win goes to `celebrate` (~6 s, tap/key skips): bat raise, then `celCam` flies out to a wide orbit (camera raised,
@@ -204,7 +205,8 @@ planet preview) + boot.
 - **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
   without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG` (fallback); fielders/bowler are lower poly,
   13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). Fielding actions (`o.act`): 1 run, 2 take
-  or stop (stoops to low balls), 3 dive, 4 leap, 5 slide, 6 keeper squat/gather; `person3D` poses the body standing, then turns it
+  or stop (stoops, and squats below 0.75 m; `playGeo` puts him in line behind the ball, so a ball over him is not taken behind his back), 3 dive (roll `diveTh`: more for a longer stretch or a lower ball; `playGeo` uses it too), 4 leap, 5 slide, 6 keeper squat/gather, 7 throw (`o.e` 0 overarm, 1 underarm, 2 looping:
+  the right hand alone on `hx/hy/hz`, the left arm leading); `person3D` poses the body standing, then turns it
   as a whole about the hip (roll for a dive, pitch back for a slide), lifts it, and puts both hands on `hx/hy/hz` by IK through
   the inverse of that transform. `GB.surf`/`GB.join`
   in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
@@ -248,8 +250,32 @@ planet preview) + boot.
   either side of t1), slide (from t1-0.45) or take lands the hands at t1; a caught/stopped/fetched ball then stays in the hands
   (`V.ball`). The keeper is drawn at `KEEP[M.bowlerType]` (`resetFielders`), squats in the run-up, rises at the pitch (pace) or
   release (spin), shuffles up to 1 m and gathers what passes the bat (`keepTick`; `ballNow` carries the ball to his gloves where he
-  is drawn). He is hidden only in the home batting view (`batView()`); the bowler's slot carries caught-and-bowled. Ring and deep
-  fielders walk in 1.5 m in the last second of the run-up.
+  is drawn). He is hidden only in the home batting view (`batView()`, with a ball in his gloves: `V.bk`); the bowler's slot carries
+  caught-and-bowled. Ring and deep fielders walk in 1.5 m in the last second of the run-up.
+  Throws back (08, show only: no logic, runs or outs; `TR` = `prng`): `planThrow` (end of `doSwing`) takes the last stop, fetch
+  (`isFetch`) or fumble of a ball not out and not a boundary, not the keeper's or the bowler's (his throw to the keeper would go
+  through the batter); the end by what the camera shows: the bowler in the home batting view (the keeper is hidden there), the
+  keeper under the cordon camera and by geometry under the chase camera (the keeper only if his take falls in the result phase,
+  else the bowler), bowling by geometry (the bowler if he is nearer than 0.75x the keeper's distance, else the keeper);
+  kind by distance (under 14 m standing: underarm 11 m/s; under 42 m: flat 28 m/s; else a one-bounce 32 m/s or a loop 21 m/s,
+  70/30), each segment's vy from its time, so only the arc changes by planet. `S.thr` (times after `S.f0`): `tg` ready (stop +0.3,
+  fetch +0.35, dive/slide +1.15, fumble: a walk to the ball first), wind-up `wu`, release `tr` (waits for the receiver), arrival
+  `ta`. The receiver (by role: keeper `kp` at 5.5 m/s from his stance or last play, or bowler `bw` at 4 m/s from 0.6 s) goes to his
+  stumps, takes it in front of them, gloves over the bails (`at`); batting, the bowler does so only if he can then walk back to his
+  mark before the next run-up, else he takes it on his way back there (no direct hit). Throws run on into the next ball's countdown
+  (`ready`, `break`, `pick`); the result phase does not grow for them. `resetFielders` keeps the thrower (with his play: `o.es`,
+  `ev`, `g`; a thrower who has let go and whose place moved goes there) and the receiver where they are; `thrBall` draws the shot's
+  path (`o.h`) once `S.hit` is cleared. After the take both walk back (`walkTo`: 4.5/5 m/s x `ENV.run`, up to 7 m/s if they would
+  be back after a 2 s countdown); each is let go at his place (`o.td`/`o.rd`, never in `result`, where a play would take him back)
+  and then `S.thr` ends (`fieldTick`). Batting, a throw is planned only if taken 0.3 s before the next run-up (a loop falls back to
+  a bounce; a keeper's take must fall in the result phase, while the cordon or chase camera still shows him); a walk still on at the
+  run-up is cut by `recStart`. Bowling, Bowl (and Space/Enter) is off until the throw ends (`bowlUI`, `bowlPress`), so everyone is
+  at his place for the run-up. `S.thr` is also cleared by `recStart`, `rpStart`, the celebration, `showEnd`, `inningsBreak`,
+  `scenBrief`, `newMatch` and `quitToMenu`. Direct
+  hit (10% of flat/underarm throws up to 30 m, at the stumps): on to the stumps, bails off (`V.st`, or `V.st2` at the far end)
+  until the receiver's gloves have been over them (take + 0.6 s), receiver takes the deflection; no text. `throwTick` drives
+  thrower (act 7, blended over 0.25 s from the play's pose) and receiver before plays and `keepTick`; `thrBall`/`thrView` put the ball in `V`; `thrSnd` plays the take and the hit. The radar's
+  shot line stops when the throw takes the ball (`drawRadar`).
 - **AI innings:** short formats: simulated instantly (`simulateAI`), scaled by each planet's `ai` multiplier. T20: played ball by
   ball by the AI batters against the player's bowling (below).
 - **T20 chase** (4th `LENGTHS` entry, `M.t20`, its own menu mode `t20` started by `startT20`; design and rejected options in docs/t20-mode.md). Pure logic in logic.js, flow in 04b:
@@ -303,7 +329,7 @@ planet preview) + boot.
     chosen plan previews on the ground and radar; Simulate rest) -> `inn1Set` + save -> `bowlOverGo` (banner, wind) -> per ball
     `nextBall` -> `bowlReady` (phase `ready` waits, `readyDur` Infinity) -> Bowl -> `runup` (1.6 s pace, 1.3 s spin) ->
     `releaseBall` -> `bowlRelease` (`bowlDelivery` with the chip's option, `M.mk` and the tapped `rel`, then `aiBat`) -> flight ->
-    `commit` -> `bowlRecord` (`inn1Record`, chips, save) -> `afterResult` -> `bowlAfter` (replay of a four or six, next ball or
+    `commit` -> `bowlRecord` (`inn1Record`, chips, save) -> `afterResult` -> `bowlAfter` (replay of a four, six or catch, next ball or
     over, or at 10 wickets/120 balls `inningsBreak`: `inn2Enter`, save, the break card with top scorers and your bowling, "Chase
     N") -> the chase as below against `M.aiAtk`, target = total + 1. `physD()` = `BOWL_D` while bowling for `evalSwing`,
     `aimSwing` windows and fielder speed. No Hold while bowling (the AI's strike rotates by the rules).
@@ -384,13 +410,25 @@ planet preview) + boot.
   a six lands >= 1 m over it, a one-bounce four 0.5 m inside).
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (187 floats/frame, max 600 frames, ~450 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (188 floats/frame, max 600 frames, ~450 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
-  Per fielder 12 floats: x, z, sin/cos face, run, flags, action, its time `ap`, hands' target, stretch.
-  Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near contact) until 0.4 s after contact,
+  Per fielder 12 floats: x, z, sin/cos face, run, flags, action, its time `ap`, hands' target, stretch; last the far stumps' hit
+  age (`V.st2`). `V.bk` (ball in the keeper's gloves, hidden with him in the batting view by `render3D`) is not recorded: the
+  ball itself always is.
+  Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near contact) until `s1` (0.4 s after contact),
   then a spider-cam trailing the ball (closer and lower for low balls, backs off and rises for high ones so the stands stay in frame) at 1x until 0.3 s after it crosses the rope, with a glow ring on the ball (`rpGlow`). Tap/key/Skip skips after 0.3 s.
+  Catch replays (`RP.ct` = the catcher's `catch` event, `tk` = the catch on the replay clock, class by `M.field[catcher]`): `close`
+  (keeper or within 18 m) cuts at contact + 0.06 s to `cordCam` (the live cordon framing, shared with `updateCam`, 3.2 m across the shorter side; a
+  catch within 4 m of the batter on the off side or straight (x > -1), `RP.sq`, square on from the off side instead, as the
+  batter hides it from the cordon camera; short leg keeps the cordon camera, as he would hide it from the off side; otherwise
+  the camera 2.2 m wider than live, clear of the batter) at
+  0.35x until tk + 0.25; `cab` (bowler's slot) at + 0.12 s to an end-on long lens from behind the striker on the off side (5 m span), 0.4x;
+  `field` (ring, deep, rope) keeps the side-on shot and the spider-cam (its path stops at the catch, so it settles behind the
+  catcher), easing to 0.5x in tk -0.2..+0.1. Ends tk + 0.8 s (field: + 0.5 s; a catch's result phase lasts at least t1 + 0.8 s so it is
+  recorded; `recContact` also records a frame at the catch's exact time, so the slow motion doesn't blend the ball short of the
+  hands); the catch sound plays at tk.
   The batter is shown in replays (the live chase camera hides it).
 
 ## Constraints to keep
@@ -466,6 +504,21 @@ planet preview) + boot.
   camera can't see (most ring fielders are off screen in portrait), which trades some views of the follow-through for seeing them try.
   Limited (review) to plays that get a hand to the ball and to close catches, drops, dives and leaps: off-screen near misses and
   plain stops by the keeper or close fielders stay in the batting view (cut rate on ground shots down by about a fifth).
+- Throws back (owner, 2026-10-15): visual only, no run-outs (running between the wickets stays out of scope), so the balance test
+  and its fingerprint are unchanged. With no batters running, the end is chosen by what the camera shows and by geometry rather
+  than by a runner to beat. Throws run into the next ball's countdown (owner, over keeping every take in the result phase, which
+  threw after ~1 in 5 stops, and over a longer pause between balls): the field reset keeps the thrower and receiver, bails go back
+  at the take, the batting take must beat the fixed countdown (the bowler takes it on his way back to his mark when walking back
+  from his stumps would not fit), and bowling Bowl waits until both are back. Batting, a long throw that would land after the
+  next run-up is skipped (probe, Earth medium: 51 of 59 batting stops, dives and fumbles thrown, 8 long ones skipped; deep
+  fetches mostly skip). A thrower far from his place (a deep chase) may still be walking at the run-up and is put back then
+  (1.5 m+ in ~1 in 6 throws). Bowling, every stop is thrown and Bowl comes on a median 2.5 s
+  (p90 4 s) into the countdown.
+  Direct hits are shown with bails and sound only: any "Out"-like text would read as a run-out that the game doesn't have.
+- Catch replays (owner, 2026-10-15): every caught wicket, the last one too (before the end screen, innings break or scenario
+  result; fours and sixes there still go straight on, a winning hit to the celebration). Three camera classes by where the catch
+  is taken, from recorded frames only; the ball in the keeper's gloves is always recorded (`V.bk` hides it live) so a quick catch
+  standing up doesn't blink out in slow motion. Drops get no replay (not out).
 - T20 strike (owner, 2026-10-14): you bat both, the XI in order with tiers, Hold and the non-striker, over "always on strike"
   (v1): it adds keep-the-strike planning (Hold at the death), at the cost of balls the tail faces.
   Targets were re-calibrated (`DIFF.t20`), and Moon/Mercury/Mars `t20` re-measured (their top order bats longer than Earth's).
@@ -499,7 +552,6 @@ planet preview) + boot.
    non-striker: ~172 calls, ~190k triangles). The keeper adds 13 meshes (+13 in the shadow pass) wherever he is drawn (not in
    the home batting view): 158 calls, ~128k triangles measured in the T20 bowling view at a keeper's gather (headless). The adaptive tiers react to it; if still slow: merge person parts into
    one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
-- Replays are only for fours and sixes; a replay of caught wickets (the cordon and deep catches) is a possible follow-up.
 - Wicket rates per planet are not guarded (only runs are): with real edge trajectories, Jupiter's gravity drops edges short of
   the cordon (about half the catches; easy short-format chases rarely lose a wicket), while Venus, Saturn and Neptune catch more.
   T20 per-planet win rates stay in band. If it matters: a per-planet cordon depth in `fieldFor`/`tplField`.

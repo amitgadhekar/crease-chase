@@ -96,7 +96,10 @@ if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3
     viol:M.st.viol.bouncer+M.st.viol.field,ns3d:LV.ns.on}:null,sfx:()=>({decoded:Object.keys(SFXBUF).length,expected:Object.keys(SFX_DATA).length}),
   // fielding: the fielders as drawn (live or replay), the field set for the next ball (keeper at his stance), the camera in use
   fv:()=>{const V=S.phase==='replay'?RV:LV;return V.f.slice(0,V.nf).map(f=>({on:f.on,kp:f.kp,act:f.act,ap:f.ap,x:f.x,z:f.z,hx:f.hx,hy:f.hy,hz:f.hz,face:f.face}));},
-  fieldSet:f=>{M.field=f;resetFielders();},view:()=>({bat:batView(),cord:!!S.cord,chase:!!S.chase})};
+  fieldSet:f=>{M.field=f;resetFielders();},view:()=>({bat:batView(),cord:!!S.cord,chase:!!S.chase}),
+  // the ball and stumps as drawn (live or replay): bk = held by the keeper, hidden with him in the batting view; st/st2 = hit near/far stumps
+  vb:()=>{const V=S.phase==='replay'?RV:LV,b=V.ball;return {b:b&&{x:b.x,y:b.y,z:b.z},bk:V.bk,vis:!!G3&&G3.ball.visible,st:V.st&&{a:V.st.a,bails:V.st.bails},st2:V.st2&&{a:V.st2.a}};},
+  pj:(x,y,z)=>proj(x,y,z)};
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();showMenu(null);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);

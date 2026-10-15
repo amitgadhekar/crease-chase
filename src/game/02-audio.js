@@ -40,8 +40,8 @@ const sfx={
   bounce(){play('bounce',{vol:0.45,rate:jit(0.04)});},
   stumps(){play('stumps',{vol:0.6,rate:jit(0.03)});},
   cheer(big,dist){
-    if(!big){play('cheer',{vol:0.15});return;}
-    play('roar',{vol:0.175+0.2*Math.min(1,(dist||60)/100)});},
+    if(!big){play('cheer',{vol:0.08});return;}
+    play('roar',{vol:0.09+0.1*Math.min(1,(dist||60)/100)});},
   groan(w){play('groan',{vol:0.5,delay:w});},
   gasp(w){play('gasp',{vol:0.45,delay:w});},
   end(kind){

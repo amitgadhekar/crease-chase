@@ -92,15 +92,16 @@ function optPick(k){
   M.optK[bw.i]=k;M.mk=optSpot(bw,o);chipsBuild();
 }
 $('#optChips').addEventListener('click',e=>{const b=e.target.closest('button');if(b)optPick(b.dataset.k);});
+// Bowl waits for a throw back to end (fieldTick calls this then): its thrower and receiver are then at their places for the run-up
 function bowlUI(){
   const ph=S.phase,ru=ph==='runup';$('#optChips').classList.toggle('off',ph!=='ready');
-  const b=$('#bowlBtn');b.textContent=ru?'Release':'Bowl';b.classList.toggle('off',ph!=='ready'&&!ru);
+  const b=$('#bowlBtn');b.textContent=ru?'Release':'Bowl';b.classList.toggle('off',ph!=='ready'&&!ru||ph==='ready'&&!!S.thr);
 }
 // the meter's cursor sweeps -1..1 over the last METER_T s of the run-up, so its end is the moment the ball leaves the hand
 const METER_T=1;
 function bowlPress(ts){
   if(!M||!M.bowl||S.paused)return;
-  if(S.phase==='ready'){S.mkDrag=null;S.phase='runup';S.t=0;S.bpos.x=S.bpos.z=0;recStart();S.meter={t0:clock+S.runupDur-METER_T,T:METER_T,tap:null};bowlUI();}
+  if(S.phase==='ready'&&!S.thr){S.mkDrag=null;S.phase='runup';S.t=0;S.bpos.x=S.bpos.z=0;recStart();S.meter={t0:clock+S.runupDur-METER_T,T:METER_T,tap:null};bowlUI();}
   else if(S.phase==='runup')bowlTap(ts);
 }
 // rel from the tap's own timestamp (gameTimeAt), never the frame that handles it; a tap before the cursor starts is ignored
@@ -137,9 +138,8 @@ function bowlRecord(res,b){
   M.runs=st.runs;M.wkts=st.wkts;M.balls=st.balls;M.overBalls.push(ballChip(res));t20Save();
 }
 function bowlAfter(){
-  if(inn1Over())return inningsBreak();
-  const nx=M.overDone?newOver:nextBall;M.overDone=false;
-  if(S.res.boundary&&S.chase&&REC.n>1)rpStart(nx);else nx();
+  if(inn1Over())return rpThen(rpCatch(),inningsBreak);
+  const nx=M.overDone?newOver:nextBall;M.overDone=false;rpThen(rpWant(),nx);
 }
 
 /* --- marker: dragged anywhere (it moves with the finger, offset so the finger doesn't cover it), a tap on the ground puts it
@@ -223,7 +223,7 @@ function inn1Line(){const i=M.i1,bb=bowled(i,M.mine)[0];
 function inningsBreak(){
   const i=M.i1,P=M.planet,row=c=>'<tr>'+c.map(x=>'<td>'+x+'</td>').join('')+'</tr>';
   rpUI(false);pickUI(false);ctlUI(false);
-  Object.assign(S,{ball:null,swing:null,ai:null,hit:null,res:null,deferred:null,chase:null,stumps:null,meter:null,relFb:null,mkDrag:null,timing:null,phase:'idle',paused:true});
+  Object.assign(S,{ball:null,swing:null,ai:null,hit:null,res:null,deferred:null,chase:null,stumps:null,thr:null,meter:null,relFb:null,mkDrag:null,timing:null,phase:'idle',paused:true});
   $('#banner').className='';$('#hud').hidden=true;hint('');
   inn2Enter();t20Save();
   $('#iTitle').textContent=P.team+' '+i.runs+'/'+i.wkts;

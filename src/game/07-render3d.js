@@ -413,17 +413,20 @@ function limb(m1,m2,a,t,l1,l2,pole,side){
   const k=ik(a,t,l1,l2,pole);mL(m1,a,k,l1,side);mL(m2,k,t,l2,side);return t;}
 // dejected variants (lost the match): torso lean, head drop; arms hanging, hands on hips, hands on knees
 const DEJ=[[.38,.95],[.24,.8],[.8,.4]];
-// fielding actions (o.act, from fplay in fieldTick): 1 run, 2 take or stop, 3 dive, 4 leap, 5 slide, 6 keeper (o.e: squat);
+// fielding actions (o.act, from fplay in fieldTick): 1 run, 2 take or stop, 3 dive, 4 leap, 5 slide, 6 keeper (o.e: squat), 7 throw
+// (o.e: 0 overarm, 1 underarm, 2 looping; the right hand on o.hx/hy/hz, the left arm leading toward the target);
 // o.ap s after the hands meet the ball (negative: approach, launch), o.hx/hy/hz their target, o.e the stretch, o.sd +1 to his
 // right. The body is posed standing, then turned as a whole about the hip (roll for a dive, pitch back for a slide) and lifted
 const AXN=[0,0,0];
+// a dive's roll: further for a longer stretch, and for a lower ball (a short dive at the grass would leave the hands above it)
+const diveTh=(e,y)=>(35+45*clamp(Math.max(e/1.2,(.9-y)/.8),0,1))*D2R;
 function person3D(r,x,z,face,o,id=0,dj=0){
   const P=SPX,c=Math.cos(face),s=Math.sin(face),act=o.act||0,ap=o.ap||0,os=o.sd||1;
   const dv=id%3,dl=DEJ[dv],rn=(o.run||0)*P.fq,sn=Math.sin(rn),cs=Math.cos(rn),L=P.th+P.sh,k=L/.93,AL=P.ua+P.fa,tw=P.tw,bw=o.arm!=null,hy0=P.an+L*P.kn;
   let ra=o.running?1:0,cr=o.crouch||0,st=0,sq=0,rl=0,pt=0,hip=null,jh=0,wh=0,sl5=0,sp=0;
   const rel=(a,b,u)=>ap<0?smooth(clamp((ap-a)/(b-a),0,1)):o.hold?1:1-smooth(clamp((ap-u)/.45,0,1));
-  if(act===2){wh=rel(-.35,-.05,.25);st=wh*clamp((1.05-o.hy)/.85,0,1);}
-  else if(act===3){const T=.12+o.e/6,th=os*(35+45*clamp(o.e/1.2,0,1))*D2R,lo=Math.max(.2,hy0*Math.cos(th)+.06),hc=clamp(o.hy-.1,lo+.05,1.6);
+  if(act===2){wh=rel(-.35,-.05,.25);st=wh*clamp((1.05-o.hy)/.85,0,1);sq=wh*clamp((.75-o.hy)/.5,0,1);}
+  else if(act===3){const T=.12+o.e/6,th=os*diveTh(o.e,o.hy),lo=Math.max(.2,hy0*Math.cos(th)+.06),hc=clamp(o.hy-.1,lo+.05,1.6);
     if(ap<-T)wh=.5*smooth(clamp((ap+T+.25)/.25,0,1));
     else if(ap<=0){const g=smooth((ap+T)/T);rl=th*g;hip=lerp(hy0,hc,g)+.12*Math.sin(Math.PI*g);wh=1;ra=0;sp=1;}
     else{const g=ap<.5?0:smooth(clamp((ap-.5)/.6,0,1));rl=th*(1-g);hip=ap<.3?lerp(hc,lo,(ap/.3)**2):lerp(lo,hy0,g);wh=o.hold?1:1-g;ra=0;sp=1-g;}}
@@ -431,6 +434,7 @@ function person3D(r,x,z,face,o,id=0,dj=0){
     st=ap<-.35?.45*smooth(clamp((ap+.6)/.25,0,1)):ap>.35?.4*(1-smooth(clamp((ap-.35)/.3,0,1))):0;wh=rel(-.55,-.2,.4);if(jh>0)ra=0;}
   else if(act===5){const g=ap<0?smooth(clamp((ap+.45)/.45,0,1)):ap<.6?1:1-smooth(clamp((ap-.6)/.5,0,1));sl5=g;pt=.85*g;hip=lerp(hy0,.34,g);wh=rel(-.35,-.1,.6);if(g>0)ra=0;}
   else if(act===6){sq=o.e;wh=1;}
+  else if(act===7)st=Math.max(o.e===1?.3:.1,clamp((1.05-o.hy)/.85,0,1));
   const up=P.fl*ra*sn*sn+(bw?P.jp*Math.sin(Math.PI*clamp((o.arm-.4*Math.PI)/(.9*Math.PI),0,1)):0);
   const A=.34*k*P.st*ra,lf=.12*k*P.lf*ra,fw=.12*tw+cr*.06+sq*.13+sp*.04,hw=.1*tw,kd=dv===2?dj:0,tk=jh>0?.22*k:0;
   const fL=[-fw,up+Math.max(0,cs)*lf+tk,sn*A+sp*.14],fR=[fw,up+Math.max(0,-cs)*lf+tk,-sn*A-sp*.14];
@@ -462,6 +466,8 @@ function person3D(r,x,z,face,o,id=0,dj=0){
     if(wh>0){AXN[0]=o.hx+c*sd*.06;AXN[1]=o.hy;AXN[2]=o.hz-s*sd*.06;
       if(sl5&&sd!==os){AXN[0]=x-s*.35+c*sd*.3;AXN[1]=.04;AXN[2]=z-c*.35-s*sd*.3;}
       t=V3.lerp(t,V3.sub(Wi(AXN),S),wh);p=V3.lerp(p,[sd,act===4?.2:-.3,-.3],wh);}
+    if(act===7){if(i){AXN[0]=o.hx;AXN[1]=o.hy;AXN[2]=o.hz;t=V3.sub(Wi(AXN),S);p=o.e===1?[1,-.5,-.3]:[1,.3,-.5];}
+      else if(o.e!==1){const l=smooth(clamp((ap+.6)/.3,0,1))*(1-smooth(clamp((ap-.3)/.4,0,1)));t=V3.lerp(t,[.05,.35*AL,.8*AL],l);p=V3.lerp(p,[-1,-.3,.2],l);}}
     limb(r.uarm[i],r.farm[i],W(S),W(V3.add(S,t)),P.ua,P.fa,Wd(p),R);}
   const hq=P.nod+ln*.35+dj*dl[1]-st*.5,Uh=Wd([0,Math.cos(hq),Math.sin(hq)]),Fh=Wd([0,-Math.sin(hq),Math.cos(hq)]),T=W(V3.add(top,slump));
   mB(r.head,T,R,Uh,Fh);
@@ -528,11 +534,13 @@ function stumps3D(s,z,hit){
   else [-1,1].forEach((k,j)=>{const y=0.73+3.2*t-4.9*t*t,b=s[3+j];b.visible=y>=0;if(y<0)return;const px=k*(0.06+0.9*t),pz=z-1.2*t;mSeg(b,[px-0.05,y,pz],[px+0.05,y+0.02,pz],0.011);});
 }
 const BZR={pace:19.45,spin:19.6};
+// the bowler's mark: start of his run-up
+const bowlMark=()=>M.bowlerType==='pace'?31:25.5;
 function bowlerState(){
   let z=S.bowlerZ,arm=null,run=0,running=false;const pace=M.bowlerType==='pace';
-  if(S.phase==='runup'){const p=S.t/S.runupDur;z=lerp(pace?31:25.5,BZR[M.bowlerType],p);run=S.t*(pace?13:10);running=true;
+  if(S.phase==='runup'){const p=S.t/S.runupDur;z=lerp(bowlMark(),BZR[M.bowlerType],p);run=S.t*(pace?13:10);running=true;
     if(p>0.72)arm=lerp(0,Math.PI,(p-0.72)/0.28);}
-  else if(S.phase==='ready'||S.phase==='break'||S.phase==='pick'){z=pace?31:25.5;}
+  else if(S.phase==='ready'||S.phase==='break'||S.phase==='pick'){z=bowlMark();}
   else if(S.phase==='flight'||S.phase==='result'){const t=S.phase==='flight'?clock-S.ball.start:S.t+0.8;
     z=Math.max(17.6,BZR[M.bowlerType]-t*2.4);arm=Math.min(2*Math.PI,Math.PI+t*12);run=t*8;running=t<0.9;}
   S.bowlerZ=z;return {z,arm,run,running};
@@ -542,13 +550,13 @@ function bowlerState(){
 const NFL=12,wideCam=()=>!!S.cel||S.phase==='replay'||MENU.on;
 // the home batting camera: the keeper is hidden there (standing up he would block the batter; standing back he is behind it)
 function batView(){return !!M&&!M.bowl&&!S.cel&&S.phase!=='replay'&&!(S.chase&&clock>=S.chase.t0)&&!(S.cord&&clock>=S.cord.t0)&&!MENU.on;}
-const mkView=()=>({pose:null,ball:null,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},mk:null,bz:0,bx:0,arm:null,brun:0,brn:false,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
+const mkView=()=>({pose:null,ball:null,bk:false,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},st2:null,so2:{a:0,bails:true},mk:null,bz:0,bx:0,arm:null,brun:0,brn:false,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
   nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0,act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,kp:false,bwl:false,hold:false})),hideBat:false,trail:null,cheer:0,dej:0});
 const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
   const V=LV,ph=S.phase;
   V.pose=poseTick();V.ball=ballNow();
-  V.st=S.stumps?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;
+  V.st=S.stumps?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;V.st2=null;V.bk=false;
   V.mk=!settings.assist||M&&M.bowl?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
   V.nf=0;
   if(M){
@@ -557,8 +565,9 @@ function liveView(){
     S.fpos.forEach(p=>{if(V.nf>=NFL)return;const o=V.f[V.nf++];
       Object.assign(o,{on:!p.bw,kp:p.kp,bwl:p.bw,x:p.x,z:p.z,face:p.face,running:p.mv>.8,run:p.run,crouch:!p.kp&&(ph==='flight'||ph==='runup')?1:0,
         act:p.act,ap:p.ap,hx:p.hx,hy:p.hy,hz:p.hz,e:p.e,sd:p.sd,hold:p.hold});
-      // a caught or gathered ball stays in the hands (behind the batting camera the keeper is not drawn, so neither is it)
-      if(p.hold&&p.ap>0&&!(p.kp&&batView()))V.ball=(V.bo.x=p.hx,V.bo.y=p.hy-.05,V.bo.z=p.hz,V.bo);});
+      // a caught or gathered ball stays in the hands (bk: the keeper's, hidden with him in the batting view by render3D)
+      if(p.hold&&p.ap>0){V.ball=(V.bo.x=p.hx,V.bo.y=p.hy-.05,V.bo.z=p.hz,V.bo);V.bk=p.kp;}});
+    thrView(V);
   }
   nsTick(V.ns,V.bx);
   V.dej=S.cel?smooth(clamp((clock-S.cel.t0-.2)/.9,0,1)):0;
@@ -617,11 +626,11 @@ function render3D(V){
   G.bowler.g.visible=!!M;
   if(M){const pc=M.bowlerType==='pace';Object.assign(BO,{running:V.brn,run:V.brun,arm:V.arm,rel:pc?2.2:2});
     if(cb)person3D(G.bowler,cb.x,cb.z,cb.face,cb,1,V.dej);else person3D(G.bowler,V.bx,V.bz,Math.PI,BO,1,V.dej);}
-  G.ball.visible=!!bp;
+  G.ball.visible=!!bp&&!(V.bk&&kh);
   if(bp)mT(G.ball,[bp.x,bp.y+0.05,bp.z],.05,.05,.05);
   G.mk.visible=G.mkr.visible=!!mk;
   if(mk){mT(G.mk,[mk.xb,0,mk.zb],0.24,1,0.24);mT(G.mkr,[mk.xb,0,mk.zb],0.26,1,0.26);}
-  stumps3D(G.stumps[0],0,V.st);
+  stumps3D(G.stumps[0],0,V.st);stumps3D(G.stumps[1],20.12,V.st2);
   const n=V.ns;G.ns.g.visible=!!M&&n.on;
   if(G.ns.g.visible){mB(G.ns.g,[n.x,0,NS_Z-n.u],[-1,0,0],[0,1,0],[0,0,-1]);const J=batsman3D(G.ns,n.pose,SKN.on);if(SKN.on)skin3D(J,SKN.b2);}
   G.bat.g.visible=!V.hideBat;if(!V.hideBat){const J=batsman3D(G.bat,pz,SKN.on);if(SKN.on)skin3D(J);}

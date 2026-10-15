@@ -1,7 +1,7 @@
 /* ---------- match flow ---------- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));MENU.on=id==='menu';}
 function newMatch(P,mode,diff,L){
-  sfx.amb(true);rpUI(false);applyPlanet(P);setKits(false);ctlUI(false);pickUI(false);S.ai=S.meter=S.pending=null;
+  sfx.amb(true);rpUI(false);applyPlanet(P);setKits(false);ctlUI(false);pickUI(false);S.ai=S.meter=S.pending=S.thr=null;
   S.timing=null;S.bpos.x=S.bpos.z=0;S.hintCount=0;S.cel=null;S.bat={mode:'stance',t0:clock,from:null,aim:0};fwReset();updateCam(0);
   return {mode,planet:P,pk:curPlanet,diff,overs:L.overs,wktsMax:mode==='nets'?(settings.netsW||Infinity):L.w,t20:mode==='chase'&&!!L.t20,target:0,runs:0,wkts:0,balls:0,overBalls:[],fours:0,sixes:0,
      swings:[],perfects:0,shots:[],lastLens:[],typeStats:{pace:{r:0,n:0},spin:{r:0,n:0}},field:[],bowlerType:'pace',spinDir:1,overNo:0,foot:{x:0,z:0}};
@@ -58,8 +58,15 @@ function newOver(cont){
   if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
 // fielders back at their places (the keeper at his stance for this bowler, KEEP), with the motion state fieldTick (08) drives
-function resetFielders(){S.fpos=M.field.map(f=>{const kp=f.n==='keeper',p=kp?KEEP[M.bowlerType]||KEEP.pace:f;
-  return {x:p.x,z:p.z,bx:p.x,bz:p.z,run:0,mv:0,face:kp?0:Math.atan2(-p.x,BATS_Z-p.z),act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,ev:null,kp,bw:f.n==='bowler'};});
+// A throw under way (S.thr) keeps its receiver and thrower where they are (and his play), so throwTick carries on and walks them
+// back; a thrower who has let go and whose place moved (a new field) goes there with everyone else
+function resetFielders(){const o=S.thr,t=clock-S.f0,old=S.fpos;
+  S.fpos=M.field.map((f,i)=>{const kp=f.n==='keeper',p=kp?KEEP[M.bowlerType]||KEEP.pace:f,
+    q={x:p.x,z:p.z,bx:p.x,bz:p.z,run:0,mv:0,face:kp?0:Math.atan2(-p.x,BATS_Z-p.z),act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,ev:null,kp,bw:f.n==='bowler'},
+    w=!o?null:kp||q.bw?o.rv===(kp?'kp':'bw')&&old.find(x=>x.kp===kp&&x.bw===q.bw):i===o.i&&!o.td&&old[i];
+    if(w&&i===o.i&&!(t<o.tr+.6||w.bx===q.bx&&w.bz===q.bz)){o.td=1;return q;}
+    if(w)Object.assign(q,{x:w.x,z:w.z,face:w.face,run:w.run,ev:w.ev,g:w.g});
+    return q;});
   S.fplay=[];S.fev=null;S.cord=null;}
 function nextBall(){
   $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
@@ -122,8 +129,8 @@ function doSwing(){
   for(const e of S.fplay)(S.fev[e.i]||(S.fev[e.i]=[])).push(e);
   let dur=1.2,tCross=0;
   if(S.hit){const h=S.hit;dur=(h.air?Math.min(h.T+(h.stop?0.2:0.9),2.6):Math.min(h.s/h.a,2.2))+0.8;
-    // long enough to see every attempt land (a diver is up again 1.1 s after it)
-    for(const e of S.fplay)if(e.k!=='run'||e.o)dur=Math.max(dur,Math.min(3.4,e.t1+1));}
+    // long enough to see every attempt land (a diver is up again 1.1 s after it), a catch to its end (the replay is recorded from this)
+    for(const e of S.fplay)if(e.k!=='run'||e.o)dur=Math.max(dur,Math.min(3.4,e.t1+1),e.o==='catch'?e.t1+.8:0);}
   if(res.boundary&&S.hit){
     const h=S.hit,bd=distToBoundary(h.x0,h.z0,h.ux,h.uz);
     if(h.air)tCross=bd<=h.C?bd/h.sh:h.T+(h.rt||1.2)*(1-Math.sqrt(Math.max(0,1-(bd-h.C)/(h.roll!=null?h.roll:h.C*0.3))));
@@ -142,7 +149,7 @@ function doSwing(){
     else{const q=e=>proj(e.x,e.y,e.z),dv=S.fplay.find(e=>act(e)&&e.o&&e.o!=='miss'&&!(x=>x&&x.x>0&&x.x<W&&x.y>0&&x.y<H)(q(e)));
       if(dv){S.chase={t0:clock+0.15,tx:clock+dv.t1};tCross=Math.min(2.5,dv.t1);}}
   }
-  commit(res,dur,tCross);
+  planThrow(res,dur);commit(res,dur,tCross);
 }
 function commit(res,dur,delay){
   const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
@@ -183,10 +190,9 @@ function afterResult(){
   if(M.mode==='chase'){
     const out=M.wkts>=M.wktsMax,done=M.balls>=M.overs*6;
     if(M.runs>=M.target)return endMatch('win');
-    if(out||done)return endMatch(M.runs===M.target-1?'tie':'loss');
-  }else if(M.wkts>=M.wktsMax)return endMatch('nets');
-  const nx=!S.res.wide&&M.balls>0&&M.balls%6===0?newOver:nextBall;
-  if(S.res.boundary&&S.chase&&REC.n>1)rpStart(nx);else nx();
+    if(out||done){const k=M.runs===M.target-1?'tie':'loss';return rpThen(rpCatch(),()=>endMatch(k));}
+  }else if(M.wkts>=M.wktsMax)return rpThen(rpCatch(),()=>endMatch('nets'));
+  rpThen(rpWant(),!S.res.wide&&M.balls>0&&M.balls%6===0?newOver:nextBall);
 }
 function endMatch(kind){
   sfx.end(kind);
@@ -211,13 +217,13 @@ function endMatch(kind){
   if(kind==='win')celebrate();else showEnd();
 }
 function celebrate(){
-  S.phase='celebrate';S.cel={t0:clock,fly:false};S.chase=null;S.trail3=[];S.aim=null;S.bat={mode:'celebrate',t0:clock,from:null,aim:0};
+  S.phase='celebrate';S.cel={t0:clock,fly:false};S.chase=S.thr=null;S.trail3=[];S.aim=null;S.bat={mode:'celebrate',t0:clock,from:null,aim:0};
   ctlUI(false);fwReset();FW.next=clock+0.8;
 }
-function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';sfx.amb(false);hint('');fwReset();showScreen('end');}
+function showEnd(){const rp=S.phase==='replay';rpUI(false);if(rp)updateCam(0);S.paused=true;S.phase='idle';S.thr=null;sfx.amb(false);hint('');fwReset();showScreen('end');}
 // a ball still in its Hold window is recorded as not held, so the T20 or scenario save includes it
 // back to the hub; from a scenario (its result, pause or briefing) straight into the Scenarios sheet
-function quitToMenu(){const toScen=!!(M&&M.sc)||$('#brief').classList.contains('on');if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;ctlUI(false);pickUI(false);setKits(false);S.ai=S.meter=null;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');showMenu(toScen?'scen':null);}
+function quitToMenu(){const toScen=!!(M&&M.sc)||$('#brief').classList.contains('on');if(M&&S.hold)holdEnd(false);rpUI(false);S.hold=null;$('#holdBtn').hidden=true;ctlUI(false);pickUI(false);setKits(false);S.ai=S.meter=S.thr=null;S.paused=true;S.phase='idle';sfx.amb(false);S.cel=null;fwReset();S.bat={mode:'stance',t0:clock,from:null,aim:0};updateCam(0);M=null;S.bpos.x=S.bpos.z=0;$('#hud').hidden=true;$('#loftBtn').hidden=true;$('#stick').hidden=true;hint('');showMenu(toScen?'scen':null);}
 function pause(){if(!M||S.paused)return;S.paused=true;S.aim=null;sfx.duck(1);
   $('#pText').textContent=M.sc?M.sc.title+'. '+objText(M.sc):M.bowl?M.planet.team+' are '+M.runs+'/'+M.wkts+' after '+oversText(M.balls)+' overs.':M.mode==='chase'?'You are '+M.runs+'/'+M.wkts+', chasing '+M.target+'.':'Tap "Quit to menu" to see your session summary.';
   $('#pCard').innerHTML=M.t20?(M.i1&&!M.bowl?inn1Line()+'\n':'')+t20Card(M.st,M.attack):'';$('#pause .card').classList.toggle('split',!!M.t20);

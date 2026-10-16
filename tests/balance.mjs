@@ -278,6 +278,37 @@ function captainFuzz(n){
   }
   return bad;
 }
+// replays (highlightOf) per 100 legal balls by kind, Earth. Batting rows: every highlight is replayed. std = the standard bot on the
+// short-format ring field; human = 65 ms spread, leaves 60% of balls wide of off (2% of others), 12% blocks, 22% lofted, half the
+// balls with the "reads length" footwork bot. bowl: T20 first innings (auto-bowler, AI batters, templates), where fours and sixes
+// share one replay per over (rp counts the replays that rule shows)
+function hlRates(kind,diff,n){
+  setPlanet('earth');const K={},A={balls:0,rp:0,overs:0};let slot=-1;
+  const add=(h,legal,o)=>{if(legal)A.balls++;if(!h)return;K[h.kind]=(K[h.kind]||0)+1;
+    if(kind!=='bowl'||!/^(four|six|leap)$/.test(h.kind))A.rp++;else if(slot!==o){slot=o;A.rp++;}};
+  if(kind==='bowl'){
+    while(A.balls<n){const mine=myAttack('earth'),st=newInn1(mine,aiXI('earth',makeAttack('earth',diff)),diff,'earth');
+      while(st.balls<120&&st.wkts<10){
+        if(st.bi<0){rollWind(PLANETS.earth);const s=inn1Suggest(st,mine);inn1Set(st,s.bi,s.pid);}
+        const bw=mine[st.bi],c=autoBowl(st,bw),f=st.field,o=A.overs+Math.floor(st.balls/6),r=inn1Ball(st,bw,c.o,c.m,c.rel);
+        add(highlightOf(r.res,r.b,f,footAt(r.b,r.sw.bp).c),!r.res.wide,o);}
+      A.overs+=20;}
+  }else{
+    const P=setPlanet('earth'),mem={},field=fieldFor([],diff).field,hu=kind==='human';
+    for(let i=0;i<n;i++){
+      if(i%6===0)rollWind(P);
+      const b=makeDelivery(planBall(mem,Math.random()<0.6?'pace':'spin',diff,{last:[],foot:null}),diff,Math.random()<.5?1:-1),
+        bp=hu&&i%2?FOOTBOTS.reads(b):null,f=footAt(b,bp);let res;
+      if(hu&&Math.random()<(f.xc>0.3?0.6:0.02))res=beaten(b,bp,false);
+      else{const blk=hu&&Math.random()<0.12,lofted=!blk&&Math.random()<(hu?0.22:0.3);let aim;
+        if(f.full>0.65)aim=Math.random()<.5?-85:85;else if(f.xc>0.2)aim=40+Math.random()*40;else if(f.xc<-0.05)aim=-40;else aim=(Math.random()-.5)*30;
+        const sw={tc:f.t-0.005+gauss()*(hu?0.065:0.045),aim:blk?0:aim+gauss()*12,power:blk?0.3:lofted?0.85:0.65,lofted,defend:blk,bp},r=evalSwing(b,sw,diff,field);
+        res=r.miss?beaten(b,r.bp||bp,true):r.res;}
+      add(highlightOf(res,b,field,f.c),!res.wide,0);brainLearn(mem,b,res.runs,!!res.out);
+    }
+  }
+  return {K,balls:A.balls,rp:A.rp};
+}
 function fieldFuzz(n){
   let bad=0;const ids=Object.keys(TPL);
   for(let k=0;k<n;k++){
@@ -323,6 +354,22 @@ for (const d of ['easy', 'medium', 'hard']) {
 const AU = ctx.fplayAudit(N);
 console.log(`  fielding events of ${N} random balls (every planet and level, all fields, every tier): ${AU.ev} events, ${AU.bad} impossible`);
 check('impossible fielding events', AU.bad, 0, 0);
+
+// Replays (docs/replays.md): highlightOf per 100 legal balls, Earth. Near misses (shave + shout) must stay at or under 0.5 replays per
+// over (owner, 2026-10-15: otherwise only the closest qualify); the replay load per over stays in a loose band
+{
+  const HK = ['caught', 'bowled', 'lbw', 'stumped', 'drop', 'chance', 'save', 'leap', 'six', 'four', 'shout', 'shave'], HN = Math.round(N / 2);
+  console.log(`\nReplays per 100 legal balls (Earth, ${HN} balls a row; bowl = T20 first innings, fours and sixes one replay per over):`);
+  console.log('  row          ' + HK.map(k => k.padStart(7)).join('') + '   per over: all  new  near');
+  for (const kind of ['std', 'human', 'bowl']) for (const d of ['easy', 'medium', 'hard']) {
+    const R = ctx.hlRates(kind, d, HN), p = k => (R.K[k] || 0) / R.balls * 100, po = ks => ks.reduce((a, k) => a + p(k), 0) * 0.06;
+    const all = R.rp / R.balls * 6, nw = po(['bowled', 'lbw', 'stumped', 'drop', 'chance', 'save', 'leap', 'shout', 'shave']), near = po(['shout', 'shave']);
+    console.log(`  ${(kind + ' ' + d).padEnd(13)}${HK.map(k => p(k).toFixed(1).padStart(7)).join('')}   ${all.toFixed(2).padStart(13)} ${nw.toFixed(2).padStart(4)} ${near.toFixed(2).padStart(5)}`);
+    check(`${kind} ${d}: near-miss replays per over`, near, 0, 0.5);
+    check(`${kind} ${d}: new replay kinds per over`, nw, 0.01, 1.2);
+    check(`${kind} ${d}: replays per over`, all, 0.5, 3.6);
+  }
+}
 
 console.log(`\nFootwork bots on Earth (medium), ${5 * N} balls each:`);
 const fw = {};

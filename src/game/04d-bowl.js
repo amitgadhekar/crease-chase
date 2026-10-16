@@ -138,7 +138,7 @@ function bowlRecord(res,b){
   M.runs=st.runs;M.wkts=st.wkts;M.balls=st.balls;M.overBalls.push(ballChip(res));t20Save();
 }
 function bowlAfter(){
-  if(inn1Over())return rpThen(rpCatch(),inningsBreak);
+  if(inn1Over())return rpThen(rpWant(true),inningsBreak);
   const nx=M.overDone?newOver:nextBall;M.overDone=false;rpThen(rpWant(),nx);
 }
 

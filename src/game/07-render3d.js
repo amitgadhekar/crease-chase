@@ -556,7 +556,7 @@ const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
   const V=LV,ph=S.phase;
   V.pose=poseTick();V.ball=ballNow();
-  V.st=S.stumps?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;V.st2=null;V.bk=false;
+  V.st=S.stumps&&clock>=S.stumps.t0?(V.so.a=clock-S.stumps.t0,V.so.bails=!!S.stumps.bails,V.so):null;V.st2=null;V.bk=false;
   V.mk=!settings.assist||M&&M.bowl?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
   V.nf=0;
   if(M){
@@ -657,6 +657,6 @@ function draw(V){
   if(!glOK){ctx.fillStyle='#fff';ctx.font='600 16px Barlow,sans-serif';ctx.textAlign='center';ctx.fillText('3D graphics are not available on this device.',W/2,H/2);}
   if(V.trail)V.trail.forEach((t,i)=>{const q=proj(t.x,t.y,t.z);if(!q)return;ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.03)+')';ctx.beginPath();ctx.arc(q.x,q.y,Math.max(2,0.05*q.s),0,7);ctx.fill();});
   drawFx();
-  if(S.phase==='replay')rpGlow(bp);
+  if(S.phase==='replay'){rpGlow(bp);rpLbw();}
   if(!S.cel&&S.phase!=='replay'){drawBowl();drawAim();drawRadar(bp);drawTimingBar();drawInfo();}
 }

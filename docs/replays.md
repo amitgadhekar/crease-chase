@@ -1,7 +1,7 @@
 # Replays: more events (plan)
 
-Status: planned, owner decisions taken (2026-10-15), nothing built yet. Today a ball gets a replay after a four or six (side-on slow motion, then the
-spider-cam) and after a caught wicket (camera class by where the catch is taken: close, cab, field), the last wicket's too.
+Status: built (2026-10-15), see "7. As built" at the end. Before it a ball got a replay after a four or six (side-on slow motion, then
+the spider-cam) and after a caught wicket (camera class by where the catch is taken: close, cab, field), the last wicket's too.
 Owner request (2026-10-15): "Start planning on adding replays on many other events, like catching the ball, catch out, bowled
 out, or any significant events where catches are missed." Owner priorities: batting feel first (replays short, skippable, not
 too frequent), fielders visibly trying, original IP only.
@@ -176,3 +176,59 @@ Risks:
    would add more than ~0.5 replays per over, only the closest ones (a distance threshold) qualify, rather than a new setting.
 
 Sources: none cited; camera choices are design reasoning from the game's own cameras, not broadcast practice.
+
+## 7. As built (2026-10-15)
+
+Approach B and the eight steps, with the owner decisions of section 6.
+
+- **Detector:** `highlightOf(res,b,field,c)` in src/logic.js, no randomness (fingerprint `FP` 96fcd588 unchanged). `c` (the logic's
+  contact point, `footAt(b,bp).c`) is a fourth argument the plan didn't have: the hands-on test (ball within 0.1 m of the hands
+  horizontally, 0.15 m vertically, in the air) and the rope save's natural length need the path from it. Priority: wicket (bowled
+  incl. played on, lbw, stumped, caught) > drop > chance > save > leap > six > four > shout > shave.
+- **Director:** 08b. `rpWant(end)` picks, `rpStart(h,nx)` builds the plan, `rpUpdate`/`rpCam` read only the plan. The four/six and
+  catch replays run through it unchanged in look (same lead-in, classes, speeds and ends). No-contact kinds anchor on the event
+  (`b.start + t`), never on `S.hitStart`.
+- **When:** batting (short formats, nets, T20 chase, Scenarios), every highlight; T20 first innings, the AI's fours, sixes and leaps
+  share one replay per over (`M.rpOver`), everything else always (wickets, chances, saves, near misses: the owner named wickets and
+  chances; saves and near misses are rare there, 0.15 and 0.1 per over, so they were kept). At the end of an innings only a wicket
+  of any kind is replayed (before the end screen, innings break or scenario result); a winning hit still goes to the celebration.
+- **Cameras:** as section 2, with `stumps` placed 3.4 m up at z 27, 0.5 m to the side away from the bowler (lower, it looks
+  through the bowler and the non-striker; the tallest species are 2.2 m), 2.8 m across the shorter side; `crease` from (6.5, 1.1,
+  4.1) toward the popping crease (straight square on at x 6.5 looks through silly point). Both cut at the pitch.
+- **Slow windows:** stumps and crease 0.45x for the whole flight after the cut; save and leap 0.45x in tk -0.35..+0.25; drops and
+  chances as a catch of their class. Ends: bowled/stumped tk + 0.7, LBW/shout/shave tk + 0.5 (after the 0.6 s hold), save tk + 0.7,
+  drop/chance tk + 0.8 (to the rope + 0.3 if it then goes for four or six).
+- **Sounds at tk:** stumps (bowled, stumped), pad (LBW, shout), a gasp (shave), gloves and a gasp (drop, chance); the bat at contact,
+  an edge for played on.
+- **LBW overlay** (`rpLbw`, 06): a dotted path from the pad to the stumps drawn out over 0.35 s of the hold, the wicket outline,
+  rings at the pitch, the pad and where it reaches the stumps (red: hitting; amber: the reason it is not out), the verdict ("Out:
+  hitting the stumps", "Not out: pitched outside leg", "Not out: impact outside the line").
+- **Deflection off the stumps:** done (cheap): `ballNow` carries the ball on to the stumps and off them, slowing, for bowled and
+  played on, live and so in the recording. Played on's bails now go when the ball reaches the stumps, not at contact.
+- **Exact frames:** `flightUpdate` records a frame at the pad, at the stumps and at the keeper's take (`tEnd`) as they happen;
+  `recContact` at contact and at the highlight's play.
+
+Measured (tests/balance.mjs, `hlRates`, Earth, 10,000 legal balls a row; rows as section 1):
+
+| per 100 balls | caught | bowled | lbw | stumped | drop | chance | save | leap | six | four | shout | shave |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| std E / M / H | 1.5 / 3.8 / 7.0 | 0.1 / 0.4 / 0.9 | 0.0 / 0.1 / 0.3 | 0 | 0.7 / 1.4 / 1.6 | 0.1 / 0.3 / 0.4 | 0.1 | 0 | 15 / 12 / 11 | 35 / 27 / 20 | 0.0 / 0.1 / 0.3 | 0.0 / 0.2 / 0.4 |
+| human E / M / H | 2.2 / 3.5 / 5.8 | 0.9 / 1.9 / 3.3 | 0.4 / 0.7 / 1.5 | 1.0 | 1.1 / 1.4 / 1.7 | 0.1 / 0.2 / 0.2 | 0.0-0.2 | 0 | 6.9 / 5.6 / 5.1 | 22 / 15 / 9.5 | 0.2 / 0.3 / 0.9 | 1.0 / 1.6 / 2.0 |
+| bowl E / M / H | 6.9 / 6.9 / 6.7 | 3.2 / 2.8 / 1.9 | 2.2 / 1.6 / 1.0 | 0.2-0.4 | 2.8 / 2.5 / 2.4 | 0.6 / 0.6 / 0.7 | 2.5 / 2.2 / 2.8 | 0.2 | 8.1 / 9.9 / 12 | 21 / 22 / 23 | 0.3 / 0.2 / 0.1 | 1.7 / 1.3 / 0.8 |
+
+| replays per over | all | new kinds | near misses |
+|---|---|---|---|
+| std E / M / H | 3.11 / 2.72 / 2.48 | 0.06 / 0.16 / 0.24 | 0.00 / 0.01 / 0.04 |
+| human E / M / H | 2.12 / 1.86 / 1.86 | 0.28 / 0.43 / 0.64 | 0.07 / 0.11 / 0.17 |
+| bowl E / M / H (one boundary slot) | 2.07 / 1.97 / 1.87 | 0.83 / 0.70 / 0.60 | 0.12 / 0.09 / 0.05 |
+
+Near-miss threshold: 8 cm (`SHAVE`) past off stump or over the bails, and every shout not given. They add at most 0.17-0.18 replays per
+over, well under the owner's 0.5, so no tighter threshold was needed. The balance test guards: near misses <= 0.5 per over, new
+kinds 0.01-1.2, all replays 0.5-3.6 per over, in every row.
+
+Deviations from the plan: the detector's fourth argument `c`; `leap` is its own kind (a six with the rider's leap); saves and near
+misses are always replayed in the bowling innings (not in the shared slot); a hands-on leap at a six that clears the fielder counts
+as a chance (it outranks the leap). Smoke (`replay2` in tests/smoke.mjs): every kind forced and checked at its event (kind, camera
+class, ball and stumps or fielder on screen, parity, skip), the keeper at his stance and the bowler at his mark after a replayed
+drop or save, the last wicket bowled before the end screen, bowled in the T20 bowling view, LBW in landscape. Screenshots
+`tests/screenshots/replay2-*.png`.

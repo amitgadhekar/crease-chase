@@ -18,11 +18,12 @@ function recFrame(V,force){
     r[k+5]=(f.on?1:0)|(f.running?2:0)|(f.crouch?4:0)|(f.sd>0?8:0)|(f.kp?16:0)|(f.bwl?32:0)|(f.hold?64:0);r[k+6]=f.act;r[k+7]=f.ap;r[k+8]=f.hx;r[k+9]=f.hy;r[k+10]=f.hz;r[k+11]=f.e;}
   const ns=V.ns;r[o+RNS-1]=V.cheer;r[o+RNS]=V.bx;r[o+RNS+1]=ns.on?1:0;r[o+RNS+2]=ns.x;r[o+RNS+3]=ns.u;r[o+RNS+4]=ns.ph;r[o+RNS+5]=ns.mv;r[o+RNS+6]=V.st2?V.st2.a:NaN;REC.nf=V.nf;REC.n++;
 }
-// contact falls between two frames, so the replay gets a frame at exactly that moment: ball on the blade, impact pose; and one at
-// a catch, so its slow motion shows the ball reaching the hands rather than blended short of them
+// contact falls between two frames, so the replay gets a frame at exactly that moment: ball on the blade, impact pose; and one at the
+// highlight's play (a catch, drop, save, leap), so its slow motion shows the ball reaching the hands rather than blended short of them.
+// The ball's own moments (stumps, pad, keeper) are recorded by flightUpdate as they happen (recAtClock)
 function recContact(){
   if(S.hit)recAtClock(S.hitStart);
-  const e=S.f0!=null&&rpCatchEv();if(e)recAtClock(S.f0+e.t1);}
+  const h=S.hl;if(h&&h.ev)recAtClock(S.f0+h.t);}
 function recAtClock(t){
   if(clock<=t||REC.n&&t-REC.t0<=REC.buf[(REC.n-1)*RFL])return;
   const c=clock;clock=t;recFrame(liveView(),true);clock=c;}
@@ -49,30 +50,53 @@ function rpView(){
   const ns=V.ns;ns.on=!!x[RNS+1];if(ns.on){ns.x=x[RNS+2];ns.u=x[RNS+3];nsPose(ns.pose,x[RNS+4],x[RNS+5]);}
   return V;
 }
-// a caught wicket's catch (drops are not out), and whether this ball gets a replay: a four or six seen in the chase camera (not at the
-// end of an innings), or a catch (the last wicket's too, before the end screen, the innings break or the scenario's result)
-const rpCatchEv=()=>REC.n>1&&S.res&&S.res.out&&S.res.catcher!=null&&S.fplay.find(e=>e.i===S.res.catcher&&e.o==='catch');
-const rpCatch=()=>!!rpCatchEv(),rpWant=()=>rpCatch()||REC.n>1&&!!S.res&&!!S.res.boundary&&!!S.chase;
-function rpThen(want,nx){if(want)rpStart(nx);else nx();}
-/* a catch replay (tk: the catch on the replay clock) by where it is taken: close (keeper, or within 18 m) cuts to the cordon camera
-   just after contact (a catch at the batter on the off side or straight: square on from the off side), slow until the catch; cab
-   (caught and bowled) to an end-on lens from behind the striker; field (ring, deep, rope) keeps the side-on shot and the spider-cam,
-   easing into slow motion briefly around the catch. Slow-motion span sa..sb at speed slo */
-function rpStart(nx){
-  const tc=S.hitStart-REC.t0,x=recAt(tc),ct=rpCatchEv()||null,last=REC.buf[(REC.n-1)*RFL];
-  const R=RP={t:Math.max(0,S.ball.start-REC.t0-.15),tc,s1:tc+.4,end:0,nx,t0:clock,h:S.hit,hit:false,ct,cls:null,
-    snd:[batKind(S.res),S.res.q,S.swing&&S.swing.power],hx:x[10+qHX],hz:x[10+qHZ],yaw:null};
-  if(ct){const f=M.field[ct.i]||{},c=R.cls=f.n==='bowler'?'cab':f.n==='keeper'||Math.hypot(f.x,f.z)<18?'close':'field';
-    R.tk=tc+ct.t1;R.sq=c==='close'&&ct.x>-1&&Math.hypot(ct.x,ct.z-.5)<4;R.s1=tc+(c==='close'?.06:c==='cab'?.12:.4);
-    R.end=Math.min(R.tk+(c==='field'?.5:.8),last);R.slo=c==='close'?.35:c==='cab'?.4:.5;R.sa=c==='field'?R.tk-.2:-1e9;R.sb=R.tk+(c==='field'?.1:.25);}
-  else R.end=Math.min(S.chase.tx-REC.t0+.3,last);
+/* the replay director: every replay comes from the ball's highlight (S.hl = highlightOf in commit). Batting, every highlight is replayed
+   (a four or six when the chase camera followed it); in the T20 first innings the AI's fours and sixes share one replay per over; at
+   the end of an innings (end: before the end screen, innings break or scenario result) only a wicket */
+const RP_BND={four:1,six:1,leap:1};
+function rpWant(end){
+  const h=S.hl;if(!h||REC.n<2||!S.ball)return null;
+  if(end)return HL_WK[h.kind]?h:null;
+  if(RP_BND[h.kind]){if(!S.chase||!S.hit)return null;if(M.bowl){if(M.rpOver===M.overNo)return null;M.rpOver=M.overNo;}}
+  return h;
+}
+function rpThen(h,nx){if(h)rpStart(h,nx);else nx();}
+/* a replay plan from the highlight. All start just before release in the side-on slow motion (0.6x easing to 0.35x near tc, the
+   contact or, without one, the event); s1 ends it. Then by class: field (spider-cam on the shot's path: boundaries, rope saves, the
+   six's leap, a catch or chance in the ring or deep, slow sa..sb round the play), close (keeper or within 18 m: the cordon camera just
+   after contact, or square on from the off side for a play at the batter), cab (bowler's slot: end-on from behind the striker), stumps
+   (bowled, LBW, near misses: end-on from behind the bowler's arm, cut at the pitch, the whole flight slow) and crease (stumped: square on
+   at the popping crease). ct: the play as drawn (S.fplay, moved onto the drawn path; h.ev is the logic's). tk: the event on the replay clock; ev: sounds at their times; hold: LBW's pause at the pad (rpLbw draws) */
+function rpStart(h,nx){
+  const b=S.ball,res=S.res,sw=S.swing,last=REC.buf[(REC.n-1)*RFL],bs=b.start-REC.t0,k=h.kind,e=h.ev&&S.fplay[(res.fplay||[]).indexOf(h.ev)]||h.ev||null,hit=!!S.hit,
+    tc=hit?S.hitStart-REC.t0:bs+h.t,tk=h.rel?bs+h.t:e?tc+e.t1:tc,x=recAt(Math.min(tc,last)),snd=[batKind(res),res.q,sw&&sw.power];
+  const R=RP={kind:k,t:Math.max(0,bs-.15),tc,tk,s1:tc+.4,end:last,nx,t0:clock,h:S.hit,ct:e,cls:'field',sq:false,sa:-1e9,sb:-1e9,slo:1,
+    hx:x[10+qHX],hz:x[10+qHZ],bx:x[RNS],yaw:null,ev:[],hold:0,hu:0,lbw:null},at=(t,f)=>R.ev.push({t,f});
+  if(hit)at(tc,()=>sfx.bat(...snd,.7));
+  if(h.rel){
+    R.cls=k==='stumped'?'crease':'stumps';R.s1=Math.max(R.t+.2,Math.min(bs+b.t1,tk-.25));R.slo=.45;R.sb=1e9;
+    R.end=Math.min(tk+(k==='bowled'||k==='stumped'?.7:.5),last);
+    if(res.outText==='Played on'&&sw)at(bs+sw.tc,()=>sfx.bat('edge',.3,.5,.7));
+    if(k==='lbw'||k==='shout'){R.hold=.6;R.lbw={b,pad:res.pad,out:k==='lbw'};at(tk,()=>play('block',{vol:.5,rate:.7}));}
+    else at(tk,k==='shave'?()=>sfx.gasp(0):()=>sfx.stumps());
+  }else if(e&&!RP_BND[k]&&k!=='save'){
+    const f=M.field[e.i]||{},c=R.cls=f.n==='bowler'?'cab':f.n==='keeper'||Math.hypot(f.x,f.z)<18?'close':'field';
+    R.sq=c==='close'&&e.x>-1&&Math.hypot(e.x,e.z-.5)<4;R.s1=tc+(c==='close'?.06:c==='cab'?.12:.4);
+    R.end=Math.min(tk+(k==='caught'&&c==='field'?.5:.8),res.boundary&&S.chase?Math.max(tk+.8,S.chase.tx-REC.t0+.3):1e9,last);
+    R.slo=c==='close'?.35:c==='cab'?.4:.5;R.sa=c==='field'?tk-.2:-1e9;R.sb=tk+(c==='field'?.1:.25);
+    at(tk,k==='caught'?()=>sfx.catch(0):()=>{sfx.keeper(.5);sfx.gasp(0);});
+  }else{
+    R.end=Math.min(RP_BND[k]?S.chase.tx-REC.t0+.3:tk+.7,last);
+    if(e){R.sa=tk-.35;R.sb=tk+.25;R.slo=.45;}
+  }
   S.phase='replay';S.chase=S.thr=S.cord=null;$('#banner').className='';S.trail3=[];S.aim=null;ctlUI(false);rpUI(true);updateCam(0);
 }
 function rpUpdate(dt){
   const R=RP,t=R.t;
-  R.t+=dt*(t<R.s1?lerp(.6,.35,smooth(clamp((t-R.tc+.5)/.2,0,1))):R.ct?lerp(1,R.slo,smooth(clamp((t-R.sa+.3)/.3,0,1))*(1-smooth(clamp((t-R.sb)/.3,0,1)))):1);
-  if(!R.hit&&R.t>=R.tc){R.hit=true;sfx.bat(...R.snd,.7);}
-  if(R.ct&&!R.ck&&R.t>=R.tk){R.ck=1;sfx.catch(0);}
+  if(R.hold&&t>=R.tk&&R.hu<R.hold)R.hu+=dt;
+  else R.t+=dt*(t<R.s1?lerp(.6,.35,smooth(clamp((t-R.tc+.5)/.2,0,1))):lerp(1,R.slo,smooth(clamp((t-R.sa+.3)/.3,0,1))*(1-smooth(clamp((t-R.sb)/.3,0,1)))));
+  if(R.hold&&R.hu<R.hold&&R.t>R.tk)R.t=R.tk;
+  for(const x of R.ev)if(!x.on&&R.t>=x.t){x.on=1;x.f();}
   if(R.t>=R.end)rpEnd();
 }
 function rpEnd(){const R=RP;rpUI(false);ctlUI(true);R.nx();updateCam(0);}
@@ -97,6 +121,12 @@ function rpCam(dt){
   // 3.2 m of ground across the shorter side (cordCam's span is half the longer side), so the catcher is as big in landscape; the
   // camera 2.2 m further out than live, so the line to a keeper or slip passes clear of the batter
   if(R.cls==='close'){const c=R.ct;return cordCam(c.x,c.z,1.6*Math.max(W,H)/Math.min(W,H),clamp(c.x*.3+(c.x<0?-2.2:2.2),-4.5,4.5));}
+  // bowled, LBW, near misses: end-on from high behind the bowler's arm (on the side away from him, clear of him and the non-striker),
+  // a long lens on the batter's stumps, 2.8 m across the shorter side
+  if(R.cls==='stumps'){const cx=R.bx>0?-.5:.5,d=Math.hypot(cx,26.4);setCam(cx,3.4,27,Math.atan2(-cx,-26.4)/D2R);F=Math.min(W,H)/2.8*d;HZ=H*.6-2.95*F/d;return;}
+  // stumped: low and square on from the off side, a little in front of the popping crease (clear of silly point): back foot, crease,
+  // stumps and the keeper across the screen
+  if(R.cls==='crease'){const cx=6.5,cz=4.1,d=Math.hypot(cx,cz-1.1);setCam(cx,1.1,cz,Math.atan2(-cx,1.1-cz)/D2R);F=Math.min(W/5.6,H/3.4)*d;HZ=H*.68-.5*F/d;return;}
   if(R.cls==='cab'){const c=R.ct,dx=c.x-2.4,dz=c.z+5,d=Math.hypot(dx,dz);setCam(2.4,2.2,-5,Math.atan2(dx,dz)/D2R);F=Math.max(W,H)/2*d/5;HZ=H*.62-2.2*F/d;return;}
   const h=R.h,b=hitPos(h,R.t-R.tc),ux=h.ux,uz=h.uz,first=R.yaw==null,k=first?1:1-Math.exp(-dt*4);
   const bk=6+b.y*.8,tx=b.x-ux*bk+uz*2,tz=b.z-uz*bk-ux*2,ty=3+b.y*.6;

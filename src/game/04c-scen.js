@@ -148,7 +148,7 @@ function scenRecord(res,b,held,quiet){
 }
 function scenAfter(){
   holdEnd(false);
-  const e=scenEnd(M.st);if(e)return rpThen(rpCatch(),()=>scenFinish(e));
+  const e=scenEnd(M.st);if(e)return rpThen(rpWant(true),()=>scenFinish(e));
   const nx=M.overDone?newOver:nextBall;M.overDone=false;rpThen(rpWant(),nx);
 }
 // stars are saved per scenario id (each session of a staged chase has its own); a drawn session carries on into the next one

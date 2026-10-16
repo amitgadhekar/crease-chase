@@ -16,7 +16,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
+npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), the other replay kinds (`replay2`: bowled, LBW, a shout not given, a shave, stumped, drops close and deep, a rope save, a hands-on chance and a six's leap, the last wicket bowled, bowled in the bowling view, LBW in landscape), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
 ```
@@ -25,6 +25,8 @@ Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub P
 `.github/workflows/pages.yml`: `npm ci`, balance test, build, deploy `dist/crease-chase.html` as `index.html`. A failing balance
 test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
+Its replay checks (`hlRates`, std / human / bowling rows): near misses (shave + shout) <= 0.5 replays per over, the new kinds 0.01-1.2,
+all replays 0.5-3.6 per over.
 Its footwork checks: "reads length" must beat the stationary bot by 5-25% runs/wicket; "always charges" and "always across" must not beat it.
 Its T20 checks (full matches: a bowling bot bowls the player's attack at the AI batters, then the batting bot chases as the XI with
 tiers and strike rotation, no Hold): standard bots win easy >=75%, medium 40-60%, hard <=25% on Earth and 35-65% on medium on every
@@ -40,6 +42,9 @@ Its fielding checks: the same balls fielded at each level score less and are cau
 chances in reach taken within bands; rope catches happen; well-timed ground shots keep >=95% of their pre-v2 runs; no impossible
 fielding event. The whole test takes ~95 s (the fielding model doubled it from ~54 s).
 Run `npm run test:smoke` after any change to rendering, flow or input, and look at `tests/screenshots/`.
+While iterating, run only the area you touched: `SMOKE_ONLY=field,throw npm run test:smoke` (sections: `node tests/smoke.mjs --list`;
+each starts from the hub and passes alone; `SMOKE_PLANETS=earth,mars` limits the per-planet loop). The full unfiltered run
+(what CI does) is required once before a push. New checks go inside the matching `if(on('section'))` guard in tests/smoke.mjs.
 
 ## Layout
 ```
@@ -148,8 +153,8 @@ planet preview) + boot.
 - **Time:** game clock `clock` only advances when not paused. Input timestamps are converted with `gameTimeAt()` so
   pausing never desyncs timing.
 - **Ball state machine** (`S.phase`): `break` (new over banner) → `ready` (countdown, `BALL_GAP` = 2 s) → `runup`
-  → `flight` → `result` → (`replay` after a four or six, unless the match/innings just ended, or a catch, the last wicket's too:
-  its `nx` is then the end screen, innings break or scenario result; `rpThen(rpWant()|rpCatch(), nx)`) → back to `ready`, or `break`
+  → `flight` → `result` → (`replay` of the ball's highlight `S.hl`, see View state and replays; when the match/innings just ended
+  only a wicket's, its `nx` then the end screen, innings break or scenario result; `rpThen(rpWant(end), nx)`) → back to `ready`, or `break`
   at an over boundary. Swings resolve at `tc = release time + SWING_DELAY`.
   Stump checks and swing resolution are processed in chronological order within a frame (see `flightUpdate`).
   A chase win goes to `celebrate` (~6 s, tap/key skips): bat raise, then `celCam` flies out to a wide orbit (camera raised,
@@ -329,7 +334,7 @@ planet preview) + boot.
     chosen plan previews on the ground and radar; Simulate rest) -> `inn1Set` + save -> `bowlOverGo` (banner, wind) -> per ball
     `nextBall` -> `bowlReady` (phase `ready` waits, `readyDur` Infinity) -> Bowl -> `runup` (1.6 s pace, 1.3 s spin) ->
     `releaseBall` -> `bowlRelease` (`bowlDelivery` with the chip's option, `M.mk` and the tapped `rel`, then `aiBat`) -> flight ->
-    `commit` -> `bowlRecord` (`inn1Record`, chips, save) -> `afterResult` -> `bowlAfter` (replay of a four, six or catch, next ball or
+    `commit` -> `bowlRecord` (`inn1Record`, chips, save) -> `afterResult` -> `bowlAfter` (a replay: wickets, chances, saves, near misses; fours and sixes one per over; next ball or
     over, or at 10 wickets/120 balls `inningsBreak`: `inn2Enter`, save, the break card with top scorers and your bowling, "Chase
     N") -> the chase as below against `M.aiAtk`, target = total + 1. `physD()` = `BOWL_D` while bowling for `evalSwing`,
     `aimSwing` windows and fielder speed. No Hold while bowling (the AI's strike rotates by the rules).
@@ -417,18 +422,37 @@ planet preview) + boot.
   Per fielder 12 floats: x, z, sin/cos face, run, flags, action, its time `ap`, hands' target, stretch; last the far stumps' hit
   age (`V.st2`). `V.bk` (ball in the keeper's gloves, hidden with him in the batting view by `render3D`) is not recorded: the
   ball itself always is.
-  Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near contact) until `s1` (0.4 s after contact),
-  then a spider-cam trailing the ball (closer and lower for low balls, backs off and rises for high ones so the stands stay in frame) at 1x until 0.3 s after it crosses the rope, with a glow ring on the ball (`rpGlow`). Tap/key/Skip skips after 0.3 s.
-  Catch replays (`RP.ct` = the catcher's `catch` event, `tk` = the catch on the replay clock, class by `M.field[catcher]`): `close`
+  Director (08b, docs/replays.md): `commit` stores `S.hl = highlightOf(res,b,field,c)` (logic.js, pure: `{kind, ev, t, rel}`, most
+  significant first: wickets `bowled` (played on too) `lbw` `stumped` `caught`; chances `drop`, `chance` (a dive or leap in the air
+  with a hand on it); `save` (stopped within 10 m of the rope, would have reached it); `leap` (a six over the rider's leap), `six`,
+  `four`; near misses `shout` (pad, would hit, not out: pitched outside leg or outside the line) and `shave` (left or beaten within
+  `SHAVE` 8 cm of off stump or over the bails)). `rpWant(end)`: batting every highlight (a boundary only with the chase camera); the
+  T20 first innings, the AI's fours and sixes one replay per over (`M.rpOver`); `end` only a wicket. `rpStart(h,nx)` builds the plan
+  `RP` (`kind`, `cls`, anchor `tc` = contact, or the event without one: never `S.hitStart`, stale then; `tk` the event; `s1`; slow
+  `sa..sb` at `slo`; `end`; sounds in `ev`; LBW `hold`) and `rpUpdate`/`rpCam` read only it.
+  Cameras (`rpCam`): side-on from the off side in slow motion (0.6x easing to 0.35x near `tc`) until `s1` (0.4 s after contact),
+  then by class. `field`: a spider-cam trailing the ball (closer and lower for low balls, backs off and rises for high ones so the
+  stands stay in frame) at 1x, until 0.3 s after it crosses the rope (boundaries), with a glow ring on the ball (`rpGlow`); a save or
+  the six's leap eases to 0.45x in tk -0.35..+0.25 and ends tk + 0.7. Catch classes (`RP.ct` = the catch, drop or chance event, class
+  by `M.field[e.i]`): `close`
   (keeper or within 18 m) cuts at contact + 0.06 s to `cordCam` (the live cordon framing, shared with `updateCam`, 3.2 m across the shorter side; a
   catch within 4 m of the batter on the off side or straight (x > -1), `RP.sq`, square on from the off side instead, as the
   batter hides it from the cordon camera; short leg keeps the cordon camera, as he would hide it from the off side; otherwise
   the camera 2.2 m wider than live, clear of the batter) at
   0.35x until tk + 0.25; `cab` (bowler's slot) at + 0.12 s to an end-on long lens from behind the striker on the off side (5 m span), 0.4x;
   `field` (ring, deep, rope) keeps the side-on shot and the spider-cam (its path stops at the catch, so it settles behind the
-  catcher), easing to 0.5x in tk -0.2..+0.1. Ends tk + 0.8 s (field: + 0.5 s; a catch's result phase lasts at least t1 + 0.8 s so it is
-  recorded; `recContact` also records a frame at the catch's exact time, so the slow motion doesn't blend the ball short of the
-  hands); the catch sound plays at tk.
+  catcher), easing to 0.5x in tk -0.2..+0.1. Ends tk + 0.8 s (a field catch + 0.5 s; a drop or chance that goes on to the rope at
+  the rope + 0.3; a catch's result phase lasts at least t1 + 0.8 s so it is recorded); the catch sound (a drop: gloves and a gasp)
+  plays at tk. No contact: `stumps` (bowled, LBW, shout, shave) cuts at the pitch to an end-on long lens from 3.4 m up behind the
+  bowler's arm, on the side away from him (`RP.bx`, clear of him and the non-striker), 2.8 m across the shorter side, the whole
+  flight at 0.45x; `crease` (stumped) to a low camera square on from the off side, in front of the popping crease (clear of silly
+  point). LBW and shout hold 0.6 s at the pad while `rpLbw` (06) draws the path on to the stumps (`ballPos` past the pad), the
+  wicket outline, rings at the pitch, the pad and the stumps (amber = the reason it is not out) and the verdict.
+  Exact frames: `recContact` at contact and at the highlight's play (`S.f0 + t`); `flightUpdate` records the pad, the stumps and
+  the keeper's take (`tEnd`) as they happen. Bowled or played on: the ball goes on to the stumps and deflects off them (`ballNow`,
+  show only, recorded); played on's bails wait for it (`S.stumps.t0` in the future, `V.st` from then).
+  Tap/key/Skip skips after 0.3 s. A throw planned on a replayed ball is cleared by `rpStart`; the next ball's `resetFielders`
+  puts everyone back.
   The batter is shown in replays (the live chase camera hides it).
 
 ## Constraints to keep
@@ -518,7 +542,12 @@ planet preview) + boot.
 - Catch replays (owner, 2026-10-15): every caught wicket, the last one too (before the end screen, innings break or scenario
   result; fours and sixes there still go straight on, a winning hit to the celebration). Three camera classes by where the catch
   is taken, from recorded frames only; the ball in the keeper's gloves is always recorded (`V.bk` hides it live) so a quick catch
-  standing up doesn't blink out in slow motion. Drops get no replay (not out).
+  standing up doesn't blink out in slow motion.
+- Replays v2 (owner, 2026-10-15; plan, measured rates and as built in docs/replays.md): a pure highlight detector in logic.js and one
+  replay director in 08b over special cases in `rpStart`; every four and six keeps its replay (no per-over budget batting); bowling,
+  the AI's fours and sixes share one per over, wickets and chances always; near misses in v1 (8 cm rule: at most 0.18 per over measured, under
+  the owner's 0.5 limit, so no tighter threshold); LBW gets a projection hold in a generic look; no new setting. Not replayed:
+  near-miss dives, plain stops, throws and direct hits (no run-outs in the game).
 - T20 strike (owner, 2026-10-14): you bat both, the XI in order with tiers, Hold and the non-striker, over "always on strike"
   (v1): it adds keep-the-strike planning (Hold at the death), at the cost of balls the tail faces.
   Targets were re-calibrated (`DIFF.t20`), and Moon/Mercury/Mars `t20` re-measured (their top order bats longer than Earth's).

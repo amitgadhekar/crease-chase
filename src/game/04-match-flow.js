@@ -69,7 +69,7 @@ function resetFielders(){const o=S.thr,t=clock-S.f0,old=S.fpos;
     return q;});
   S.fplay=[];S.fev=null;S.cord=null;}
 function nextBall(){
-  $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
+  $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.hl=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
   const sb=M.sc?scenNext():null;
   if(M.note){banner('Field change',M.note,'small',1600);M.note='';}
   resetFielders();
@@ -96,11 +96,11 @@ function flightUpdate(){
   for(const e of ev){
     if(S.phase!=='flight')return;
     if(e.k===0)doSwing();
-    else if(e.k===1){tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:bo?0.7:0.5,rate:bo?0.55:0.7});const of=!!sw||!!(S.ai&&!S.ai.sw.leave),r=pd?padResult(b,ph,of):beaten(b,bp,of,scBat());commit(r,r.out?1.9:1.1);}
-    else{b.stumpChecked=true;
-      if(b.onStumps){tooLate(sw,b);sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
+    else if(e.k===1){recAtClock(b.start+ph.t);tooLate(sw,b);S.padHit={x:ph.x,y:ph.y,z:ph.z,t0:clock};play('block',{vol:bo?0.7:0.5,rate:bo?0.55:0.7});const of=!!sw||!!(S.ai&&!S.ai.sw.leave),r=pd?padResult(b,ph,of):beaten(b,bp,of,scBat());commit(r,r.out?1.9:1.1);}
+    else{b.stumpChecked=true;recAtClock(b.start+b.tStumps);
+      if(b.onStumps){tooLate(sw,b);sfx.stumps();S.stumps={t0:clock};commit({runs:0,out:true,outText:'Bowled',stumps:true,label:'Bowled!',sub:sw?'Missed it':'Left it, and it hit the stumps',cls:'out'},1.9);}}
   }
-  if(S.phase==='flight'&&bt>=b.tEnd&&!ph){
+  if(S.phase==='flight'&&bt>=b.tEnd&&!ph){recAtClock(b.start+b.tEnd);
     sfx.keeper(b.wide?0.5:1);
     if(sw&&!sw.done){sw.done=true;sw.missed=true;}
     const st=M.sc?beaten(b,bp,!!sw,scBat()):stumpedResult(b,S.bpos);
@@ -118,7 +118,7 @@ function doSwing(){
   if(r.miss){sw.missed=true;if(r.bp)S.padBp=r.bp;return;}
   const res=r.res,cp=sw.cp,cur=cp||ballPos(b,clock-b.start),c0=footAt(b,sw.bp).c;
   sfx.contact(res,sw);if(res.catcher!=null)sfx.catch(res.path.T);
-  if(res.stumps){S.stumps={t0:clock};sfx.stumps();}
+  if(res.stumps){S.stumps={t0:Math.max(clock,b.start+b.tStumps)};sfx.stumps();}
   if(res.path){const h=S.hit=preparePath(res.path,cur,res.dir);S.hitStart=clock;
     if(cp){S.hitStart=b.start+sw.tc;if(h.air)h.vy+=(h.y0-cp.y)/h.T;h.y0=cp.y;}
     // the drawn path starts up to 0.5 m from the logic's: a six still lands over the rope, a one-bounce four inside it
@@ -152,7 +152,7 @@ function doSwing(){
   planThrow(res,dur);commit(res,dur,tCross);
 }
 function commit(res,dur,delay){
-  const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;
+  const b=S.ball;S.res=res;S.phase='result';S.t=0;S.resultDur=dur;S.hl=highlightOf(res,b,M.field,footAt(b,S.swing&&S.swing.bp||S.bpos).c);
   if(S.swing){S.hintCount++;if(S.hintCount>=4)hint('');}
   // Tests and T20: a holdable ball is recorded when Hold is tapped or its window closes (holdEnd)
   // a deferred outcome (a camera cut) opens the window when it is shown, so a Hold is never overwritten by the runs before it
@@ -190,8 +190,8 @@ function afterResult(){
   if(M.mode==='chase'){
     const out=M.wkts>=M.wktsMax,done=M.balls>=M.overs*6;
     if(M.runs>=M.target)return endMatch('win');
-    if(out||done){const k=M.runs===M.target-1?'tie':'loss';return rpThen(rpCatch(),()=>endMatch(k));}
-  }else if(M.wkts>=M.wktsMax)return rpThen(rpCatch(),()=>endMatch('nets'));
+    if(out||done){const k=M.runs===M.target-1?'tie':'loss';return rpThen(rpWant(true),()=>endMatch(k));}
+  }else if(M.wkts>=M.wktsMax)return rpThen(rpWant(true),()=>endMatch('nets'));
   rpThen(rpWant(),!S.res.wide&&M.balls>0&&M.balls%6===0?newOver:nextBall);
 }
 function endMatch(kind){

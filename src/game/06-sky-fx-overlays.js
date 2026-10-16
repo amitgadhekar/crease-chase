@@ -67,6 +67,10 @@ function ballNow(){
   if(S.phase==='result'){
     if(S.hit)return hitPos(S.hit,clock-S.hitStart);
     if(S.padHit){const h=S.padHit,u=clock-h.t0;return {x:h.x+0.15*Math.min(u,0.6),y:Math.max(0,h.y+0.6*u-4.9*u*u),z:h.z+0.5*Math.min(u,0.6)};}
+    // bowled or played on: on to the stumps, then a short deflection off them, slowing (show only; recorded like any ball)
+    if(S.stumps&&!S.stumps.bails&&S.ball){const b=S.ball,t=clock-b.start;if(t<b.tStumps)return ballPos(b,t);
+      const p=ballPos(b,b.tStumps),u=Math.min(t-b.tStumps,1),w=u-u*u/2,q={x:p.x+(p.x<0?-1:1)*.9*w,y:Math.max(0,p.y+1.1*u-4.9*u*u),z:p.z-.12*b.vz2*w};
+      return !batView()||q.z>-2.2?q:null;}
     // past the batter it goes on to the keeper's gloves where he is drawn (fieldTick then holds it in them), stumpings included
     if(S.ball&&(!S.res.out&&!S.stumps||S.stumps&&S.stumps.bails)){const t=clock-S.ball.start,p=ballPos(S.ball,t),bv=batView();return !bv||!S.stumps&&p.z>-2.2?p:null;}
   }
@@ -143,4 +147,23 @@ function drawInfo(){
   else if(S.ball)txt=(pace?'Pace':'Spin')+', '+S.ball.kmh+' km/h';
   if(!txt)return;ctx.save();ctx.font='700 15px "Barlow",system-ui,sans-serif';ctx.textAlign='left';
   ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.strokeText(txt,12+SAFE.l,hudBottom+22);ctx.fillStyle='#fff';ctx.fillText(txt,12+SAFE.l,hudBottom+22);ctx.restore();
+}
+// LBW replays (lbw, and a shout not given): while the replay holds at the pad, the ball's path on from the pad to the stumps (the
+// delivery is deterministic: ballPos past the pad is where it was going) drawn out dotted, the wicket outlined, rings where it pitched,
+// hit the pad and reaches the stumps (red: hitting; amber: the reason it is not out), and the verdict with its reason
+function rpLbw(){
+  const R=RP,L=R&&R.lbw;if(!L||!R.hu)return;
+  const b=L.b,p=L.pad,u=smooth(clamp(R.hu/.35,0,1)),t1=p.t+(b.tStumps-p.t)*u,leg=b.zb>p.z&&b.xb<-STUMP_HALF,inl=Math.abs(p.x)<STUMP_HALF,
+    bad='#ff5a4a',why='#ffc23d',ok='#f2f2ea',ring=(x,y,z,c,r)=>{const q=proj(x,y,z);if(!q)return;ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(r,.04*q.s),0,7);ctx.stroke();};
+  ctx.save();ctx.globalAlpha=smooth(clamp(R.hu/.15,0,1));ctx.lineCap='round';
+  const w=[[-.114,0],[-.114,.725],[.114,.725],[.114,0]].map(([x,y])=>proj(x,y,0));
+  if(w.every(Boolean)){ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();w.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();}
+  ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=3;ctx.setLineDash([2,7]);ctx.beginPath();
+  for(let i=0,m=0;i<=16;i++){const q=ballPos(b,p.t+(t1-p.t)*i/16),s=proj(q.x,q.y,q.z);if(!s)continue;if(m++)ctx.lineTo(s.x,s.y);else ctx.moveTo(s.x,s.y);}
+  ctx.stroke();ctx.setLineDash([]);
+  ring(b.xb,0,b.zb,leg?why:ok,5);ring(p.x,p.y,p.z,inl||leg?ok:why,5);
+  if(u>=1){const e=ballPos(b,b.tStumps);ring(e.x,e.y,0,b.onStumps?bad:ok,6);}
+  const txt=L.out?'Out: hitting the stumps':leg?'Not out: pitched outside leg':!inl?'Not out: impact outside the line':'Not out: missing the stumps',ty=LAND?34:hudBottom+84;
+  ctx.font='800 18px "Barlow",system-ui,sans-serif';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.65)';ctx.strokeText(txt,W/2,ty);
+  ctx.fillStyle=L.out?bad:why;ctx.fillText(txt,W/2,ty);ctx.restore();
 }

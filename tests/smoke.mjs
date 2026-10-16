@@ -1,11 +1,22 @@
 // Browser smoke test: loads dist/crease-chase.html in headless Chromium (software WebGL), plays a few balls
 // on each planet, forces a perfectly timed swing, and fails on any page error. Screenshots go to tests/screenshots/.
 // Usage: npm run build && node tests/smoke.mjs [planet ...]
+// Filters (unset = everything, as CI and the run before a push): SMOKE_ONLY=field,throw runs only those sections (each starts from the
+// hub on a fresh page, so it passes alone); SMOKE_PLANETS=earth,mars limits the per-planet loop (argv planets still work).
+// `node tests/smoke.mjs --list` prints the section names. Sections run in file order; the skinned-batter check always runs.
 import {chromium} from 'playwright';
 import {mkdirSync} from 'node:fs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
-const planets = process.argv.slice(2).length ? process.argv.slice(2) : ['earth','moon','mercury','venus','mars','jupiter','saturn','neptune'];
+const SECTIONS = ['menu', 'planets', 'replay', 'field', 'throw', 'catch', 'celebrate', 'replay2', 't20bowl', 't20chase', 'scen', 'scenlast', 'scenstage', 'scensave', 'land', 'landt20', 'sizes'];
+if (process.argv.includes('--list')) { console.log(SECTIONS.join('\n')); process.exit(0); }
+const ONLY = process.env.SMOKE_ONLY ? process.env.SMOKE_ONLY.split(',').map(x => x.trim()).filter(Boolean) : null;
+if (ONLY && ONLY.some(x => !SECTIONS.includes(x))) { console.error(`SMOKE_ONLY: unknown section ${ONLY.filter(x => !SECTIONS.includes(x))}; sections: ${SECTIONS.join(', ')}`); process.exit(2); }
+const ran = new Set(), on = n => { const y = !ONLY || ONLY.includes(n); if (y) ran.add(n); return y; }, any = (...n) => n.map(on).some(Boolean);
+const argPlanets = process.argv.slice(2).filter(a => !a.startsWith('--')), envPlanets = (process.env.SMOKE_PLANETS || '').split(',').map(x => x.trim()).filter(Boolean);
+const planets = argPlanets.length ? argPlanets : envPlanets.length ? envPlanets : ['earth','moon','mercury','venus','mars','jupiter','saturn','neptune'];
+console.log(`smoke sections: ${SECTIONS.join(' ')}\nrunning: ${ONLY ? ONLY.join(' ') : 'all'}; planets: ${planets.join(' ')}`);
+const smokeT0 = Date.now();
 const shots = fileURLToPath(new URL('./screenshots/', import.meta.url));
 mkdirSync(shots, {recursive: true});
 const url = pathToFileURL(fileURLToPath(new URL('../dist/crease-chase.html', import.meta.url))).href + '#test';
@@ -46,25 +57,25 @@ const PLAYS = {
     pred: "r.out&&r.catcher!=null&&Math.hypot(f[r.catcher].x,f[r.catcher].z)>BOUNDARY*.6&&r.fplay.some(e=>e.i===r.catcher&&e.o==='catch'&&Math.hypot(f[e.i].x-e.x,f[e.i].z-e.z)>3)",
     key: "e=>e.o==='catch'"},
   four: {sw: {aim: 30, power: 1}, pred: "r.boundary===4&&r.fplay.some(e=>e.k==='dive'&&e.o==='miss')", key: "e=>e.k==='dive'"},
-  // throws (noPose: only the play is forced, throwCheck looks at the throw): a standing stop in the ring, a stop in the deep (long-on/long-off back), mid-on or mid-off stopping an AI drive (T20 bowling)
-  thr: {sw: {aim: 30, power: 1}, noPose: 1, field: 'PC', pred: "!r.out&&!r.boundary&&!r.lofted&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&Math.hypot(f[e.i].x,f[e.i].z)<35)",
+  // throws (noPose: only the play is forced, throwCheck looks at the throw; balls with no replay, which would cut the throw): a standing stop in the ring, a stop in the deep (long-on/long-off back), mid-on or mid-off stopping an AI drive (T20 bowling)
+  thr: {sw: {aim: 30, power: 1}, noPose: 1, field: 'PC', pred: "!r.out&&!r.boundary&&!r.lofted&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&Math.hypot(f[e.i].x,f[e.i].z)<35)&&!highlightOf(r,b,f,footAt(b,s.bp).c)",
     key: "e=>e.k==='stop'&&e.o==='stop'"},
-  thrDeep: {sw: {aim: 8, power: 0.5, loft: 1}, field: 1, noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&e.t1<3.6&&Math.hypot(f[e.i].x,f[e.i].z)>BOUNDARY*.6)",
+  thrDeep: {sw: {aim: 30, power: 0.3, loft: 1}, field: 1, noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&e.t1<3.6&&Math.hypot(f[e.i].x,f[e.i].z)>BOUNDARY*.6)&&!highlightOf(r,b,f,footAt(b,s.bp).c)",
     key: "e=>e.k==='stop'&&e.o==='stop'"},
   // a diving stop in the ring (its throw lands in the next ball's countdown), an AI drive stopped or fetched in the deep on the off side (T20 bowling: to the keeper)
-  thrDive: {sw: {aim: 30, power: 1}, noPose: 1, pred: "!r.lofted&&!r.boundary&&!r.out&&r.fplay.some(e=>e.k==='dive'&&e.o==='stop'&&e.t1>0.8&&Math.hypot(f[e.i].x,f[e.i].z)<35)",
+  thrDive: {sw: {aim: 30, power: 1}, noPose: 1, pred: "!r.lofted&&!r.boundary&&!r.out&&r.fplay.some(e=>e.k==='dive'&&e.o==='stop'&&e.t1>0.8&&Math.hypot(f[e.i].x,f[e.i].z)<35)&&!highlightOf(r,b,f,footAt(b,s.bp).c)",
     key: "e=>e.k==='dive'&&e.o==='stop'"},
-  thrFetch: {noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>(e.o==='stop'||e.k==='run'&&!e.o)&&e.z<35&&Math.hypot(e.x,e.z)>BOUNDARY*.55)",
+  thrFetch: {noPose: 1, pred: "!r.out&&!r.boundary&&r.fplay.some(e=>(e.o==='stop'||e.k==='run'&&!e.o)&&e.z<35&&Math.hypot(e.x,e.z)>BOUNDARY*.55)&&!highlightOf(r,b,f,footAt(b,s.bp).c)",
     key: "e=>(e.o==='stop'||e.k==='run'&&!e.o)&&e.z<35&&Math.hypot(e.x,e.z)>BOUNDARY*.55"},
   // caught wickets for the catch replays: an edge to the keeper or the cordon, caught and bowled (opt: may not come up), an AI drive caught in the ring
   slipCatch: {sw: {aim: 20, edge: 1}, noPose: 1, pred: "r.out&&r.catcher!=null&&/^(keeper|slip|gully)/.test(f[r.catcher].n)", key: "e=>e.o==='catch'"},
   cab: {sw: {aim: 0, power: 0.5, loft: 1}, noPose: 1, opt: 1, pred: "r.out&&r.catcher!=null&&f[r.catcher].n==='bowler'", key: "e=>e.o==='catch'"},
   aiCatch: {noPose: 1, pred: "r.out&&r.catcher!=null&&!/^(keeper|slip|gully|bowler)/.test(f[r.catcher].n)&&r.fplay.some(e=>e.i===r.catcher&&e.o==='catch')", key: "e=>e.o==='catch'"},
-  thrMid: {noPose: 1, pred: "!r.out&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&['midon','midoff'].includes(f[e.i].n))", key: "e=>e.k==='stop'&&e.o==='stop'"}
+  thrMid: {noPose: 1, pred: "!r.out&&r.fplay.some(e=>e.k==='stop'&&e.o==='stop'&&['midon','midoff'].includes(f[e.i].n))&&!highlightOf(r,b,f,footAt(b,s.bp).c)", key: "e=>e.k==='stop'&&e.o==='stop'"}
 };
 const armPlay = (p, play) => p.evaluate(pl => {
-  const want = new Function('r', 'f', 'return ' + pl.pred), ev0 = evalSwing; window.__fp = 0;
-  window.evalSwing = (...a) => { window.evalSwing = ev0; for (let i = 0; i < 6000; i++) { const r = ev0(...a); if (r.res && r.res.fplay && want(r.res, a[3])) { window.__fp = i + 1; return r; } } return ev0(...a); };
+  const want = new Function('r', 'f', 'b', 's', 'return ' + pl.pred), ev0 = evalSwing; window.__fp = 0;
+  window.evalSwing = (...a) => { window.evalSwing = ev0; for (let i = 0; i < 6000; i++) { const r = ev0(...a); if (r.res && r.res.fplay && want(r.res, a[3], a[0], a[1])) { window.__fp = i + 1; return r; } } return ev0(...a); };
 }, play);
 const fieldPlay = async (p, name, play, ai) => {
   for (let n = 0; n < 4; n++) {
@@ -210,6 +221,7 @@ await page.waitForFunction(() => __r.skin().on || __r.skin().err, null, {timeout
 const skin = await page.evaluate(() => __r.skin());
 if (!skin.on) errors.push('skinned batter: ' + skin.err);
 else console.log('skin     ok  skinned batter loaded');
+if(on('menu'))
 {
   // Menu: the hub over the live stadium (a sweeping camera, in parity with the overlays), each mode's sheet, a planet picked in a
   // sheet switches the stadium behind it, options persist, settings toggles, how to play; Play puts the batting lens back
@@ -252,6 +264,7 @@ else console.log('skin     ok  skinned batter loaded');
   if (await page.evaluate(() => document.querySelector('#menu').classList.contains('sheet-on'))) errors.push('menu: Escape did not close the panel');
   console.log(`menu     ok  hub camera sweep (yaw ${c0.yaw.toFixed(1)} -> ${c1.yaw.toFixed(1)}), four mode sheets, live planet switch ${ms} ms, settings and how-to`);
 }
+if(on('planets'))
 for (const pk of planets) {
   await startMode(page, 'nets', {planet: pk});
   await page.waitForFunction(() => __t.S.phase === 'runup' && __t.S.t > 1.0, null, {timeout: 30000, polling: 30});
@@ -279,6 +292,7 @@ for (const pk of planets) {
   if (await page.isVisible('#end')) await page.click('#menuBtn');
 }
 if (planets.includes('earth')) {
+if(on('replay')){
   // Replay: force perfectly timed lofted shots that suit the length (a boundary ~90% of the time) until one goes for four or six.
   // The brain is reset first: after the forced drives above it bowls short, which a lofted drive mishits.
   await openPanel(page, '#setBtn', '#setSheet');
@@ -310,10 +324,13 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
+}
   // Fielding (forced plays, see fieldPlay): an edge to the keeper or slip in the cordon camera, a diving stop in the ring, a running
   // catch in the deep in the chase camera, and a four past a diving fielder, whose dive the replay must show too
+if(any('field','throw','catch')){
   await startMode(page, 'nets', {netsW: 0, planet: 'earth'});
   const fp = {};
+if(on('field')){
   for (const k of ['edge', 'ring', 'deep']) fp[k] = await fieldPlay(page, 'earth-field-' + k, PLAYS[k]);
   if (fp.deep) await catchReplay(page, 'earth-catch-replay-deep', 'field');
   fp.four = await fieldPlay(page, 'earth-field-four', PLAYS.four);
@@ -327,6 +344,8 @@ if (planets.includes('earth')) {
       if (b.up > 0.9) errors.push('fielding: the replayed diver is upright ' + b.up.toFixed(2)); fp.four.up = b.up; fp.four.hd = 0; }
   }
   for (const k in fp) console.log(`field    ok  ${k}: ${playText(fp[k])}`);
+}
+if(on('throw')){
   // batting: a ring stop and a diving stop throw to the bowler, taken before the next run-up (the dive's in the countdown: up to
   // 4 tries); a deep stop may not be thrown (it would land after the next run-up)
   for (const [k, play] of [['earth-throw', PLAYS.thr], ['earth-throw-dive', PLAYS.thrDive], ['earth-throw-deep', PLAYS.thrDeep]]) {
@@ -344,6 +363,8 @@ if (planets.includes('earth')) {
     if (o && k === 'earth-throw-deep' && !['bounce', 'loop', 'flat'].includes(o.kind)) errors.push(`throw ${k}: a ${o.kind} throw from the deep`);
     console.log(`throw    ok  ${k}: ${thrText(o)}`);
   }
+}
+if(on('catch')){
   if (await fieldPlay(page, 'earth-catch-cordon', PLAYS.slipCatch)) await catchReplay(page, 'earth-catch-replay-cordon', 'close');
   if (await fieldPlay(page, 'earth-catch-cab', PLAYS.cab)) await catchReplay(page, 'earth-catch-replay-cab', 'cab');
   else console.log('replay   ok  (no caught and bowled came up in 4 balls)');
@@ -352,9 +373,12 @@ if (planets.includes('earth')) {
   await page.evaluate(() => { const M = __t.getM(); M.wktsMax = M.wkts + 1; });
   if (await fieldPlay(page, 'earth-catch-last', PLAYS.slipCatch)) { const nx = await catchReplay(page, 'earth-catch-replay-last', null);
     if (!await page.isVisible('#end')) errors.push(`catch replay of the last wicket: no end screen after it (${nx})`); }
+}
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await page.waitForTimeout(100);
   if (await page.isVisible('#end')) await page.click('#menuBtn');
+}
+if(on('celebrate')){
   await startMode(page, 'quick', {planet: 'earth', len: 1});
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
@@ -379,7 +403,142 @@ if (planets.includes('earth')) {
     .catch(async () => errors.push('celebration: no end screen, phase ' + await page.evaluate(() => __t.S.phase + ' ' + document.querySelector('.screen.on')?.id)));
   console.log(`earth    ok  celebration skipped to end screen: ${await page.textContent('#eTitle')}`);
 }
+}
+// ---------- replay2: the replay director's kinds beyond fours, sixes and catches (docs/replays.md) ----------
+// Forced per kind: a delivery re-made until it is bowled, LBW, a shout not given, shaves off stump or (a batter charging the spinner)
+// is stumped, with no swing; or a swing whose evalSwing is re-rolled (aim and power varied) until highlightOf gives the kind (drop,
+// chance, save, leap). The replay must be that kind with its camera class; paused at the event (LBW: in the hold, the path drawn) the
+// ball and the focus (the stumps, or the fielder) are on screen, camera parity holds, a screenshot; a tap skips it and play goes on.
+// After a drop or a save the keeper is back at his stance, the bowler at his mark and no throw is left. Then the last wicket bowled
+// (its replay, then the end screen), a bowled ball in the T20 bowling view and an LBW in landscape
+const R2B = {
+  bowled: "b.onStumps&&!padHit(b,null)",
+  lbw: "(h=>!!h&&padResult(b,h,false).out)(padHit(b,null))",
+  shout: "b.onStumps&&(h=>!!h&&!padResult(b,h,false).out)(padHit(b,null))",
+  shave: "!b.onStumps&&!padHit(b,null)&&(p=>{const x=Math.abs(p.x)-STUMP_HALF,y=p.y-STUMP_H;return p.x>0&&x>0&&x<=SHAVE&&y<=SHAVE||x<=0&&y>=0&&y<=SHAVE;})(ballPos(b,b.tStumps))",
+  stumped: "!b.onStumps&&!padHit(b,{x:0,z:1.5})"
+};
+const R2S = {
+  dropClose: {kind: 'drop', cls: 'close', sw: {aim: 20, edge: 1}},
+  dropDeep: {kind: 'drop', cls: 'field', field: 1, opt: 1, sw: {aim: 10, power: 0.5, loft: 1}, vary: {aim: 60, pw: 0.6}},
+  save: {kind: 'save', cls: 'field', field: 1, sw: {aim: 8, power: 1}, vary: {aim: 40, pw: 0.5}},
+  chance: {kind: 'chance', opt: 1, sw: {aim: 30, power: 0.8, loft: 1}, vary: {aim: 160, pw: 0.7}},
+  leap: {kind: 'leap', cls: 'field', field: 1, opt: 1, sw: {aim: 10, power: 0.9, loft: 1}, vary: {aim: 50, pw: 0.7}}
+};
+// the next delivery (S.pending, in the countdown) re-made until it is the kind wanted; spin: the over turned to spin (keeper up)
+const r2Ball = async (p, kind, spin) => {
+  await p.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 20});
+  return p.evaluate(([pred, spin]) => { const S = __t.S, M = __t.getM(), want = new Function('b', 'return !b.wide&&' + pred);
+    if (spin) { M.bowlerType = 'spin'; S.runupDur = 1.1; __t.fieldSet(M.field); }
+    for (let i = 0; i < 60000; i++) { const b = makeDelivery({type: M.bowlerType, len: 'YFGSB'[i % 5], line: ['off', 'mid', 'leg', 'wide'][(i / 5 | 0) % 4]}, M.diff, M.spinDir);
+      if (want(b)) { S.pending = b; return true; } }
+    return false; }, [R2B[kind], !!spin]) && p.waitForFunction(() => __t.S.phase !== 'ready', null, {timeout: 30000, polling: 10}).then(() => true);
+};
+// a swing in this flight (as fieldPlay sets it) whose evalSwing is re-rolled until highlightOf gives the kind; true if it came up
+const r2Shot = async (p, c) => {
+  await p.waitForFunction(() => __t.S.phase === 'ready' || __t.S.phase === 'runup', null, {timeout: 30000, polling: 20});
+  if (c.field) await p.evaluate(() => __t.fieldSet(tplField(Object.keys(TPL).find(k => TPL[k].f.includes('longoff') && TPL[k].f.includes('longon')))));
+  await p.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 10});
+  await p.evaluate(([kind, vary, sw]) => {
+    const ev0 = evalSwing; window.__fp = 0;
+    window.evalSwing = (...a) => { window.evalSwing = ev0; const [b, s, , f] = a, s0 = {aim: s.aim, power: s.power};
+      for (let i = 0; i < 8000; i++) {
+        if (vary) { s.aim = s0.aim + (Math.random() - 0.5) * vary.aim; s.power = Math.min(1, Math.max(0.3, s0.power + (Math.random() - 0.5) * vary.pw)); }
+        const r = ev0(...a), h = r.res && highlightOf(r.res, b, f, footAt(b, s.bp).c); if (h && h.kind === kind) { window.__fp = i + 1; return r; } }
+      Object.assign(s, s0); return ev0(...a); };
+    const S = __t.S, fa = footAt(S.ball, S.bpos), w = windows(__t.getM().diff, true, 1 + 0.35 * fa.gain);
+    S.swing = {tc: fa.t + (sw.edge ? -(w.ok + w.edge) / 2 : 0.002), aim: sw.aim, power: sw.power || 0.8, lofted: !!sw.loft, defend: false, done: false};
+    S.bat = {mode: 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim: sw.aim}; }, [c.kind, c.vary || null, c.sw]);
+  await p.waitForFunction(() => __t.S.phase !== 'flight' && __t.S.phase !== 'runup', null, {timeout: 30000, polling: 10});
+  return p.evaluate(() => window.__fp > 0);
+};
+const r2Check = async (p, name, kind, cls) => {
+  const r = await p.waitForFunction(() => __t.S.phase === 'replay' ? 'replay' : !['result', 'flight', 'runup'].includes(__t.S.phase) && __t.S.phase, null, {timeout: 20000, polling: 20}).then(h => h.jsonValue());
+  const lab = await p.evaluate(() => __t.S.res ? __t.S.res.label + ', ' + (__t.S.res.sub || '') : '');
+  if (r !== 'replay') { errors.push(`replay2 ${name}: no replay, went to ${r} (${lab})`); return null; }
+  const R = await p.evaluate(() => { const R = __t.rp(); return {kind: R.kind, cls: R.cls, tk: R.tk, rec: __t.rec(), i: R.ct ? R.ct.i : -1, n: R.ct ? __t.getM().field[R.ct.i].n || '' : ''}; });
+  if (R.kind !== kind || (cls ? R.cls !== cls : !['close', 'cab', 'field'].includes(R.cls))) errors.push(`replay2 ${name}: ${R.kind} replay with the ${R.cls} camera, expected ${kind} with ${cls || 'a catch class'}`);
+  if (!(R.rec.n < R.rec.max)) errors.push(`replay2 ${name}: the recording hit its budget (${R.rec.n} of ${R.rec.max} frames)`);
+  await p.waitForFunction(() => { const R = __t.rp(); if (R && (R.t < R.tk || R.hold && R.hu < 0.45)) return false; __t.S.paused = true; return true; }, null, {timeout: 20000, polling: 'raf'});
+  await p.waitForTimeout(150);
+  const s = await p.evaluate(i => { const on = q => !!q && q.x >= 0 && q.x <= innerWidth && q.y >= 0 && q.y <= innerHeight, b = __t.vb().b, f = i >= 0 && __t.fv()[i];
+    return {ph: __t.S.phase, ball: !!b && on(__t.pj(b.x, b.y, b.z)), focus: on(f ? __t.pj(f.x, 1, f.z) : __t.pj(0, 0.4, 0)), par: __t.cam3()}; }, R.i);
+  await p.screenshot({path: `${shots}replay2-${name}.png`});
+  await p.evaluate(() => { __t.S.paused = false; });
+  camErr = Math.max(camErr, s.par); if (!(s.par < 0.5)) errors.push(`camera parity replay2 ${name}: ${s.par} px`);
+  if (s.ph !== 'replay' || !s.ball || !s.focus) errors.push(`replay2 ${name}: at the event ${JSON.stringify(s)}`);
+  const vp = p.viewportSize();
+  if (await p.evaluate(() => __t.S.phase === 'replay')) { await p.waitForFunction(() => __t.S.phase !== 'replay' || __t.clk() - __t.rp().t0 >= 0.3, null, {timeout: 5000}); await p.mouse.click(vp.width / 2, vp.height * 0.6); }
+  const nx = await p.waitForFunction(() => __t.S.phase !== 'replay' && __t.S.phase, null, {timeout: 3000, polling: 20}).then(h => h.jsonValue()).catch(() => 'replay');
+  if (nx === 'replay') errors.push(`replay2 ${name}: a tap did not skip it`);
+  console.log(`replay2  ok  ${name}: ${R.kind}, ${R.cls} camera${R.n ? ' on ' + R.n : ''} (${lab}), ball and ${R.n ? 'fielder' : 'stumps'} on screen ${s.ball && s.focus}, then ${nx}`);
+  return {...R, nx};
+};
+// after a drop or save (a throw may have been planned): the next ball's countdown with the keeper at his stance, the bowler at his mark
+const r2After = async (p, name) => {
+  await p.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 20000, polling: 20});
+  await p.waitForTimeout(100);
+  const k = await p.evaluate(() => { const M = __t.getM(), f = __t.fv().find(f => f.kp), K = KEEP[M.bowlerType] || KEEP.pace;
+    return {thr: !!__t.S.thr, d: f ? Math.hypot(f.x - K.x, f.z - K.z) : -1, bz: __t.S.bowlerZ, mark: M.bowlerType === 'pace' ? 31 : 25.5}; });
+  if (k.thr || !(k.d >= 0 && k.d < 0.05) || Math.abs(k.bz - k.mark) > 0.01) errors.push(`replay2 ${name}: next ball not set up ${JSON.stringify(k)}`);
+};
+if(on('replay2')){
 if (planets.includes('earth')) {
+  if (await page.isVisible('#end')) await page.click('#menuBtn');
+  await startMode(page, 'nets', {netsW: 0, planet: 'earth'});
+  for (const k of ['bowled', 'lbw', 'shout', 'shave', 'stumped']) {
+    if (!await r2Ball(page, k, k === 'stumped')) { errors.push(`replay2 ${k}: no such delivery in 60000`); continue; }
+    if (k === 'stumped') {
+      await page.waitForFunction(() => __t.S.phase === 'flight', null, {timeout: 30000, polling: 10});
+      await page.evaluate(() => { Object.assign(__t.S.bpos, {x: 0, z: 1.5}); const st0 = stumpedResult;
+        window.stumpedResult = (b, bp) => { window.stumpedResult = st0; const r = Math.random; Math.random = () => 0; try { return st0(b, bp); } finally { Math.random = r; } }; });
+    }
+    await r2Check(page, k, k, k === 'stumped' ? 'crease' : 'stumps');
+  }
+  for (const [k, c] of Object.entries(R2S)) {
+    let done = false;
+    for (let n = 0; n < 4 && !done; n++) {
+      if (!await r2Shot(page, c)) continue;
+      const r = await r2Check(page, k, c.kind, c.cls);done = true;
+      if (r && (c.kind === 'drop' || c.kind === 'save')) await r2After(page, k);
+    }
+    if (!done) { if (c.opt) console.log(`replay2  ok  (no ${k} came up in 4 balls)`); else errors.push(`replay2 ${k}: did not come up in 4 balls`); }
+  }
+  // the last wicket bowled: its replay, then the end screen
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 20});
+  await page.evaluate(() => { const M = __t.getM(); M.wktsMax = M.wkts + 1; });
+  if (await r2Ball(page, 'bowled')) { const r = await r2Check(page, 'last-bowled', 'bowled', 'stumps');
+    if (r && !await page.isVisible('#end')) errors.push(`replay2 last wicket: no end screen after its replay (${r.nx})`); }
+  if (await page.isVisible('#end')) await page.click('#menuBtn');
+  // T20 bowling view: the AI batter leaves a ball that hits the stumps
+  await page.evaluate(() => localStorage.removeItem('cc_t20'));
+  await startMode(page, 't20', {planet: 'earth'});
+  await page.click('#chaseBtn');
+  await page.waitForFunction(() => __t.S.phase === 'pick', null, {timeout: 30000, polling: 30});
+  await page.click('#opGo');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  await page.evaluate(() => { __t.S.t = Math.max(__t.S.t, __t.S.breakDur - 0.1); });
+  await page.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 30000, polling: 30});
+  await page.evaluate(() => { const bd0 = bowlDelivery, ab = aiBat;
+    window.bowlDelivery = (bw, o, m, rel, d) => { window.bowlDelivery = bd0; const mm = spotFor(bw, o, 5.4, 0);
+      for (let i = 0; i < 20000; i++) { const b = bd0(bw, o, mm, 0, d); if (b.onStumps && !b.wide && !padHit(b, null)) return b; } return bd0(bw, o, m, rel, d); };
+    window.aiBat = () => { window.aiBat = ab; return {leave: true, bp: null}; }; });
+  await page.click('#bowlBtn');
+  await r2Check(page, 't20-bowl-bowled', 'bowled', 'stumps');
+  await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+  await page.waitForTimeout(100);
+  if (await page.isVisible('#end')) await page.click('#menuBtn');
+  // landscape: an LBW, the projection drawn in the hold
+  const land = await browser.newPage({viewport: {width: 844, height: 390}});
+  land.on('pageerror', e => errors.push('replay2 landscape: ' + (e.stack || String(e))));
+  await land.goto(url);
+  await startMode(land, 'nets', {netsW: 0, planet: 'earth'});
+  if (await r2Ball(land, 'lbw')) await r2Check(land, 'landscape-lbw', 'lbw', 'stumps');
+  await land.close();
+}
+}
+if (planets.includes('earth')) {
+if(any('t20bowl','t20chase')){
   // T20: two overs with forced swings (ready/break waits cut short), a bowler change and a field change, every field legal
   // (fieldOk), the strike after every ball (odd runs, wickets, over ends), a Hold, the non-striker drawn, then save, reload,
   // resume and compare the match state (lineup and strike included). A v1 save is not offered.
@@ -484,6 +643,7 @@ if (planets.includes('earth')) {
   };
   const seenB = new Set();
   const taps = [0, -0.2, null, 0.15, 'mouse', 0.05, -0.05, 0.3, 0];
+if(on('t20bowl')){
   for (let i = 0; i < 9; i++) await bowlOne(i, taps[i]);
   let bw1 = await toReady();
   if (bw1.overNo < 2 || JSON.parse(bw1.bw).filter(f => f.o || f.b).length < 2) errors.push('T20 bowling: no second bowler ' + bw1.bw);
@@ -498,6 +658,7 @@ if (planets.includes('earth')) {
   for (const k of ['runs', 'wkts', 'balls', 'bi', 'pid', 's', 'ns', 'bat', 'bw', 'overNo', 'optK', 'mkB', 'chips', 'mk']) if (sv1[k] !== bw1[k]) errors.push(`T20 bowling resume: ${k} was ${sv1[k]}, resumed ${bw1[k]}`);
   await bowlOne(9, 0);
   console.log(`earth    ok  T20 bowling ${bw1.runs}/${bw1.wkts} after ${bw1.balls} balls, resumed mid-over ${bw1.overNo}; results: ${[...seenB].join(', ')}`);
+}
   // Simulate rest from the pause screen (two taps), the innings break, then the chase
   await toReady();
   await page.click('#pauseBtn');
@@ -509,6 +670,7 @@ if (planets.includes('earth')) {
   if (brk.target !== brk.i1 + 1 || brk.btn !== 'Chase ' + brk.target || !(brk.w >= 10 || brk.b >= 120) || brk.kit) errors.push('T20 innings break ' + JSON.stringify(brk));
   await page.screenshot({path: `${shots}earth-t20-break.png`});
   console.log(`earth    ok  T20 simulated rest: ${brk.i1}/${brk.w} in ${brk.b} balls, chase ${brk.target}`);
+if(on('t20chase')){
   await page.click('#chaseBtn');
   await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
   { const c = await page.evaluate(() => __t.t20());
@@ -567,7 +729,10 @@ if (planets.includes('earth')) {
   await page.reload();
   if (await page.isVisible('#resumeT20')) errors.push('T20: a v2 save is offered for resume');
 }
+}
+}
 if (planets.includes('earth')) {
+if(any('scen','scenlast','scenstage','scensave')){
   // Scenarios: the list, a briefing, a survive scenario (forced duck under a bouncer, forced swings, then a forced end: result card
   // with stars), a last pair against spin (forced sweep, a Hold, a strike change, legal Test fields), and a staged scenario
   // carried into its next session after the interstitial.
@@ -589,6 +754,7 @@ if (planets.includes('earth')) {
     S.bat = {mode: def ? 'block' : 'swing', t0: S.ball.start + S.swing.tc - SWING_DELAY, from: null, aim: S.swing.aim}; }, [aim, opt]);
   const fieldCheck = async where => { const c = await page.evaluate(() => __t.scen()); if (!c.ok || c.viol) errors.push(`Scenario ${c.id} ${where}: field legal ${c.ok}, rule breaches ${c.viol}`); return c; };
 
+if(on('scen')){
   await page.click('#scenSeries .sctile');
   if (!await page.isVisible('#brief') || (await page.textContent('#gTitle')) !== await page.evaluate(() => scenById('s1a').title)) errors.push('Scenarios: no briefing for the first Test');
   await page.screenshot({path: `${shots}scen-brief.png`});
@@ -620,6 +786,8 @@ if (planets.includes('earth')) {
   if (!card.st || !(card.rec.stars && card.rec.stars.s1a >= 1) || !card.next) errors.push('Scenarios: result card ' + JSON.stringify(card));
   await page.screenshot({path: `${shots}scen-result.png`});
   console.log(`scen     ok  s1a result card: ${card.t} ${card.st}, saved ${JSON.stringify(card.rec.stars)}`);
+}
+if(on('scenlast')){
 
   // last pairs: a sweep against two spinners (c4), then a Hold and a strike change against the single-on-offer field (c1). A
   // wicket ends a last-pair scenario, so it is retried from the result card.
@@ -668,6 +836,8 @@ if (planets.includes('earth')) {
 
   // the staged final day: session one ends level with the par, the interstitial shows, and session two starts from that state
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+}
+if(on('scenstage')){
   await page.evaluate(() => localStorage.setItem('cc_scen', JSON.stringify({stars: Object.fromEntries(SCEN.filter(s => s.set === 'series' && !s.stage).map(s => [s.id, 1]))})));
   await page.reload();
   await openMode(page, 'scen');
@@ -692,6 +862,8 @@ if (planets.includes('earth')) {
   if (s2.id !== 's5b' || s2.target > 100 || s2.target < 94) errors.push('Scenarios: next session ' + JSON.stringify(s2));
   console.log(`scen     ok  s5a -> "${lunch}" -> ${s2.id}, ${s2.target} to win with ${s2.lineup} batters`);
   await page.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
+}
+if(on('scensave')){
 
   // Save and resume (cc_scensave): a mid-over resume restores score, strike, bowler, field, over chips and HUD and plays on; quitting
   // in a Hold window records that ball; quitting after an over's last ball resumes with a new over and another bowler; a save made in
@@ -771,11 +943,24 @@ if (planets.includes('earth')) {
   await page.screenshot({path: `${shots}scen-resume-menu.png`});
   scenGood = good;
 }
+}
+}
+if(on('land')&&!scenGood){
+  // the portrait page starts a scenario, which writes the save the landscape menu shows (when the scen sections did not run)
+  await page.reload();
+  await openMode(page, 'scen');
+  await page.click('#scenSeries .sctile');
+  await page.click('#gPlay');
+  await page.waitForFunction(() => __t.S.phase === 'break', null, {timeout: 30000, polling: 30});
+  scenGood = await page.evaluate(() => localStorage.getItem('cc_scensave'));
+}
+if(any('land','landt20'))
 {
   // Landscape phone: its own layout and camera framing. A run-up and a forced shot, with camera parity in both.
   const land = await browser.newPage({viewport: {width: 844, height: 390}});
   land.on('pageerror', e => errors.push('landscape: ' + (e.stack || String(e))));
   await land.goto(url);
+if(on('land')){
   if (scenGood) {
     await land.evaluate(b => localStorage.setItem('cc_scensave', b), scenGood);
     await land.reload();
@@ -819,6 +1004,8 @@ if (planets.includes('earth')) {
   await land.evaluate(() => { __t.S.paused = true; document.querySelector('#quitBtn').click(); });
   await land.waitForTimeout(100);
   if (await land.isVisible('#end')) await land.click('#menuBtn');
+}
+if(on('landt20')){
   await land.evaluate(() => localStorage.removeItem('cc_t20'));
   await startMode(land, 't20');
   // bowling first: the over picker, the bowling view (chips, Bowl, HUD and radar apart), the meter in the run-up
@@ -855,8 +1042,10 @@ if (planets.includes('earth')) {
   await land.click('#pauseBtn');
   await land.screenshot({path: `${shots}landscape-t20-pause.png`});
   console.log(`land     ok  T20 slab ${JSON.stringify(lay)}`);
+}
   await land.close();
 }
+if(on('sizes'))
 for (const [w, h] of [[375, 667], [430, 932]]) {
   const p = await browser.newPage({viewport: {width: w, height: h}});
   p.on('pageerror', e => errors.push(`${w}x${h}: ` + (e.stack || String(e))));
@@ -872,5 +1061,6 @@ for (const [w, h] of [[375, 667], [430, 932]]) {
   await p.close();
 }
 await browser.close();
+console.log(`\nsections ran: ${SECTIONS.filter(x => ran.has(x)).join(' ') || '(none)'}\nsections skipped: ${SECTIONS.filter(x => !ran.has(x)).join(' ') || '(none)'}${planets.includes('earth') ? '' : ' (replay to landt20 need earth in the planets)'}; ${((Date.now() - smokeT0) / 1000).toFixed(0)} s`);
 if (errors.length) { console.log('\nPage errors:\n' + errors.join('\n')); process.exit(1); }
 console.log(`\nNo page errors. Camera parity within ${camErr.toFixed(4)} px. Screenshots in tests/screenshots/`);

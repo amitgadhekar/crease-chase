@@ -842,6 +842,36 @@ function applyHold(res){
   if(res.boundary||res.out||res.wide||!(res.runs%2))return res;
   return {...res,runs:res.runs-1,held:true,label:res.runs>1?runLabel(res.runs-1):'Held',sub:'Kept the strike',cls:res.runs>1?'runs':'dot'};
 }
+/* ---------- highlights: the replay-worthy moment of a ball, most significant first. No randomness (the balance fingerprint stays).
+   c: the logic's contact point (footAt(b,bp).c) for shots. Returns {kind, ev (the fielding event), t (s after contact; with rel: after
+   release)} or null. Kinds: wickets bowled (played on too), lbw, stumped, caught; missed chances drop, chance (a dive or leap in the air
+   with a hand on it: the ball within 0.1 m of the hands); save (stopped within 10 m of the rope, a ball that would have reached it);
+   leap (a six over the rider's leap), six, four; near misses shout (on the pad, would hit, not out: pitched outside leg or hit outside
+   the line) and shave (beaten or left within SHAVE of off stump or over the bails) ---------- */
+const SHAVE=0.08,HL_WK={bowled:1,lbw:1,stumped:1,caught:1},HL_CH={drop:1,chance:1};
+function highlightOf(res,b,field,c){
+  if(!res||!b)return null;
+  const E=res.fplay||[],h=res.path&&c?preparePath(res.path,c,res.dir):null,deep=i=>!!field[i]&&Math.hypot(field[i].x,field[i].z)>BOUNDARY*.6;
+  if(res.out){
+    if(res.catcher!=null){const e=E.find(e=>e.i===res.catcher&&e.o==='catch');return e?{kind:'caught',ev:e,t:e.t1}:null;}
+    if(res.stumped)return {kind:'stumped',t:b.tEnd,rel:1};
+    if(res.outText==='LBW'&&res.pad)return {kind:'lbw',t:res.pad.t,rel:1};
+    if(res.stumps)return {kind:'bowled',t:b.tStumps,rel:1};
+    return null;
+  }
+  const on=e=>{if(!h||!h.air||e.t1>h.T+.01)return false;const q=hitPos(h,e.t1);return Math.hypot(q.x-e.x,q.z-e.z)<.1&&Math.abs(q.y-e.y)<.15;};
+  const ch=E.find(e=>e.o==='drop')||E.find(e=>e.o==='miss'&&(e.k==='dive'||e.k==='jump')&&on(e));
+  if(ch)return {kind:ch.o==='drop'?'drop':'chance',ev:ch,t:ch.t1};
+  if(h&&!res.boundary){const L=h.air?h.C+(h.stop?0:h.roll!=null?h.roll:h.C*.3):h.s*h.s/(2*h.a),
+    sv=L>=distToBoundary(h.x0,h.z0,h.ux,h.uz)&&E.find(e=>e.o==='stop'&&BOUNDARY-Math.hypot(e.x,e.z)<10);
+    if(sv)return {kind:'save',ev:sv,t:sv.t1};}
+  if(res.boundary===6){const l=E.find(e=>e.k==='jump'&&e.o==='miss'&&deep(e.i));return l?{kind:'leap',ev:l,t:l.t1}:{kind:'six'};}
+  if(res.boundary===4)return {kind:'four'};
+  if(res.pad&&b.onStumps)return {kind:'shout',t:res.pad.t,rel:1};
+  if(!res.path&&!res.pad&&!res.body&&!res.wide&&!b.duck){const p=ballPos(b,b.tStumps),x=Math.abs(p.x)-STUMP_HALF,y=p.y-STUMP_H;
+    if(p.x>0&&x>0&&x<=SHAVE&&y<=SHAVE||x<=0&&y>=0&&y<=SHAVE)return {kind:'shave',t:b.tStumps,rel:1};}
+  return null;
+}
 
 /* ---------- AI bowler brain: remembers what each length and line costs it ---------- */
 function bScore(mem,k){const s=mem[k]||{r:0,n:0,w:0},n=s.n+2;return (s.r+2.4)/n-5*s.w/n;}

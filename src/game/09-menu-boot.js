@@ -79,7 +79,7 @@ $('#rpSkip').addEventListener('click',()=>{if(S.phase==='replay'&&!S.paused)rpEn
 $('#resetBrain').addEventListener('click',e=>{mem={};store.set('mem',mem);e.target.textContent='Done. The bowler starts fresh.';});
 
 // Test hook for tests/smoke.mjs; only exposed when the page is opened with #test.
-if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,cam3:camParity,cam:()=>({yaw:cam.yaw,y:cam.y,F,HZ,base:F===baseF&&HZ===baseHZ,planet:curPlanet,menu:MENU.on,sheet:sheetMode}),t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
+if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,rec:()=>({n:REC.n,max:RMAX}),cam3:camParity,cam:()=>({yaw:cam.yaw,y:cam.y,F,HZ,base:F===baseF&&HZ===baseHZ,planet:curPlanet,menu:MENU.on,sheet:sheetMode}),t20:()=>M&&M.t20?{runs:M.runs,wkts:M.wkts,balls:M.balls,target:M.target,bi:M.bi,pid:M.plan&&M.plan.id,type:M.bowlerType,overNo:M.overNo,
   ok:fieldOk(M.field,phaseOf(Math.max(0,M.overNo-1))==='pp'),field:M.field.map(f=>f.n+'@'+f.x.toFixed(1)+','+f.z.toFixed(1)).join(' '),bw:JSON.stringify(M.st.bw),
   s:M.st.s,ns:M.st.ns,bat:JSON.stringify(M.st.bat),hold:!!S.hold,ns3d:LV.ns.on,inn:M.inn,aiAtk:M.attack===M.aiAtk,i1:M.i1?M.i1.runs+'/'+M.i1.wkts:'',kit:KS.you}:null,
   // T20 first innings: state, the over picker, the last ball's inputs; bowlTap(rel) taps the meter at the game time that gives rel

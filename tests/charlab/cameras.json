@@ -1,0 +1,20 @@
+{
+  "_": "Lab cameras. rel: the subject (the sequence's subject, or bat/ns/bowler/keeper/play/f:<name>); az degrees from the subject's facing (0 in front of him; the batter's chest faces the off side, the non-striker's the striker), d distance, h camera height, ty target height, span metres across the shorter screen side, fy the target's screen height fraction. game: one of the game's own cameras (bat, bowl, side, cord, cel, chase), at: the point it frames.",
+  "f4": {"rel": "subject","az": 0,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m front"},
+  "s4": {"rel": "subject","az": 90,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m side"},
+  "b4": {"rel": "subject","az": 180,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m back"},
+  "q4": {"rel": "subject","az": 45,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m three-quarter"},
+  "f16": {"rel": "subject","az": 15,"d": 1.6,"ty": "head","span": 0.85,"fy": 0.5,"label": "1.6 m face"},
+  "g16": {"rel": "subject","az": 45,"d": 1.6,"h": 1.2,"ty": 1.0,"span": 0.9,"fy": 0.5,"label": "1.6 m hands"},
+  "l16": {"rel": "subject","az": 60,"d": 1.6,"h": 0.7,"ty": 0.45,"span": 0.9,"fy": 0.5,"label": "1.6 m feet"},
+  "w10": {"rel": "subject","az": 30,"d": 10,"h": 2.2,"ty": 0.9,"span": 5.5,"fy": 0.55,"label": "10 m"},
+  "kp4": {"rel": "keeper","az": 40,"d": 4,"h": 1.2,"ty": 0.8,"span": 2.4,"fy": 0.5,"label": "4 m keeper"},
+  "bw4": {"rel": "bowler","az": 40,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m bowler"},
+  "gbat": {"game": "bat","label": "game: batting view"},
+  "gbowl": {"game": "bowl","label": "game: bowling view"},
+  "gside": {"game": "side","at": "bat","label": "game: side-on replay"},
+  "gcord": {"game": "cord","at": "play","label": "game: cordon camera"},
+  "gcel": {"game": "cel","label": "game: celebration orbit"},
+  "gchase": {"game": "chase","at": "ball","label": "game: chase camera"},
+  "fr4": {"rel": "f:ring","az": 30,"d": 4,"h": 1.25,"ty": 0.95,"span": 2.4,"fy": 0.5,"label": "4 m ring fielder"}
+}

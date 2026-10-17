@@ -337,3 +337,18 @@ p.sc b{color:var(--ink-dim);font-weight:600;margin-right:4px}
   .pblurb{font-size:13px;line-height:1.3;min-height:0}
   .sgo{padding-top:4px}.sgo .primary{padding:9px;font-size:26px}
 }
+
+/* loading screen (first paint while the single ~2 MB page arrives; removed by bootDone in 09-menu-boot.js) */
+#boot{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 35%,var(--board),var(--board-edge));color:var(--chalk);transition:opacity .4s ease}
+#boot.off{opacity:0;pointer-events:none}
+.bootc{display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 24px;text-align:center}
+.bootball{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#e0574a,var(--ball) 55%,#7c1f17);
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);position:relative;animation:bootspin 1.1s linear infinite}
+.bootball::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:0;border-left:2px dashed rgba(255,240,220,.85);transform:translateX(-1px)}
+.boott{font-family:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;font-weight:900;font-size:40px;letter-spacing:1px;line-height:1}
+#bootMsg{font-size:15px;color:var(--chalk-dim);min-height:1.3em}
+.bootbar{display:block;width:min(240px,62vw);height:6px;border-radius:3px;background:rgba(239,232,210,.15);overflow:hidden}
+#bootFill{display:block;height:100%;width:2%;border-radius:3px;background:var(--gold);transition:width .3s ease}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.bootball{animation:none}#boot{transition:none}}

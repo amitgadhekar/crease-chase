@@ -9,7 +9,10 @@
     "test:balance": "node tests/balance.mjs",
     "test:smoke": "node build.mjs && node tests/smoke.mjs",
     "test": "npm run test:balance && npm run test:smoke",
-    "model:batter": "node tools/model.mjs batter"
+    "lab": "BUILD_OUT=dist/lab.html node build.mjs && node tests/charlab.mjs",
+    "test:motion": "node tests/motion.mjs",
+    "model:batter": "node tools/model.mjs batter",
+    "model:fielder": "node tools/model.mjs fielder"
   },
   "devDependencies": {
     "@gltf-transform/cli": "4.5.0",

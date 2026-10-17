@@ -5,10 +5,10 @@
 // hub on a fresh page, so it passes alone); SMOKE_PLANETS=earth,mars limits the per-planet loop (argv planets still work).
 // `node tests/smoke.mjs --list` prints the section names. Sections run in file order; the skinned-batter check always runs.
 import {chromium} from 'playwright';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
-const SECTIONS = ['menu', 'planets', 'replay', 'field', 'throw', 'catch', 'celebrate', 'replay2', 't20bowl', 't20chase', 'scen', 'scenlast', 'scenstage', 'scensave', 'land', 'landt20', 'sizes'];
+const SECTIONS = ['menu', 'planets', 'replay', 'field', 'throw', 'catch', 'celebrate', 'replay2', 't20bowl', 't20chase', 'scen', 'scenlast', 'scenstage', 'scensave', 'land', 'landt20', 'sizes', 'chars'];
 if (process.argv.includes('--list')) { console.log(SECTIONS.join('\n')); process.exit(0); }
 const ONLY = process.env.SMOKE_ONLY ? process.env.SMOKE_ONLY.split(',').map(x => x.trim()).filter(Boolean) : null;
 if (ONLY && ONLY.some(x => !SECTIONS.includes(x))) { console.error(`SMOKE_ONLY: unknown section ${ONLY.filter(x => !SECTIONS.includes(x))}; sections: ${SECTIONS.join(', ')}`); process.exit(2); }
@@ -19,7 +19,8 @@ console.log(`smoke sections: ${SECTIONS.join(' ')}\nrunning: ${ONLY ? ONLY.join(
 const smokeT0 = Date.now();
 const shots = fileURLToPath(new URL('./screenshots/', import.meta.url));
 mkdirSync(shots, {recursive: true});
-const url = pathToFileURL(fileURLToPath(new URL('../dist/crease-chase.html', import.meta.url))).href + '#test';
+// SMOKE_DIST=dist/other.html tests another build (a parallel track's, or the lab's)
+const url = pathToFileURL(fileURLToPath(new URL('../' + (process.env.SMOKE_DIST || 'dist/crease-chase.html'), import.meta.url))).href + '#test';
 
 const browser = await chromium.launch({args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 const page = await browser.newPage({viewport: {width: 390, height: 844}});
@@ -77,6 +78,8 @@ const armPlay = (p, play) => p.evaluate(pl => {
   const want = new Function('r', 'f', 'b', 's', 'return ' + pl.pred), ev0 = evalSwing; window.__fp = 0;
   window.evalSwing = (...a) => { window.evalSwing = ev0; for (let i = 0; i < 6000; i++) { const r = ev0(...a); if (r.res && r.res.fplay && want(r.res, a[3], a[0], a[1])) { window.__fp = i + 1; return r; } } return ev0(...a); };
 }, play);
+// hands on the ball at a catch, stop or drop: the character lab's gate (tests/charlab/thresholds.json handsBall)
+const HANDS_BALL = JSON.parse(readFileSync(new URL('./charlab/thresholds.json', import.meta.url), 'utf8')).handsBall;
 const fieldPlay = async (p, name, play, ai) => {
   for (let n = 0; n < 4; n++) {
     if (!ai) {
@@ -106,7 +109,7 @@ const fieldPlay = async (p, name, play, ai) => {
     const f = st.fv, act = {dive: 3, jump: 4, slide: 5}[ev.k] || 2, hd = Math.min(...st.b.hands.map(h => Math.hypot(h[0] - f.hx, h[1] - f.hy, h[2] - f.hz)));
     if (st.fv.act !== act || !st.b.vis) errors.push(`fielding ${name}: ${ev.k} by ${ev.n || ev.i} drawn as action ${st.fv.act}, visible ${st.b.vis}`);
     if (ev.k === 'dive' && st.b.up > 0.9) errors.push(`fielding ${name}: diving ${ev.n || ev.i} still upright (${st.b.up.toFixed(2)})`);
-    if ((ev.o === 'catch' || ev.o === 'stop' || ev.o === 'drop') && Math.hypot(f.hx - ev.x, f.hy - ev.y, f.hz - ev.z) < 0.05 && hd > 0.35)
+    if ((ev.o === 'catch' || ev.o === 'stop' || ev.o === 'drop') && Math.hypot(f.hx - ev.x, f.hy - ev.y, f.hz - ev.z) < 0.05 && hd > HANDS_BALL)
       errors.push(`fielding ${name}: hands ${hd.toFixed(2)} m from the ball at ${ev.o}`);
     return {...ev, up: st.b.up, hd};
   }
@@ -1059,6 +1062,76 @@ for (const [w, h] of [[375, 667], [430, 932]]) {
   if (w === 430) { await p.emulateMedia({colorScheme: 'dark'}); await openMode(p, 'nets'); await p.screenshot({path: `${shots}menu-nets-dark.png`}); }
   console.log(`menu     ok  ${w}x${h} hub fits ${JSON.stringify(f)}`);
   await p.close();
+}
+// Characters (docs/characters.md, Gates): five Earth sequences played by the character lab's runner (tests/charlab/runner.js) on a
+// page of their own (__lab steps the game at 120 Hz on a lab clock, seeded), every frame reduced from __lab.frame({caps, verts}), and
+// the lab's own gates (tests/charlab/metrics.mjs, thresholds.json: nothing loosened here) asserted for the subject of each: the batter
+// in the stance and a cover drive (impact pose exact, contact, skinning, bat speed through the ball), the diver, a cordon catcher, the
+// thrower of a stop. KNOWN lists the gates still red at the wrap-up (docs/characters.md, As built: open findings): they are printed,
+// not failed, so this section is a ratchet; delete an entry once its finding is fixed. A shot per phase in tests/screenshots/chars-*.
+if(on('chars')){
+  const CM = await import('./charlab/metrics.mjs'), LAB = new URL('./charlab/', import.meta.url), rd = f => JSON.parse(readFileSync(new URL(f, LAB), 'utf8'));
+  const TH = rd('thresholds.json'), SQ = rd('sequences.json'), seq = (g, id, o) => ({...SQ[g], ...SQ[g].seqs.find(s => s.id === id), seqs: undefined, group: g, ...o});
+  const DEF = {keys: [['top', 'swing-0.05'], ['impact', 'impact'], ['follow', 'impact+0.15'], ['finish', 'impact+0.45']], end: 'impact+0.8'};
+  const CHARS = [
+    {name: 'stance', spec: seq('batter', 'bat-stance'), who: 'bat', cam: 'gbat', at: 'stance'},
+    {name: 'cover-drive', spec: seq('batter', 'bat-cover', DEF), who: 'bat', cam: 'gside', at: 'impact'},
+    {name: 'dive', spec: seq('fielding', 'fld-dive'), who: 'play', cam: 'gchase', at: 'hands'},
+    {name: 'cordon-catch', spec: seq('fielding', 'fld-edge', {play: {pred: "r.out&&r.catcher!=null&&/^(keeper|slip|gully)/.test(f[r.catcher].n)", key: "e=>e.o==='catch'"},
+      keys: [['edge', 'contact+0.05'], ['catch', 'play'], ['after', 'play+0.4']], end: 'play+0.9'}), who: 'play', cam: 'gcord', at: 'catch'},
+    {name: 'throw', spec: seq('fielding', 'fld-stop-throw', {subject: 'thrower'}), who: 'thrower', cam: 'w10', at: 'release'}];
+  // red at the wrap-up (2026-10-17), per sequence: gate id with the subject's name replaced by its role (bat, play, thrower) -> [open finding (B/H/M label in
+  // tests/charlab/reviews/round-3.md), value then]. A known gate fails again when it gets worse: more than 1.2x its excess over the
+  // limit + 5 mm (the lab is seeded, so an unchanged build repeats its values exactly)
+  const KNOWN = {
+    stance: {'pen:bat:torso-uarm': ['M8', .0437], 'pen:bat:handle-wrst': ['M2', .0154]},
+    'cover-drive': {'pen:bat:torso-uarm': ['M8', .0913]},
+    dive: {'slip:play': ['B4', .8936], 'slipTurn:play': ['B4', 2.497], 'teleport:play': ['H5', .0923], 'teleportHand:play': ['H5', .2815],
+      'pen:play:torso-uarm': ['H5', .163], 'pen:play:farm-torso': ['H5', .1939], 'pen:play:hand-torso': ['H5', .1991], 'pen:play:head-uarm': ['H5', .1446],
+      'pen:play:farm-head': ['H5', .1361], 'pen:play:shin-thigh': ['M8', .1199]},
+    'cordon-catch': {'slip:play': ['B4', .7264], 'vertex:play': ['M5', -.0269], 'pen:play:torso-uarm': ['M1', .119], 'pen:play:farm-torso': ['M1', .1189],
+      'pen:play:hand-torso': ['M1', .0381], 'pen:play:head-uarm': ['M1', .1143], 'pen:play:farm-head': ['M1', .105], 'pen:play:hand-thigh': ['M8', .0565],
+      'pen:play:farm-thigh': ['M8', .0485], 'pen:play:shin-thigh': ['M8', .0517]},
+    throw: {'slip:thrower': ['B4', .6462], 'teleport:thrower': ['B4', .0719], 'vertex:thrower': ['M5', -.0198], 'pen:thrower:hand-torso': ['H1', .1607],
+      'pen:thrower:farm-torso': ['H1', .1527], 'pen:thrower:shin-thigh': ['M8', .0539], 'pen:thrower:thigh-uarm': ['M8', .0217], 'pen:thrower:shin-torso': ['M8', .0409],
+      'pen:thrower:hand-thigh': ['M8', .0341]}};
+  const worse = (g, v) => Math.abs(g.value - g.limit) > 1.2 * Math.abs(v - g.limit) + .005;
+  const CAMS = rd('cameras.json'), cmScript = 'window.__cm=(()=>{' + readFileSync(new URL('metrics.mjs', LAB), 'utf8').replace(/^export /gm, '') + '\nreturn {V,wrap,segDist,penetration,reduce,pairKey};})();';
+  const cp = await browser.newPage({viewport: {width: 390, height: 844}});
+  cp.on('pageerror', e => errors.push('chars: ' + (e.stack || String(e))));
+  await cp.addInitScript({content: cmScript}); await cp.addInitScript({content: readFileSync(new URL('runner.js', LAB), 'utf8')});
+  await cp.goto(url);
+  await cp.waitForFunction(() => __r.skin().on || __r.skin().err, null, {timeout: 15000, polling: 50}).catch(() => {});
+  await cp.evaluate(() => { __lab.seed(7); __lab.on(); __lab.start({mode: 'nets', planet: 'earth', diff: 'medium'}); });
+  const known = [];
+  for (const c of CHARS) {
+    const spec = {...c.spec, planet: 'earth', kit: 'ai', key: 'chars-' + c.name};
+    await cp.evaluate(s => __run.begin(s), spec);
+    let frames = [], A = null, impact = null, fail = null; const keys = [...spec.keys, ['end', spec.end]], seen = [];
+    for (let ki = 0; ki < keys.length; ki++) { const [k, expr] = keys[ki], u = await cp.evaluate(e => __run.until(e), expr);
+      if (u.reset) { frames = []; impact = null; seen.length = 0; }
+      if (u.restart) { ki = -1; continue; }
+      frames.push(...u.frames); A = u.A; if (u.impact) impact = u.impact;
+      if (u.fail || u.skip) { fail = u.fail || u.skip; break; }
+      if (!u.reached || k === 'end') { if (u.done) break; continue; }
+      seen.push(k);
+      for (const cid of ['q4', ...(k === c.at ? [c.cam] : [])]) {
+        const v = await cp.evaluate(([cm, s]) => __run.view(cm, s), [CAMS[cid], spec.subject]); if (!v) continue;
+        await cp.evaluate(() => __run.shot()); await cp.screenshot({path: `${shots}chars-${c.name}-${k}-${cid}.png`}); } }
+    if (fail || !A) { errors.push(`chars ${c.name}: ${fail || 'no anchors'}`); continue; }
+    const subj = c.who === 'bat' ? 'bat' : c.who === 'play' ? A.playN : A.thrI != null ? (A.fieldN[A.thrI] || 'f' + A.thrI) : null;
+    if (!subj) { errors.push(`chars ${c.name}: no ${c.who} (play ${A.playN}, throw ${A.thrKind})`); continue; }
+    const m = CM.seqMetrics(frames, A, spec, impact), all = CM.gates(m, TH, spec);
+    const mine = all.filter(g => { const p = g.id.split(':'); return p[1] === subj || c.who === 'bat' && ['impactExact', 'contact', 'skinErr', 'batAV', 'batAxis'].includes(p[0]); });
+    const role = id => id.split(':').map((x, i) => i === 1 && x === subj ? c.who : x).join(':');
+    const red = mine.filter(g => !g.pass), kn = g => (KNOWN[c.name] || {})[role(g.id)], bad = red.filter(g => !kn(g) || worse(g, kn(g)[1]));
+    for (const g of red) if (kn(g) && !worse(g, kn(g)[1])) known.push(`${c.name} ${g.id}=${g.value} (limit ${g.limit}; ${kn(g)[0]}, was ${kn(g)[1]})`);
+    for (const g of bad) errors.push(`chars ${c.name}: ${role(g.id)} (${subj}) = ${g.value}, limit ${g.limit}${g.t != null ? ' at ' + (g.t - A.start).toFixed(2) + ' s' : ''}${kn(g) ? `, worse than at the wrap-up (${kn(g)[0]}: ${kn(g)[1]})` : ''}`);
+    const play = A.playK ? `, ${A.playK} ${A.playO} by ${A.playN}` : '', thr = A.thrKind ? `, ${A.thrKind} throw to the ${A.thrRv}` : '';
+    console.log(`chars    ${bad.length ? 'RED' : 'ok '} ${c.name}: ${frames.length} frames, phases ${seen.join(' ')}${play}${thr}; ${subj}: ${mine.length} gates, ${red.length - bad.length} known red${bad.length ? ', ' + bad.length + ' new red: ' + bad.map(g => role(g.id) + '=' + g.value).join(' ') : ''}`);
+  }
+  if (known.length) console.log('chars    known (open findings):\n  ' + known.join('\n  '));
+  await cp.close();
 }
 await browser.close();
 console.log(`\nsections ran: ${SECTIONS.filter(x => ran.has(x)).join(' ') || '(none)'}\nsections skipped: ${SECTIONS.filter(x => !ran.has(x)).join(' ') || '(none)'}${planets.includes('earth') ? '' : ' (replay to landt20 need earth in the planets)'}; ${((Date.now() - smokeT0) / 1000).toFixed(0)} s`);

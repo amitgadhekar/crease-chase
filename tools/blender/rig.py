@@ -12,7 +12,11 @@ Every bone stores two rest vectors as custom properties, exported as glTF extras
 The game drives a bone by giving the same two vectors for the current pose (src/game/07-skin.js, skinVecs):
 its rotation maps rest aim -> current aim and rest ref -> current ref (made perpendicular), so the runtime never
 depends on Blender's or the exporter's bone axis conventions. Bone lengths equal the game's limb lengths, so
-joints land on the pose's joints and only the root (pelvis) gets a translation.
+joints land on the pose's joints. Rig v2 (docs/characters.md): the game writes every bone's world matrix (position and
+rotation), so a stretched limb is closed at the hands and feet, and four twist bones share the twist along the arms:
+  uarm_tw_K  child of upperarm_K, head at the upper arm's midpoint: the elbow plane; the upper arm's root takes less
+  farm_tw_K  child of forearm_K, head at the forearm's midpoint: the hand's twist; the forearm's root keeps the elbow plane
+They carry no automatic weights: batter.py moves a smoothstep share of the parent's weights onto them along the bone.
 """
 from math import cos, sin, radians
 
@@ -87,7 +91,14 @@ def bones(L=HUMAN):
               ('thigh_' + k, 'pelvis', J['hipj_' + k], J['knee_' + k], X),               # ref: knee points forward
               ('shin_' + k, 'thigh_' + k, J['knee_' + k], J['ankle_' + k], X),           # ref: toe direction
               ('foot_' + k, 'shin_' + k, J['ankle_' + k], ADD(J['ankle_' + k], (L['foot'], 0, 0)), Y)]
+    for k in ('L', 'R'):   # twist bones last: the first 19 keep their v1 order
+        mid = lambda a, b: tuple((x + y) / 2 for x, y in zip(a, b))
+        B += [('uarm_tw_' + k, 'upperarm_' + k, mid(J['shoulder_' + k], J['elbow_' + k]), J['elbow_' + k], NEG(X)),
+              ('farm_tw_' + k, 'forearm_' + k, mid(J['elbow_' + k], J['hand_' + k]), J['hand_' + k], NEG(X))]
     return B
+
+
+TWIST = {'uarm_tw_L': 'upperarm_L', 'farm_tw_L': 'forearm_L', 'uarm_tw_R': 'upperarm_R', 'farm_tw_R': 'forearm_R'}
 
 
 def build_armature(name='rig', L=HUMAN):
@@ -119,9 +130,10 @@ def build_armature(name='rig', L=HUMAN):
 
 
 def pose_armature(ob, targets):
-    """Poses the armature from game-space drive vectors {root: [x,y,z], bones: {name: {a: aim, r: ref}}, pins: {name:
-    [x,y,z]}}, the same rule the game uses: bone rotation maps rest (aim, ref) to current (aim, ref); the root moves and
-    pinned bones (hands, feet) are placed on the pose's hand points and ankles."""
+    """Poses the armature from game-space drive vectors {root: [x,y,z], bones: {name: {a: aim, r: ref, p: head}}, pins:
+    {name: [x,y,z]}}, the same rule the game uses: bone rotation maps rest (aim, ref) to current (aim, ref); a bone with a
+    head p (rig v2: every bone) is placed there, else the root moves and pinned bones (hands, feet) are placed on the
+    pose's hand points and ankles (v1 dumps)."""
     import bpy
     from mathutils import Matrix, Vector
 
@@ -136,11 +148,13 @@ def pose_armature(ob, targets):
         aim0 = Vector(g2b(ob.data.bones[n]['aim']))
         ref0 = Vector(g2b(ob.data.bones[n]['ref']))
         Lm = rest.transposed() @ basis(aim0, ref0)   # rest aim/ref in bone-local axes
-        d = targets['bones'][n]
+        d = targets['bones'].get(n)
+        if d is None:   # a v1 dump: a twist bone follows its parent
+            d = targets['bones'][TWIST[n]]
         W = basis(g2b(d['a']), g2b(d['r'])) @ Lm.transposed()
         bpy.context.view_layer.update()
-        pin = targets.get('pins', {}).get(n)
-        head = Vector(g2b(targets['root'] if parent is None else pin)) if parent is None or pin else pb.matrix.translation.copy()
+        pin = d.get('p') or targets.get('pins', {}).get(n)
+        head = Vector(g2b(targets['root'] if parent is None and not pin else pin)) if parent is None or pin else pb.matrix.translation.copy()
         M = W.to_4x4()
         M.translation = head
         pb.matrix = M

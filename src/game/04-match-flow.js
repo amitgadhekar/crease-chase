@@ -57,17 +57,28 @@ function newOver(cont){
   S.phase='break';S.t=0;S.breakDur=lng?2.4:1.6;resetFielders();
   if(S.hintCount<4)hint('Pull back to aim, release to swing, tap to block');
 }
-// fielders back at their places (the keeper at his stance for this bowler, KEEP), with the motion state fieldTick (08) drives
-// A throw under way (S.thr) keeps its receiver and thrower where they are (and his play), so throwTick carries on and walks them
-// back; a thrower who has let go and whose place moved (a new field) goes there with everyone else
-function resetFielders(){const o=S.thr,t=clock-S.f0,old=S.fpos;
+// the fielders' places for this ball (the keeper at his stance for this bowler, KEEP), with the motion state fieldTick (08) drives.
+// Everyone keeps where he is and the way he faces: the same man for an unchanged spot, else the nearest man still unassigned (a
+// new field), so fieldTick walks him to his place and nobody is put back in one jump; a new match starts everyone at his spot.
+// A throw under way (S.thr) keeps its receiver's and thrower's play too, so throwTick carries on
+function resetFielders(){const o=S.thr,t=clock-S.f0,old=S.fpos&&S.fpos.m===M?S.fpos:[],used=new Set(),
+    pick=(i,q)=>{if(q.kp||q.bw){const w=old.find(x=>x.kp===q.kp&&x.bw===q.bw);return w||null;}
+      const w=old[i];if(w&&!w.kp&&!w.bw&&w.bx===q.bx&&w.bz===q.bz&&!used.has(w)){used.add(w);return w;}
+      let best=null,bd=1e9;for(const x of old){if(x.kp||x.bw||used.has(x))continue;const d=Math.hypot(x.x-q.bx,x.z-q.bz);if(d<bd){bd=d;best=x;}}
+      if(best)used.add(best);return best;};
   S.fpos=M.field.map((f,i)=>{const kp=f.n==='keeper',p=kp?KEEP[M.bowlerType]||KEEP.pace:f,
-    q={x:p.x,z:p.z,bx:p.x,bz:p.z,run:0,mv:0,face:kp?0:Math.atan2(-p.x,BATS_Z-p.z),act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,ev:null,kp,bw:f.n==='bowler'},
-    w=!o?null:kp||q.bw?o.rv===(kp?'kp':'bw')&&old.find(x=>x.kp===kp&&x.bw===q.bw):i===o.i&&!o.td&&old[i];
-    if(w&&i===o.i&&!(t<o.tr+.6||w.bx===q.bx&&w.bz===q.bz)){o.td=1;return q;}
+    q={n:f.n,x:p.x,z:p.z,bx:p.x,bz:p.z,run:0,mv:0,face:kp?0:Math.atan2(-p.x,BATS_Z-p.z),act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,ev:null,kp,bw:f.n==='bowler'},
+    w=!o?null:kp||q.bw?o.rv===(kp?'kp':'bw')&&!o.rd&&old.find(x=>x.kp===kp&&x.bw===q.bw):i===o.i&&!o.td&&old[i],same=pick(i,q);
+    if(w&&i===o.i&&!(t<o.tr+.6||w.bx===q.bx&&w.bz===q.bz)){o.td=1;if(same&&Math.hypot(same.x-q.bx,same.z-q.bz)<12)Object.assign(q,{x:same.x,z:same.z,face:same.face,run:same.run});return q;}
+    // batting (the keeper is hidden between balls), a receiver who has taken the throw but is too far from his place to walk
+    // back in the countdown (the keeper at the stumps, 12 m from his stance to pace) starts there: his part of the throw is over.
+    // Bowling, Bowl waits for the throw to end, so he walks back
+    if(w&&i!==o.i&&!M.bowl&&t>=thrRecv(o).tk&&Math.hypot(w.x-q.bx,w.z-q.bz)>=(kp?6:12)){o.rd=1;return q;}
     if(w)Object.assign(q,{x:w.x,z:w.z,face:w.face,run:w.run,ev:w.ev,g:w.g});
+    // a man more than 12 m from his spot (a new field at the over break, a long chase) starts at it: the 2 s gap covers 12 m at a run
+    else if(same&&!same.bw&&Math.hypot(same.x-q.bx,same.z-q.bz)<(kp?6:12))Object.assign(q,{x:same.x,z:same.z,face:same.face,run:same.run});
     return q;});
-  S.fplay=[];S.fev=null;S.cord=null;}
+  S.fpos.m=M;S.fplay=[];S.fev=null;S.cord=null;}
 function nextBall(){
   $('#holdBtn').hidden=true;S.ball=null;S.swing=null;S.ai=null;S.hit=null;S.res=null;S.hl=null;S.stumps=null;S.padNow=S.padHit=S.padBp=S.hold=null;S.trail=[];S.chase=null;S.deferred=null;setLoft(false);S.bat={mode:S.aim?'backlift':'stance',t0:clock,from:null,aim:0};
   const sb=M.sc?scenNext():null;

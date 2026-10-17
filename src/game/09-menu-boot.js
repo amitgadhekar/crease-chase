@@ -103,3 +103,5 @@ if(location.hash==='#test')window.__t={S,getM:()=>M,clk:()=>clock,rp:()=>RP,rec:
 buildPlanetGrid();applyPlanet(setPlanet(settings.planet));resize();showMenu(null);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize);
 requestAnimationFrame(frame);
+// the loading screen (index.html) fades out once the stadium has drawn a couple of frames
+bootStep(.95,'Building the stadium…');requestAnimationFrame(()=>requestAnimationFrame(bootDone));

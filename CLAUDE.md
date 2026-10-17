@@ -16,11 +16,21 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
 npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
-npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), the other replay kinds (`replay2`: bowled, LBW, a shout not given, a shave, stumped, drops close and deep, a rope save, a hands-on chance and a six's leap, the last wicket bowled, bowled in the bowling view, LBW in landscape), three scenarios and a landscape pass (844x390) in headless Chromium, fails on page errors
+npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), the other replay kinds (`replay2`: bowled, LBW, a shout not given, a shave, stumped, drops close and deep, a rope save, a hands-on chance and a six's leap, the last wicket bowled, bowled in the bowling view, LBW in landscape), three scenarios, a landscape pass (844x390) and the characters' gates (`chars`, below) in headless Chromium, fails on page errors
 npm test                         # both
 npm run model:batter             # Blender (headless) + glTF Transform -> src/models/batter.glb (commit the .glb)
+npm run model:fielder            # the same for src/models/fielder.glb (the fielding sides' shared body, keeper kit, Earth head and cap)
+npm run lab                      # character lab: builds dist/lab.html, plays tests/charlab/sequences.json on every planet and kit,
+                                 # shoots cameras.json, gates thresholds.json -> tests/charlab/out/<run>/ (~17 min; -- --quick: Earth,
+                                 # -- --gates: no shots, exit 1 on a red gate; -- --seq a,b / --species x / --diff A B / --baseline run)
+npm run test:motion              # node checks of src/game/07-motion.js (springs, gait, anchors, IK, hands2) in node:vm
 ```
-Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests.
+Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests, `window.__r`
+(render and skinning: `info` draw calls/triangles, `tier`/`setTier`, `skin()`, `skinErr()`, `contact()`, `body(i)`, `rig(i)`,
+`drive()`) and `window.__lab` (07b-lab, the character lab: `on` (a lab clock behind performance.now, the GL render stubbed except
+`render`), `seed`, `start`, `step(dt)` at 120 Hz, `ball`/`swing`/`backlift`/`foot`/`duck`, `arm` a forced play, camera lock `look`/
+`game` (one guard line at the top of `updateCam`), `kits`, dumps `joints`/`caps`/`verts`/`frame({caps,verts})`/`anchors`/`drive`).
+`#test&nomodel` leaves the GLBs unloaded (the procedural fallbacks).
 Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub Pages). Every push to `main` runs
 `.github/workflows/pages.yml`: `npm ci`, balance test, build, deploy `dist/crease-chase.html` as `index.html`. A failing balance
 test blocks the deploy. `dist/` is not committed.
@@ -45,6 +55,12 @@ Run `npm run test:smoke` after any change to rendering, flow or input, and look 
 While iterating, run only the area you touched: `SMOKE_ONLY=field,throw npm run test:smoke` (sections: `node tests/smoke.mjs --list`;
 each starts from the hub and passes alone; `SMOKE_PLANETS=earth,mars` limits the per-planet loop). The full unfiltered run
 (what CI does) is required once before a push. New checks go inside the matching `if(on('section'))` guard in tests/smoke.mjs.
+Its `chars` section plays five Earth sequences through the character lab's runner on a page of its own (stance, cover drive, a
+diving stop, a cordon catch, a stop and throw) and asserts the lab's gates (tests/charlab/metrics.mjs + thresholds.json) for each
+subject; gates still red at the 2026-10-17 wrap-up are listed in its `KNOWN` (with their round-3 finding) and fail only if they get
+worse (more than 1.2x their excess + 5 mm). Remove an entry when its finding is fixed. `fieldPlay`'s hands-on-the-ball check uses the
+lab's `handsBall` (12 cm). Run `npm run lab` (or `-- --quick`) after any change to a character's model or motion, and read the
+sheets in `tests/charlab/out/<run>/sheets/` against docs/art-style.md; rules, gates and contracts are in docs/characters.md.
 
 ## Layout
 ```
@@ -56,11 +72,16 @@ src/game/09-menu-boot.js  `import * as THREE from 'three'` on top). Keep the num
 build.mjs                 Inlines CSS, logic.js and SFX into the HTML; bundles the game entry with esbuild (tree-shaken,
                           minified IIFE, target es2020/safari15) and inlines it. logic.js stays a plain script (balance test)
 tests/balance.mjs         Balance simulator over src/logic.js (runs in node:vm)
-tests/smoke.mjs           Playwright smoke test over dist/
-src/models/*.glb          Skinned models, embedded as base64 (MODEL_DATA) by build.mjs; generated, but committed
-tools/blender/            Model scripts run headless in Blender: rig.py (skeleton contract), sdf.py (shapes, meshing),
-                          batter.py (the batter). tools/model.mjs runs Blender, then gltf-transform prune/dedup/quantize
+tests/smoke.mjs           Playwright smoke test over dist/ (SMOKE_DIST=dist/other.html for another build)
+tests/charlab.mjs         Character lab (Playwright over dist/lab.html, LAB_DIST=): tests/charlab/{sequences,cameras,thresholds,
+                          baseline}.json, metrics.mjs (pure, node-testable), runner.js (in-page sequence runner); out/ gitignored
+tests/motion.mjs          node checks of 07-motion.js
+src/models/*.glb          Skinned models (batter, fielder), embedded as base64 (MODEL_DATA) by build.mjs; generated, but committed
+tools/blender/            Model scripts run headless in Blender: rig.py (skeleton contract), sdf.py (shapes, meshing), body.py
+                          (shared body and atlas bake), batter.py, fielder.py. tools/model.mjs runs Blender, then gltf-transform
+                          prune/dedup/quantize (KHR_mesh_quantization), WebP textures and a byte report
 ```
+`BUILD_OUT=dist/<name>.html node build.mjs` builds to another file (parallel work, the lab).
 Game modules: 01 core state, settings, sizing, camera + projection, planet application · 02 audio (WebAudio, recorded clips) ·
 03 HUD/banner · 04 match flow + ball state machine + scoring · 04b T20 (over setup, mid-over swaps, save/resume, scorecard) · 04d T20
 first innings (over picker, delivery chips, marker, release meter, AI batter, innings break, Simulate rest) · 04c
@@ -68,8 +89,10 @@ Scenarios (list, briefing, Test overs and balls, strike, Hold, sessions, stars, 
 2D overlays (aim arrow, radar, timing bar, info text), firework simulation · 07-arena stadium geometry (stands, sightscreens,
 floodlights, boards, rope), instanced crowd, glow points (fireworks, floodlight halos) · 07-canvas procedural canvas textures
 (ground, grass detail/normal, pitch, ads, wood, ball, seats, glow) · 07-geometry raw shape builders (`GB`, people parts) and
-`geo`/`fillGeo` (-> BufferGeometry) · 07-people fielder/bowler species per planet (`SPECIES`, `spBuild`) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
-ball), batter pose, view state, adaptive quality · 07-skin skinned batter (loads the GLB, drives its bones from the pose) ·
+`geo`/`fillGeo` (-> BufferGeometry) · 07-motion pure motion toolkit (`MO`: springs, slerp, arcs, gait, anchors, IK, hands2) ·
+07-people species per planet (heads, skin, feature: `SPECIES`, `BODY`, `REGIONS`, the people atlas `spPaint`) · 07-render3d three scene (lights, environment, shadows, materials, people, bat, stumps,
+ball), batter pose and motion, people joints and motion, bowler, view state, adaptive quality · 07-skin skinned batter and
+fielders (loads the GLBs, writes their bones from the joints) · 07b-lab character lab hooks (`#test` only, `window.__lab`) ·
 08 camera follow (incl. the menu camera `menuCam`) + main loop · 08b replay (recording, playback, replay cameras) · 09 menu (hub, sheets,
 planet preview) + boot.
 
@@ -185,47 +208,71 @@ planet preview) + boot.
   still connect). More bowled when moving to leg, more LBW when moving across, emerge from this geometry. `stumpedResult`
   at the keeper (tEnd): beaten or left with the back foot (0.8+bp.z) past the popping crease (1.22); 0.88 vs spin (keeper
   up), 0.3 vs pace; bails only. The balance bots use the same functions via `beaten()`.
-- **Batter animation** (07, visual only): full-body procedural pose (26-number arrays: feet, hips, spine, shoulders,
-  hands, bat, head, blade face azimuth `qFC`, back-knee kneel `qKN`), knees/elbows by 2-bone IK. `poseTick` blends from the pose on screen: trigger step from delivery
-  length during flight, per-shot impact/follow-through (`SH3`, one per `SHOTS` entry), block, leave, celebrate.
+- **Batter animation** (07-render3d + 07-motion, visual only): full-body procedural pose (`PN` = 29 numbers: feet, hips, spine,
+  shoulders, hands, bat, head, blade face azimuth `qFC`, back-knee kneel `qKN`, top-hand offset `qTX/qTY/qTZ`), knees/elbows by
+  2-bone IK with pole hysteresis (`MO.ikS`, per rig). `poseTick` blends from the pose on screen with `mixPose` (channels lerp, the bat
+  direction slerps through the swing plane, the hands travel on an arc about the shoulders, never through the body, a foot that
+  moves lifts first); `swingTiming` makes the swing C1 through a bit-exact impact (follow and finish timed from the downswing's
+  speed); the result's re-aim fades in over the 60 ms after impact. Per-family backlifts with the lunge/back-and-across step in the
+  backlift (`capStep` keeps a step the backlift did not take within .2 m), a baseline backlift for keyboard/AI swings, idle life and
+  a trigger press in the stance, the head tracking ball/bowler/shot, the drawn hip on `bpos` by impact, a two-stage relax then walk
+  back between balls, flinch recovery, the celebration on the game clock with pivoting feet (`MO.anchors`). Per-shot keys: `SH3`
+  (one per `SHOTS` entry), `SW3` sweeps, `UP` duck/sway/hit; block and leave.
   The impact pose must land exactly at release + `SWING_DELAY`: the player's timing is anchored to it visually.
-  Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
-- **Skinned batter** (07-skin, tools/blender): one smooth skinned body (skin, shirt, collar/cuff trim, trousers; 4
-  material groups, ~6.1k tris; decimation keeps the face and shoulders denser) plus kit (~5.2k tris): helmet + grille and
-  shoes rigid on a bone, gloves skinned to hand + forearm (fingers curled round the handle radius, so the palm bends and the
-  cuff follows the arm), pads skinned to shin + thigh (the flap above the knee roll follows the thigh in lunges). 19 bones,
-  ~215 KB GLB, ambient occlusion and the face's eyes/brows/lips baked into vertex colours. `batJoints(p)` (07-render3d) turns a pose into joints; both
-  the procedural parts and the skeleton use it. **Skeleton contract** = `tools/blender/rig.py` (`HUMAN` lengths = the
-  pose's: thigh/shin .43, upper arm .31, forearm .30 to the grip, shoulders ±.19, spine+chest .5, neck .17; rest A-pose in
-  game coordinates, L = front side). Each bone stores rest `aim`/`ref` vectors (glTF extras -> `bone.userData`);
-  `skinVecs` gives the same two vectors from the pose (limb line + IK pole for elbows/knees, toe for shins; hands are turned
-  so the glove's grip channel lies exactly on the bat axis, forearms take half the hand's twist,
-  half twists for spine and neck, clavicles follow 15% of the arm swing), and `skin3D` sets `bone.quaternion` to map one
-  onto the other (no AnimationMixer). Only the pelvis, hands and feet get positions: hands/feet are pinned to the pose's
-  hand points and ankles (a leg stretched past its reach stops short otherwise). The bat stays procedural (`batsman3D`),
-  so contact targeting is untouched. Grip (`batJoints`, H = bat anchor): left glove at H+`HAND_AT`[0] .095·d (top of the handle, which starts at `HTOP`), right at .18 touching it ~4 cm above the blade; correctly handed gloves, top hand's back to the bowler, bottom palm behind the handle (`GA`/`GRIP_A`, `GF`), elbow poles toward the glove's forearm (`J.wa`). If the GLB fails to load, the procedural batter below stays (`__r.skin()` says why).
-  Materials are replaced by name with `kit()` ones (KIT colours, vertex colours on). Species can reuse the rig with their
-  own `HUMAN`-style lengths. Regenerate with `npm run model:batter` (Blender 5.2 at /Applications or `BLENDER=`; a
-  `-- --render DIR --poses poses.json` run renders turntables and game poses; `__r.drive()` dumps a pose).
-- **People models** (07): limbs are tapered capsules built once per fixed bone length (`capG`, `mL`), so joints blend
-  without gaps; changing a bone length means rebuilding its geometry. Batter parts in `BG` (fallback); fielders/bowler are lower poly,
-  13 meshes each (`personRig`/`batterRig` create them, `person3D`/`batsman3D` pose them). Fielding actions (`o.act`): 1 run, 2 take
-  or stop (stoops, and squats below 0.75 m; `playGeo` puts him in line behind the ball, so a ball over him is not taken behind his back), 3 dive (roll `diveTh`: more for a longer stretch or a lower ball; `playGeo` uses it too), 4 leap, 5 slide, 6 keeper squat/gather, 7 throw (`o.e` 0 overarm, 1 underarm, 2 looping:
-  the right hand alone on `hx/hy/hz`, the left arm leading); `person3D` poses the body standing, then turns it
-  as a whole about the hip (roll for a dive, pitch back for a slide), lifts it, and puts both hands on `hx/hy/hz` by IK through
-  the inverse of that transform. `GB.surf`/`GB.join`
-  in 07-geometry build smooth parametric shapes; materials come from `kit()` (roughness per surface: glossy helmet, metal grille, wood-grain blade).
-- **Species** (07-people): fielders and bowler are a species per planet (Earth humans, Selenites, Scorchlings, Cloudwaders,
-  Rustkin, Gravitons, Ringlings, Tidefolk); the batter stays human. `SPECIES[planet]` sets bone lengths and radii (1.4 m to
-  2.2 m tall), torso scale, gait (`st` stride, `lf` lift, `fq` cadence, `fl` low-gravity float), delivery bound `jp`, legwear,
-  and head/hand/foot builders. `spBuild` builds a species' parts once (cached), `spApply` swaps geometry and maps on the 13
-  rigs per planet. `person3D` places legs and arms by IK with the species' own lengths (`limb`), so nothing stretches; the hip
-  drops to keep feet on the ground. Skin, eyes and glow share one material: a 128 px atlas (pattern for limbs and head, four
-  swatches for features) as colour, emissive and roughness maps, so features cost no draw calls. Budget: 13 meshes per person
-  (thighs, shins, feet, torso, sleeves, forearm+hand, head with features, one extra: cap or Saturn's ring), 12 without the
-  extra. The torso texture paints trousers below the waist. The bowler's arm angle at release is fitted per species so the
-  hand meets the ball's release point (0.03-0.5 m; tallest species are furthest off for spin; `BZR` places the delivery stride). In the win celebration fielders
-  stand dejected (`V.dej`, three variants by index; not recorded, replays end before it).
+  Contact: `aimSwing` picks `sw.cp` (ball at tc, clamped to the shot's reach; else where the path passes nearest the bat), bend limits per shot family (`FAM`, `shapeFor`: drives/blocks upright, pulls/cuts flat), `bend` puts the blade point for the kind (`BK`) on it with the face (`qFC`, `faceFor`: between the ball and the shot direction) toward it (misses clear over the whole swing; it may slide the ball along the blade, `x[9]`, at a higher cost than moving the hands; low balls get a second start), `ballNow` time-warps the last `SWING_DELAY` to reach it, `recContact` records that frame for replays.
+  Non-striker (`nsPose`/`nsTick`): `MO.gait` walk/backpedal/sidestep from his track position, the bat in the bottom hand, the free
+  arm swinging; his pose is recorded per frame.
+- **Skinned batter** (07-skin, tools/blender): batter.glb (~314 KB, 11.2k tris: body 6.2k, helmet 1.5k, shoes, gloves with
+  fingers and thumb, pads with knee roll, straps and wing), one 1024² WebP atlas (position bake + AO + painted detail: face,
+  placket, number, seams, belt, pad ribs, glove bars, sole, helmet vents; alpha = the material's tint mask) on smart-projected UVs,
+  9 materials replaced by name with `kit()` ones (roughness and rim per art-style section 1). Proportions per docs/art-style.md
+  section 2 (shared body code in tools/blender/body.py). Helmet and shoes rigid on a bone, gloves skinned to hand + forearm twist,
+  pads to shin + thigh. **Skeleton contract (rig v2)** = `tools/blender/rig.py`: the 19 bones of v1 (`HUMAN` lengths = the pose's:
+  thigh/shin .43, upper arm .31, forearm .30 to the grip, shoulders ±.19, spine+chest .5, neck .17; rest A-pose in game coordinates,
+  L = front side) plus 4 twist bones `uarm_tw_L/R`, `farm_tw_L/R` (children of the upper arm/forearm, heads at their midpoints),
+  parent-first; each bone stores rest `aim`/`ref` vectors (glTF extras -> `bone.userData`); <= 4 influences. `batJoints(p)` turns a
+  pose into the joint struct `J` (the one interface for every person). `skinVecs(J)` gives aim/ref from the pose (limb line + IK
+  pole for elbows/knees, toe for shins, the elbow taken from the pose's own IK; hands turned so the glove's grip channel lies on the
+  bat axis; twist refs spread the hand's twist along the forearm and the elbow plane along the upper arm; lengths from `J.L`), and
+  `skinDrive(rec,J,scale,gw)` writes every bone's **world matrix** (head at the joint, rotation mapping rest aim/ref onto the
+  pose's; bones have `matrixAutoUpdate`/`matrixWorldAutoUpdate` off), so a limb the pose stretches still ends at the hand and ankle
+  and nothing depends on Blender's bone axes (`__r.skinErr()` 0). The bat stays procedural (`batsman3D`), so contact targeting is
+  untouched. Grip (`batJoints`, H = bat anchor): left glove at H+`HAND_AT`[0] .095·d (top of the handle, which starts at `HTOP`), right at .18 touching it ~4 cm above the blade; correctly handed gloves, top hand's back to the bowler, bottom palm behind the handle (`GA`/`GRIP_A`, `GF`), elbow poles toward the glove's forearm (`J.wa`). If the GLB fails to load, the procedural batter (`BG`) stays (`__r.skin()` says why).
+  The non-striker is a SkeletonUtils clone (`SKN.b2`) driven with his group's world matrix. Regenerate with `npm run model:batter`
+  (Blender 5.2 at /Applications or `BLENDER=`, sandbox off; a `-- --render DIR --poses poses.json` run renders turntables and game
+  poses; `__r.drive()` / the lab's `poses.json` dump poses).
+- **People models** (07-skin, 07-render3d): fielders, bowler and keeper are SkinnedMeshes on fielder.glb (~216 KB, 7.6k tris: one
+  athletic body at the rig.py lengths, collared short-sleeve shirt, cream trousers, shoes, cupped hands with a thumb, the Earth head
+  with a face and the cap; keeper gauntlets and pads; one 512² WebP detail atlas in `REGIONS`). At load each mesh is put into bind
+  space and merged per species into ONE geometry (body + shoes + head: the GLB Earth head and cap, or the species' head with
+  head-bone weights), so a person is one draw call; the keeper's gauntlets + pads one more (`wk`), his helmet up to spin (a clone of
+  the batter GLB's, Earth only) another; Saturn's ring stays a rigid part. Each rig: 23 cloned bones and its own Skeleton,
+  `skinDrive` from `personJoints`' J, frustum-culled by a bounding sphere at the hip; fielders beyond `SHADOW_D` (28 m) cast no
+  shadow and keep a blob. ONE people material (`peopleMat`) over three 512² canvases painted per species and kit (`spPaint`, 07-people:
+  colour with the GLB detail atlas multiplied in on the CPU, alpha = tint mask for trim and eye white; emissive; roughness G + rim
+  share R), so a kit change is a repaint (`kitApply`/`setKits` per innings). `personJoints(x,z,face,o,id,dj,ik)` builds J for
+  everyone (index 0 his left; `wr`=`hd` the wrist; two-handed plays by `MO.hands2`: hands side by side across the ball's line, palms
+  to it, fingers up above the chest and cupped below, shoulders and head turned to it). The fallback (`#test&nomodel`, or the GLB
+  failing) is the 13-part procedural rig (`personRig`, `placeParts` from J): tapered capsules per fixed bone length (`capG`, `mL`).
+  Fielding actions (`o.act`): 1 run, 2 take or stop (stoops, and squats below 0.75 m; `playGeo` puts him in line behind the ball), 3
+  dive (roll `diveTh`), 4 leap, 5 slide, 6 keeper squat/gather, 7 throw (`o.e` 0 overarm, 1 underarm, 2 looping). `GB.surf`/`GB.join`
+  in 07-geometry build smooth parametric shapes; materials come from `kit()`.
+- **Species** (07-people): one shared body (`BODY` = rig.py lengths, 1.82 m) and kit for every planet; a species is a head, a skin
+  colour/pattern and one signature feature (docs/art-style.md section 5: Earth humans and the team cap, Selenites' glowing crest,
+  Scorchlings' fin, Cloudwaders' gill fronds, Rustkin antennae, Gravitons' amber eyes, Ringlings' ring, Tidefolk fins). Heads are
+  authored in the head frame (origin the head centre, x his right, y up, z forward) over a shared neck cover, within .26 x .30 m.
+  `SPECIES[planet]` keeps the per-planet gait physics only (`st` stride, `lf` lift, `fq` cadence, `fl` low-gravity float, delivery
+  bound `jp`). `vis.kit` per planet: shirt, cream trousers, `trim`, `cap` (section 4 contrast). `spApply(key,kit)` swaps heads and
+  repaints; in the T20 first innings both batters wear the planet team's kit and the fielders are Earth humans (`setKits`). In the
+  win celebration fielders stand dejected (`V.dej`, three variants by index; not recorded, replays end before it).
+- **Bowler** (07-render3d `bowlerState`, persistent `BW`, never a jump): a steady run-up from his mark (`BWP`: pace 31 m, spin
+  25.5 m), then a keyed window around the release (`BKP` pace, `BKS` spin; times in s from the release, `kf` over `bt`): pace = gather
+  with both hands on the ball, bound off the left foot, back-foot contact side-on (hips and shoulders turned, front arm high), front
+  arm pulled down over a braced front leg, hips opening before the shoulders, the bowling hand through the logic's release point at
+  `bt` 0, follow-through across to the off side and decelerating strides; spin = a short approach, the back foot pivoting, the front
+  arm leading, a slower arm. Then a jog back to the mark (still in the result). The ball is drawn in his hand through the run-up. A
+  caught-and-bowled or a throw to him hands his slot over from `BW` without a jump. `V.bt/bv/bh` (recorded) replace the old
+  `arm/brn`.
 - **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
   `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
   `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
@@ -257,6 +304,13 @@ planet preview) + boot.
   release (spin), shuffles up to 1 m and gathers what passes the bat (`keepTick`; `ballNow` carries the ball to his gloves where he
   is drawn). He is hidden only in the home batting view (`batView()`, with a ball in his gloves: `V.bk`); the bowler's slot carries
   caught-and-bowled. Ring and deep fielders walk in 1.5 m in the last second of the run-up.
+  Motion (people parts of 07-render3d, 08 `fieldTick`/`keepTick`/`throwTick`/`walkTo`): everyone stands and moves on planted feet:
+  `feetStep` hands the feet between `MO.gait` (moving; fed a spring-smoothed velocity, cycle capped at 2.6 m) and `MO.anchors`
+  (standing: pivot steps on a turn, the split-step at the release via `PS.split`); a planted foot out of reach pivots on its toes;
+  the crouch, run amount, idle variant and the head's look are springs per rig (`mkPIk`), so a recorded flag never pops. Positions
+  are continuous: fielders walk in over the last second of the run-up, then walk/backpedal home from the result on; the keeper
+  sidesteps to the line and walks back; `resetFielders` keeps every man where he is and only starts a man at his spot when it moved
+  more than 12 m (keeper 6 m: a stance change under the over break).
   Throws back (08, show only: no logic, runs or outs; `TR` = `prng`): `planThrow` (end of `doSwing`) takes the last stop, fetch
   (`isFetch`) or fumble of a ball not out and not a boundary, not the keeper's or the bowler's (his throw to the keeper would go
   through the batter); the end by what the camera shows: the bowler in the home batting view (the keeper is hidden there), the
@@ -415,12 +469,14 @@ planet preview) + boot.
   a six lands >= 1 m over it, a one-bounce four 0.5 m inside).
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (188 floats/frame, max 600 frames, ~450 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (245 floats/frame, max 600 frames, ~575 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
-  Per fielder 12 floats: x, z, sin/cos face, run, flags, action, its time `ap`, hands' target, stretch; last the far stumps' hit
-  age (`V.st2`). `V.bk` (ball in the keeper's gloves, hidden with him in the batting view by `render3D`) is not recorded: the
+  Frame layout (08b header): t, ball xyz, bowler z/arm/run/running, stumps age/bails, bowler `bt`/`bv`/`bh` (`RP0` = 13), the
+  batter's pose[`PN` 29], then per fielder 14 floats (`RFF`): x, z, sin/cos face, run, flags, action, its time `ap`, hands' target,
+  stretch, heading `vx`/`vz`; then crowd cheer, bowler x, non-striker on/x/backing-up distance and his pose[`PN`], last the far
+  stumps' hit age (`V.st2`). `V.bk` (ball in the keeper's gloves, hidden with him in the batting view by `render3D`) is not recorded: the
   ball itself always is.
   Director (08b, docs/replays.md): `commit` stores `S.hl = highlightOf(res,b,field,c)` (logic.js, pure: `{kind, ev, t, rel}`, most
   significant first: wickets `bowled` (played on too) `lbw` `stumped` `caught`; chances `drop`, `chance` (a dive or leap in the air
@@ -570,17 +626,45 @@ planet preview) + boot.
 - Kneeling sweeps need a pose parameter (`qKN`) for the back knee's IK pole: the pole follows the toe, which points back when
   kneeling. The crouch starts in the backlift while a sweep is aimed, so the 75 ms downswing doesn't drop the batter in one jump.
 
+- Characters upgrade (owner, 2026-10-15; docs/characters.md, docs/art-style.md): production characters over polishing the
+  procedural parts; three review rounds (owner cap, 2026-10-16), then stop and list what is left. Not production ready at the end:
+  the bowler, throw, dive and catch findings of round 3 are open (docs/characters.md, As built).
+- Twist bones + world-matrix skinning (rig v2): 4 arm twist bones spread the hand's twist along the forearm and the elbow plane along
+  the upper arm, so wrists and elbows no longer candy-wrap; `skinDrive` writes each bone's world matrix from the joints instead of
+  local quaternions down the chain (v1's `skin3D`), so the skeleton lands exactly on the pose's joints (skinErr 0) whatever the
+  pose stretches, and clones (non-striker, 13 people) take a group matrix.
+- One shared fielder body + a canvas atlas: every team is the same athletic body (fielder.glb) in real kit, painted per species
+  and kit on three 512² canvases with the GLB's baked detail multiplied in on the CPU (`spPaint`), one material for everyone. Over
+  per-species bodies (13 meshes per person, bone lengths from 1.4 to 2.2 m that read as toys) and over a shader-side tint
+  (`onBeforeCompile`, as first planned): the CPU paint needs no shader patch, and a kit change is a repaint (it also fixed the Earth
+  sleeve colour baked from one kit). Head merged into the body geometry: one draw call per person (keeper +1, helmet +1, Saturn's
+  ring +1); batting view 161 -> 103 calls, bowling 110 -> 63, with the non-striker 211 -> 95, celebration 356 -> 115.
+- Species = head, skin and one feature (owner, 2026-10-15): the alien is in the face, the athlete in the body; species bone
+  lengths were removed, per-planet gait physics kept.
+- WebP textures (EXT_texture_webp, quality ~82) for the GLB atlases: a 1024² batter atlas in 46 KB, the fielder's 512² in 15 KB;
+  no KTX2/Draco/meshopt (they need WebAssembly, which the artifact CSP may block). Meshes use KHR_mesh_quantization (positions 14
+  bit, normals 8, texcoords 12, weights 8). Build 1.57 MB -> 2.22 MB (cap 2.5 MB).
+- Character lab and its gates: a deterministic in-page harness (`__lab`: lab clock, seeded random, camera lock) plus an in-page
+  runner and pure metrics, so every model or motion change is measured (slip, ground, hands, penetration, pole flips, teleports,
+  facing, hands on the ball, impact exactness, contact, skin error, bat speed through impact, draw calls, triangles, build size, GLB
+  contracts) and seen (labelled contact sheets on 8 planets, 2 kits, 1.6/4/10 m and the game cameras) before a critic reviews it.
+  Gates only ratchet tighter; changes so far: teleports are breaks in the motion (distance from the velocity's prediction), hands
+  have their own limit (.25 m/frame) and the bowler's hands are gated against the ball's release speed; jumps under a game camera
+  cut are allowed; triangles count the scene without the crowd (it has its own budget). Permanent subset: the smoke test's `chars`.
 ## Known gaps / backlog (ranked as discussed)
 1. Bowling outside T20 (done in T20, 2026-10-14): the short formats still chase a simulated total. Unverified on a phone: the
    meter's 1 s sweep and window widths, marker drag precision, the bowling camera's framing on real screens.
 2. Career: ladder of AI teams, coins from wins, batter upgrades (timing window, power).
 3. Achievements (e.g. 3 sixes in an over, chase 20+ in the last over, 10 perfect-timing shots).
 4. Original collectible characters/kits as part of career.
-5. Unverified on real iPhone hardware: frame rate (~145 draw calls/frame between balls including the shadow pass, measured
-   with the skinned batter at 14 meshes, was 22; ~250 in the celebration orbit; ~160k triangles, mostly crowd; Scenarios and T20 add the
-   non-striker: ~172 calls, ~190k triangles). The keeper adds 13 meshes (+13 in the shadow pass) wherever he is drawn (not in
-   the home batting view): 158 calls, ~128k triangles measured in the T20 bowling view at a keeper's gather (headless). The adaptive tiers react to it; if still slow: merge person parts into
-   one mesh per person (halves draw calls, also in the shadow pass), drop fielders from the shadow pass in the celebration.
+5. Unverified on real iPhone hardware: frame rate. With one draw call per skinned person (2026-10-17, the lab's worst frame per
+   view, shadow pass included): batting view 103 calls, side-on replay 82, bowling view 63 (95 with the non-striker), chase 51,
+   cordon 57, celebration orbit 115; T20 bowling view at a keeper's gather 87 calls / 132k triangles. Triangles without the crowd
+   at most ~133k (the celebration); the crowd adds 55k-400k by view (its `QT` tiers). Skinning 14 people with 23 bones each is
+   vertex work the adaptive tiers don't reduce; if slow on a phone: drop far fielders' skinning to the rigid fallback.
+6. Characters (docs/characters.md, As built: open findings): the bowler's bound pops 9-20 cm and his planted foot slides ~2 m/s;
+   the spin approach leans 45 deg; front-foot contact is a T; spin and pace releases look alike; the throw has no crow-hop; dives
+   face-plant; catches end 15-30 cm short of the ball; residual fielder skating; the keeper's give puts the gauntlets on the helmet.
 - Wicket rates per planet are not guarded (only runs are): with real edge trajectories, Jupiter's gravity drops edges short of
   the cordon (about half the catches; easy short-format chases rarely lose a wicket), while Venus, Saturn and Neptune catch more.
   T20 per-planet win rates stay in band. If it matters: a per-planet cordon depth in `fieldFor`/`tplField`.

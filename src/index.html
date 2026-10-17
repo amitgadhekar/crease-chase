@@ -9,12 +9,24 @@
 <title>Crease Chase</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- not render-blocking, so the loading screen paints at once on a slow connection -->
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 /* @include src/styles.css */
 </style>
 </head>
 <body>
+<!-- Loading screen: the page is one ~2 MB file, so it shows while the rest arrives; the steps below move the bar, and
+     09-menu-boot.js calls bootDone() once the stadium has drawn -->
+<div id="boot" role="status" aria-live="polite">
+  <div class="bootc"><div class="bootball" aria-hidden="true"></div><b class="boott">Crease Chase</b>
+    <span id="bootMsg">Loading the game&hellip;</span><span class="bootbar" aria-hidden="true"><span id="bootFill"></span></span></div>
+</div>
+<script>
+function bootStep(p,t){var f=document.getElementById('bootFill'),m=document.getElementById('bootMsg');if(f)f.style.width=Math.round(p*100)+'%';if(m&&t)m.textContent=t;}
+function bootDone(){window.__booted=1;var b=document.getElementById('boot');if(!b)return;b.classList.add('off');setTimeout(function(){b.remove();},450);}
+window.addEventListener('error',function(){if(!window.__booted)bootStep(1,'Something went wrong. Please reload the page.');});
+</script>
 <div id="app">
   <canvas id="sky" aria-hidden="true"></canvas>
   <canvas id="gl" aria-hidden="true"></canvas>
@@ -179,15 +191,21 @@
 // @include src/logic.js
 </script>
 
+<script>bootStep(.07,'Loading sounds…')</script>
+
 <!-- ================= Sound effects (base64 MP3 clips from src/sfx) ================= -->
 <script id="sfx">
 // @include-sfx src/sfx
 </script>
 
+<script>bootStep(.23,'Loading the players…')</script>
+
 <!-- ================= 3D models (base64 GLB from src/models, made by npm run model:batter) ================= -->
 <script id="models">
 // @include-models src/models
 </script>
+
+<script>bootStep(.55,'Loading the stadium…')</script>
 
 <!-- ================= Rendering (three.js), input, flow: bundled by build.mjs ================= -->
 <script>

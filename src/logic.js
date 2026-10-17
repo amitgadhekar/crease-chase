@@ -17,7 +17,7 @@ const PLANETS={
   blurb:'Home conditions: normal gravity and a little swing. The baseline.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#8fd0ff,#2b78c2 55%,#2d6b3c)',sky:['#5d9ccf','#cfe5f2'],ground:['#3c8a45','#2f7a39'],stripe:.055,
    pitch:['#e3cf9c','#cdb27a'],crease:'rgba(255,255,255,.92)',rope:'#f4efe1',standsH:14,stands:'#34424f',roof:'#d8d3c3',crowd:CROWD,
-   boards:['#1d3a2b','#efe8d2','#f2b134'],ads:['Play straight','Crease Chase'],bodies:[],kit:{shirt:'#7a1f2b',pants:'#f1ece0',trim:'#f1ece0',cap:'#5a1620'}}},
+   boards:['#1d3a2b','#efe8d2','#f2b134'],ads:['Play straight','Galactic Cricket'],bodies:[],kit:{shirt:'#7a1f2b',pants:'#f1ece0',trim:'#f1ece0',cap:'#5a1620'}}},
  moon:{name:'Moon',team:'Lunar XI',g:1.62,air:1.1,swing:0,spin:1.25,bounce:.95,pace:1,boundary:95,wind:0,ai:1.34,t20:0.98,
   blurb:'One-sixth gravity and no air. Lofted shots fly for ages, so mistimed ones hang up to be caught. No swing at all.',
   vis:{sw:'radial-gradient(circle at 35% 35%,#e4e4df,#8d8d88 60%,#5c5c58)',sky:['#000004','#0d0f1a'],stars:1,ground:['#9a9a96','#74736d'],stripe:.03,

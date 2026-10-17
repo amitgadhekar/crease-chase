@@ -1,4 +1,4 @@
-# Crease Chase: release roadmap (PRD)
+# Galactic Cricket: release roadmap (PRD)
 
 Status: draft for owner review (2026-10-15), partly decided (2026-10-16, see "Owner decisions"). Nothing else is decided until the
 owner marks it; decisions get dated below.
@@ -17,6 +17,7 @@ owner marks it; decisions get dated below.
 - 2026-10-16: **Community: a Discord server** (feedback, bug reports, reviews) plus short clips on Instagram Reels / YouTube Shorts /
   TikTok and Reddit; Facebook page as a name placeholder only -> R0.8, R1.5.
 - 2026-10-17: **New name: Galactic Cricket** (over Crease Chase, which is one letter from an existing web cricket game "Crease Clash" and uses a generic word; and over "Galaxy Cricket", whose .com has been taken since 2014 and which leans on Samsung's "Galaxy" mark). `galacticcricket.com` and `.game` were unregistered on 2026-10-17: the owner bought `galacticcricket.com` on 2026-10-17 (R0.7) and runs a trademark check (R0.4). The rename in the game and docs follows the current character fixes.
+- 2026-10-17: **Core gameplay picked: G1, G2, G3, in that order.** G1 = **automatic runs with visible running** (the game decides the runs as now; both batters visibly run and cross; no run-outs and no new controls). G4-G7 later. G1 design and the owner's answers (timing overlapping the countdown, a non-striker in Quick match, voice calls, throws to the danger end): docs/running.md.
 - 2026-10-16: **Core gameplay first**, then the release steps -> section "G" below (the owner picks its items).
 - 2026-10-16: **Loading screen** on first open (done): paints at once, a progress bar through sounds, players and stadium.
 
@@ -31,11 +32,11 @@ games' reviews and retention), docs/replays.md. Sizes: S = a few hours of agent 
 
 ## 1. Goal and position
 
-Release Crease Chase publicly as a **free, instant-play browser cricket game: no ads, no energy, no pay-to-win, no sign-up**,
+Release Galactic Cricket publicly as a **free, instant-play browser cricket game: no ads, no energy, no pay-to-win, no sign-up**,
 installable to the home screen, short sessions, original fantasy venues, and a fair AI with published difficulty bands.
 Why this position: in mobile cricket and casual games the top review complaints are monetisation and pay-to-win (34%), bugs and
 crashes (22%) and intrusive ads (18%) [1]; cricket titles get the same complaints (ads, grind, energy, "impossible" finals) [2][3].
-Crease Chase already avoids all of them, and at ~1.6 MB (685 KB gzipped) it loads in a moment next to 75 MB-2 GB store apps [2][3].
+Galactic Cricket already avoids all of them, and at ~1.6 MB (685 KB gzipped) it loads in a moment next to 75 MB-2 GB store apps [2][3].
 We don't try real-time multiplayer. Accounts and cloud-kept achievements come later on a free Cloudflare D1 database (R2.7).
 
 Success for launch: a first-time player understands batting within 2 minutes, nothing looks broken on a mid-range phone, a shared
@@ -61,7 +62,7 @@ docs/replays.md), the `SMOKE_ONLY` smoke filter. In flight: production-ready cha
 3. **Not installable or shareable:** no manifest, icons, favicon, description or Open Graph cards; shared links look bare.
 4. **Legal basics missing:** no LICENSE or credits/privacy page; three.js's MIT notice is likely stripped by the minifier;
    Google Fonts sends visitors' IPs to Google undisclosed; 4 Pixabay clips need their terms checked for redistribution in a public
-   file; "Crease Chase" not checked for trademarks.
+   file; "Galactic Cricket" not checked for trademarks.
 5. **Release safety:** the smoke test is not in CI and there are no PR checks; no version shown, no changelog, no feedback link;
    saves other than T20/Scenarios have no version or migration. **Flaky balance band (found 2026-10-16):** the T20 section of
    `tests/balance.mjs` uses unseeded randomness, and one run failed with Mercury's T20 medium win rate at 65.5% against the 35-65%
@@ -118,7 +119,7 @@ Recommended order: G1 (it changes how every ball ends, so the rest builds on it)
 | R0.4 | **Legal:** LICENSE (owner's choice, Q4), About/Credits page (licences, sound sources, one-line privacy statement), three.js notice kept in the build, fonts self-hosted, the 4 Pixabay clips replaced with CC0 or confirmed, name check | Gap 4 | S |
 | R0.5 | **Release engineering:** smoke in CI plus PR checks, a `SMOKE_ONLY` filter for fast iteration (done), build version + commit in Settings, CHANGELOG and tags, a "Send feedback" link, a bundle-size budget, versioned saves with a `migrate()` per key, a deterministic (seeded) T20 balance check so CI never fails at random (gap 5) | Gap 5; makes every later track faster and safer | S-M |
 | R0.6 | **Real-device pass (owner + agent):** an older iPhone, a recent iPhone, a mid-range Android: frame rate and quality tier, meter feel, dive camera cuts, landscape, install, offline; fixes from it | Gap 6; the biggest unknown | M |
-| R0.7 | **Move to Cloudflare Pages on our own domain** (owner, 2026-10-16): Cloudflare account, Pages project `crease-chase`, the GitHub Actions workflow deploys there (balance gate kept), `_headers` for the service worker and manifest, domain bought at Cloudflare Registrar and attached; the GitHub Pages copy then links to the new URL | One permanent URL before anyone saves progress (see "Launch plan") | S |
+| R0.7 | **Move to Cloudflare Pages on our own domain** (owner, 2026-10-16): Cloudflare account, Pages project `galactic-cricket`, the GitHub Actions workflow deploys there (balance gate kept), `_headers` for the service worker and manifest, domain bought at Cloudflare Registrar and attached; the GitHub Pages copy then links to the new URL | One permanent URL before anyone saves progress (see "Launch plan") | S |
 | R0.8 | **Discord server** (owner, 2026-10-16): channels and moderation as in "Launch plan", a permanent invite as "Community (13+)" in the menu and credits, the game version shown in Settings/pause so bug reports can include it | Feedback, bug reports and reviews in one place | S |
 | R0.9 | **Protect the game from copies** (owner, 2026-10-16; see "Copy protection" below): make the GitHub repository private once deploys go to Cloudflare (today the full source, Blender scripts and docs are public); "All rights reserved" LICENSE and a copyright line in the game's About/credits and the built file's header; a domain lock (the game only starts on our domain and localhost, with a "play the original at <our domain>" message elsewhere); `frame-ancestors`/`X-Frame-Options` headers in `_headers` so other sites can't embed it; keep the minified game bundle and also minify what is still readable in the page: the inlined `src/logic.js` (physics, AI bowler, fielding, captain logic, scenarios; today pasted with its comments) and the CSS, through esbuild in `build.mjs` (the balance test keeps loading the readable `src/logic.js`; top-level names the game bundle calls stay); a short takedown playbook (DMCA notices to GitHub, Cloudflare, portals and app stores) | A web game's code always reaches the player's browser; these steps raise the effort to copy it and give us the legal tools to remove copies | S |
 
@@ -233,7 +234,7 @@ scores can be forged: sanity bounds, rate limits, and server-side re-simulation 
 - Promotion: one 10-20 s clip cut once and posted to Instagram Reels, YouTube Shorts and TikTok; Reddit posts within each
   subreddit's rules; a Facebook page only to hold the name (organic reach ~1.8% [26]). Original art only in clips and thumbnails.
 
-**Steps (R0.7, R0.8):** Cloudflare account -> Pages project `crease-chase` (Direct Upload) -> repository secrets
+**Steps (R0.7, R0.8):** Cloudflare account -> Pages project `galactic-cricket` (Direct Upload) -> repository secrets
 `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (the owner creates these) -> workflow deploys with wrangler -> `_headers` ->
 buy the domain and attach it -> the GitHub Pages copy links to the new URL -> Discord server and the in-game link. Cost: $0 plus the
 domain.

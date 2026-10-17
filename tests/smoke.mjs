@@ -1,4 +1,4 @@
-// Browser smoke test: loads dist/crease-chase.html in headless Chromium (software WebGL), plays a few balls
+// Browser smoke test: loads dist/galactic-cricket.html in headless Chromium (software WebGL), plays a few balls
 // on each planet, forces a perfectly timed swing, and fails on any page error. Screenshots go to tests/screenshots/.
 // Usage: npm run build && node tests/smoke.mjs [planet ...]
 // Filters (unset = everything, as CI and the run before a push): SMOKE_ONLY=field,throw runs only those sections (each starts from the
@@ -20,7 +20,7 @@ const smokeT0 = Date.now();
 const shots = fileURLToPath(new URL('./screenshots/', import.meta.url));
 mkdirSync(shots, {recursive: true});
 // SMOKE_DIST=dist/other.html tests another build (a parallel track's, or the lab's)
-const url = pathToFileURL(fileURLToPath(new URL('../' + (process.env.SMOKE_DIST || 'dist/crease-chase.html'), import.meta.url))).href + '#test';
+const url = pathToFileURL(fileURLToPath(new URL('../' + (process.env.SMOKE_DIST || 'dist/galactic-cricket.html'), import.meta.url))).href + '#test';
 
 const browser = await chromium.launch({args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 const page = await browser.newPage({viewport: {width: 390, height: 844}});

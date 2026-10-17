@@ -1,4 +1,4 @@
-// Bundles src/ into a single self-contained HTML file: dist/crease-chase.html
+// Bundles src/ into a single self-contained HTML file: dist/galactic-cricket.html
 // Usage: node build.mjs   (BUILD_OUT=dist/other.html writes elsewhere, e.g. a lab or a parallel track's build)
 import {readFileSync, writeFileSync, readdirSync, mkdirSync} from 'node:fs';
 import {join, dirname} from 'node:path';
@@ -44,7 +44,7 @@ for (const line of read('src/index.html').split('\n')) {
 }
 const html = out.join('\n');
 
-const outFile = process.env.BUILD_OUT || 'dist/crease-chase.html';
+const outFile = process.env.BUILD_OUT || 'dist/galactic-cricket.html';
 mkdirSync(dirname(join(root, outFile)), {recursive: true});
 writeFileSync(join(root, outFile), html + '\n');
 console.log(`Built ${outFile} (${(html.length / 1024).toFixed(1)} KB)`);

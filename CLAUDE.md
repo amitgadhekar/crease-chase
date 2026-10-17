@@ -1,7 +1,7 @@
-# Crease Chase
+# Galactic Cricket
 
 A single-file, mobile-first 3D cricket **batting** game played against an AI bowler. No ads, no multiplayer, no backend.
-It started as an original game inspired by the *style* of mobile cricket games; all names, art, teams and text are original.
+Renamed from Crease Chase on 2026-10-17 (the repo and Pages URL still say crease-chase until the repo is renamed). It started as an original game inspired by the *style* of mobile cricket games; all names, art, teams and text are original.
 Keep it that way: never copy another game's characters, logos, screens or branding.
 
 ## How the owner likes to work
@@ -14,7 +14,7 @@ Keep it that way: never copy another game's characters, logos, screens or brandi
 ## Commands
 ```bash
 npm ci                           # once (exact pinned devDeps from package-lock.json); then: npx playwright install chromium
-npm run build                    # src/ -> dist/crease-chase.html (single self-contained file; game + three bundled by esbuild)
+npm run build                    # src/ -> dist/galactic-cricket.html (single self-contained file; game + three bundled by esbuild)
 npm run test:balance             # bots play ~20k balls per row (footwork bots 100k) + T20 full matches and first innings, 300 per row (T20_N=) + every scenario (SCEN_N=300) against src/logic.js; exits 1 if balance drifts
 npm run test:smoke               # builds, plays each planet, a T20 (bowled balls with forced inputs, resume mid-over, Simulate rest, two chase overs with resume), forced fielding plays (edge to the cordon, ring dive, deep catch, a dive in a replay, keeper in the bowling view), throws back (ring, a diving stop's landing in the countdown, deep, on the winning ball (cleared), in the bowling view a forced direct hit at the bowler's end and a deep stop or fetch to the keeper with Bowl off until both walk back, landscape), catch replays (deep, cordon, caught and bowled if one comes up, the last wicket before the end screen, a ring catch in the bowling view, landscape), the other replay kinds (`replay2`: bowled, LBW, a shout not given, a shave, stumped, drops close and deep, a rope save, a hands-on chance and a six's leap, the last wicket bowled, bowled in the bowling view, LBW in landscape), three scenarios, a landscape pass (844x390) and the characters' gates (`chars`, below) in headless Chromium, fails on page errors
 npm test                         # both
@@ -25,14 +25,14 @@ npm run lab                      # character lab: builds dist/lab.html, plays te
                                  # -- --gates: no shots, exit 1 on a red gate; -- --seq a,b / --species x / --diff A B / --baseline run)
 npm run test:motion              # node checks of src/game/07-motion.js (springs, gait, anchors, IK, hands2) in node:vm
 ```
-Open `dist/crease-chase.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests, `window.__r`
+Open `dist/galactic-cricket.html` directly in a browser to play. `#test` in the URL exposes `window.__t` for tests, `window.__r`
 (render and skinning: `info` draw calls/triangles, `tier`/`setTier`, `skin()`, `skinErr()`, `contact()`, `body(i)`, `rig(i)`,
 `drive()`) and `window.__lab` (07b-lab, the character lab: `on` (a lab clock behind performance.now, the GL render stubbed except
 `render`), `seed`, `start`, `step(dt)` at 120 Hz, `ball`/`swing`/`backlift`/`foot`/`duck`, `arm` a forced play, camera lock `look`/
 `game` (one guard line at the top of `updateCam`), `kits`, dumps `joints`/`caps`/`verts`/`frame({caps,verts})`/`anchors`/`drive`).
 `#test&nomodel` leaves the GLBs unloaded (the procedural fallbacks).
 Live at https://amitgadhekar.github.io/crease-chase/ (public repo, free GitHub Pages). Every push to `main` runs
-`.github/workflows/pages.yml`: `npm ci`, balance test, build, deploy `dist/crease-chase.html` as `index.html`. A failing balance
+`.github/workflows/pages.yml`: `npm ci`, balance test, build, deploy `dist/galactic-cricket.html` as `index.html`. A failing balance
 test blocks the deploy. `dist/` is not committed.
 Run `npm run test:balance` after any change to physics, timing windows, shot resolution, fielding, footwork or planet values.
 Its replay checks (`hlRates`, std / human / bowling rows): near misses (shave + shout) <= 0.5 replays per over, the new kinds 0.01-1.2,
@@ -547,6 +547,7 @@ planet preview) + boot.
 - Keep `src/logic.js` free of DOM access so the balance test can run it in Node.
 
 ## Decision log
+- Name (owner, 2026-10-17): renamed from Crease Chase to **Galactic Cricket** (galacticcricket.com bought; reasons in docs/roadmap.md). Title, menu, loading screen, Earth LED board and the build file (dist/galactic-cricket.html) changed; the GitHub repo name, Pages URL, `cc_` localStorage keys and the Cloudflare move stay as they were.
 - Batting control: compared one-tap timing, single swipe, and drag-to-aim/release-to-swing. Chose release-to-swing
   (aim and timing are separate skills; finger-up timing is precise on phones). Then switched to slingshot aiming at the
   owner's request (finger stays low, doesn't cover the ball); "point the way" was removed by owner decision.

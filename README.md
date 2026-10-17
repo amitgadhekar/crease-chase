@@ -1,12 +1,12 @@
-# Crease Chase
+# Galactic Cricket
 
 3D cricket batting game against an adaptive AI bowler, across eight planet venues. Single HTML file (three.js bundled in), no ads, no backend.
 
-Play: https://amitgadhekar.github.io/crease-chase/ (redeployed by GitHub Actions on every push to `main`).
+Play: https://amitgadhekar.github.io/crease-chase/ (the GitHub repository keeps its old name for now; redeployed by GitHub Actions on every push to `main`). Planned home: galacticcricket.com.
 
 ```bash
 npm ci            # three and esbuild (build), playwright (smoke test; then: npx playwright install chromium)
-npm run build      # -> dist/crease-chase.html, open it in any browser
+npm run build      # -> dist/galactic-cricket.html, open it in any browser
 npm test           # balance simulation + headless browser smoke test
 ```
 

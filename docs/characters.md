@@ -257,7 +257,7 @@ lands; keep it lean.
 
 ## As built
 (2026-10-17, wrap-up after review round 3; numbers from the full lab run wrapup-20261017, 142 sequences, 19,879 gates, 2,326 red:
-identical to round 3, the characters are unchanged since; and the smoke test on dist/crease-chase.html)
+identical to round 3, the characters are unchanged since; and the smoke test on dist/galactic-cricket.html)
 
 Contracts as implemented
 - Rig v2 as specified (19 + 4 twist bones, parent-first, aim/ref extras, <= 4 influences; both GLBs pass the lab's contract checks).

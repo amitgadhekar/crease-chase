@@ -17,7 +17,7 @@ jobs:
       - run: npm ci
       - run: node tests/balance.mjs
       - run: node build.mjs
-      - run: mkdir _site && cp dist/crease-chase.html _site/index.html
+      - run: mkdir _site && cp dist/galactic-cricket.html _site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

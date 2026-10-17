@@ -106,7 +106,7 @@ const fieldPlay = async (p, name, play, ai) => {
     camErr = Math.max(camErr, st.par); if (!(st.par < 0.5)) errors.push(`camera parity ${name}: ${st.par} px`);
     await p.screenshot({path: `${shots}${name}.png`});
     await p.evaluate(() => { __t.S.paused = false; });
-    const f = st.fv, act = {dive: 3, jump: 4, slide: 5}[ev.k] || 2, hd = Math.min(...st.b.hands.map(h => Math.hypot(h[0] - f.hx, h[1] - f.hy, h[2] - f.hz)));
+    const f = st.fv, act = {dive: 3, jump: 4, slide: 5}[ev.k] || 2, hd = Math.min(...st.b.hands.map(h => Math.hypot(h[0] - f.hx, h[1] - (f.hy + 0.05), h[2] - f.hz)));   // (the ball as drawn: its centre .05 above the path, as the lab's handsBall)
     if (st.fv.act !== act || !st.b.vis) errors.push(`fielding ${name}: ${ev.k} by ${ev.n || ev.i} drawn as action ${st.fv.act}, visible ${st.b.vis}`);
     if (ev.k === 'dive' && st.b.up > 0.9) errors.push(`fielding ${name}: diving ${ev.n || ev.i} still upright (${st.b.up.toFixed(2)})`);
     if ((ev.o === 'catch' || ev.o === 'stop' || ev.o === 'drop') && Math.hypot(f.hx - ev.x, f.hy - ev.y, f.hz - ev.z) < 0.05 && hd > HANDS_BALL)
@@ -128,7 +128,7 @@ const catchReplay = async (p, name, cls) => {
   await p.waitForTimeout(150);
   const s = await p.evaluate(i => { const f = __t.fv()[i], n = __t.getM().field[i].n, r = __r.body(n === 'bowler' ? -1 : i), b = __t.vb().b,
       on = q => !!q && q.x >= 0 && q.x <= innerWidth && q.y >= 0 && q.y <= innerHeight;
-    return {n, ph: __t.S.phase, act: f && f.act, vis: r.vis, d: b ? +Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y, h[2] - b.z))).toFixed(3) : -1,
+    return {n, ph: __t.S.phase, act: f && f.act, vis: r.vis, d: b ? +Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y - 0.05, h[2] - b.z))).toFixed(3) : -1,   // (the ball as drawn)
       ball: !!b && on(__t.pj(b.x, b.y, b.z)), body: !!f && on(__t.pj(f.x, 1, f.z)), par: __t.cam3()}; }, R.i);
   await p.screenshot({path: `${shots}${name}.png`});
   await p.evaluate(() => { __t.S.paused = false; });
@@ -176,7 +176,7 @@ const throwCheck = async (p, name, hit) => {
   const tk = o.ta + (o.hit ? 0.15 / o.v + 0.15 : 0);
   await pauseAt(p, tk + 0.15);
   s = await p.evaluate(o => { const t = __t.clk() - __t.S.f0, k = __t.fv().findIndex(f => f.kp), r = o.rv === 'bw' ? __r.body(-1) : k >= 0 ? __r.body(k) : null, vb = __t.vb(), b = vb.b;
-    return {t, ph: __t.S.phase, on: !!__t.S.thr, vis: !!r && r.vis, ball: vb.vis, d: r && b ? Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y, h[2] - b.z))) : -1,
+    return {t, ph: __t.S.phase, on: !!__t.S.thr, vis: !!r && r.vis, ball: vb.vis, d: r && b ? Math.min(...r.hands.map(h => Math.hypot(h[0] - b.x, h[1] - b.y - 0.05, h[2] - b.z))) : -1,
       st: vb.st, st2: vb.st2, out: !!(__t.S.res && __t.S.res.out), w: __t.getM().wkts, banner: document.querySelector('#banner').textContent}; }, o);
   if (o.hit) await p.screenshot({path: `${shots}${name}-hit.png`});
   await resume(p);
@@ -194,7 +194,7 @@ const thrAfter = async (p, name, o) => {
   await p.waitForFunction(() => __t.S.phase !== 'result', null, {timeout: 30000, polling: 20});
   const rx = () => p.evaluate(rv => { const S = __t.S, r = S.fpos.find(f => rv === 'kp' ? f.kp : f.bw), M = __t.getM(), vb = __t.vb();
     return {ph: S.phase, on: !!S.thr, off: document.querySelector('#bowlBtn').classList.contains('off'), x: r.x, z: r.z, act: r.act, hold: r.hold,
-      home: rv === 'kp' ? Math.hypot(r.x - r.bx, r.z - r.bz) : Math.abs(r.z - (M.bowlerType === 'pace' ? 31 : 25.5)), st: vb.st, st2: vb.st2,
+      home: rv === 'kp' ? Math.hypot(r.x - r.bx, r.z - r.bz) : Math.abs(r.z - (M.bowlerType === 'pace' ? 28.5 : 23.3)), st: vb.st, st2: vb.st2,
       far: Math.max(...S.fpos.filter(f => !f.bw).map(f => Math.hypot(f.x - f.bx, f.z - f.bz)))}; }, o.rv);
   const a = await rx();
   if (!a.on) { o.after = ', over before the next ball'; return; }
@@ -482,7 +482,7 @@ const r2After = async (p, name) => {
   await p.waitForFunction(() => __t.S.phase === 'ready', null, {timeout: 20000, polling: 20});
   await p.waitForTimeout(100);
   const k = await p.evaluate(() => { const M = __t.getM(), f = __t.fv().find(f => f.kp), K = KEEP[M.bowlerType] || KEEP.pace;
-    return {thr: !!__t.S.thr, d: f ? Math.hypot(f.x - K.x, f.z - K.z) : -1, bz: __t.S.bowlerZ, mark: M.bowlerType === 'pace' ? 31 : 25.5}; });
+    return {thr: !!__t.S.thr, d: f ? Math.hypot(f.x - K.x, f.z - K.z) : -1, bz: __t.S.bowlerZ, mark: M.bowlerType === 'pace' ? 28.5 : 23.3}; });
   if (k.thr || !(k.d >= 0 && k.d < 0.05) || Math.abs(k.bz - k.mark) > 0.01) errors.push(`replay2 ${name}: next ball not set up ${JSON.stringify(k)}`);
 };
 if(on('replay2')){
@@ -1080,21 +1080,16 @@ if(on('chars')){
     {name: 'cordon-catch', spec: seq('fielding', 'fld-edge', {play: {pred: "r.out&&r.catcher!=null&&/^(keeper|slip|gully)/.test(f[r.catcher].n)", key: "e=>e.o==='catch'"},
       keys: [['edge', 'contact+0.05'], ['catch', 'play'], ['after', 'play+0.4']], end: 'play+0.9'}), who: 'play', cam: 'gcord', at: 'catch'},
     {name: 'throw', spec: seq('fielding', 'fld-stop-throw', {subject: 'thrower'}), who: 'thrower', cam: 'w10', at: 'release'}];
-  // red at the wrap-up (2026-10-17), per sequence: gate id with the subject's name replaced by its role (bat, play, thrower) -> [open finding (B/H/M label in
+  // red at the wrap-up (2026-10-17; values re-taken after fix pass 4, the fixed ones removed), per sequence: gate id with the subject's name replaced by its role (bat, play, thrower) -> [open finding (B/H/M label in
   // tests/charlab/reviews/round-3.md), value then]. A known gate fails again when it gets worse: more than 1.2x its excess over the
   // limit + 5 mm (the lab is seeded, so an unchanged build repeats its values exactly)
   const KNOWN = {
     stance: {'pen:bat:torso-uarm': ['M8', .0437], 'pen:bat:handle-wrst': ['M2', .0154]},
     'cover-drive': {'pen:bat:torso-uarm': ['M8', .0913]},
-    dive: {'slip:play': ['B4', .8936], 'slipTurn:play': ['B4', 2.497], 'teleport:play': ['H5', .0923], 'teleportHand:play': ['H5', .2815],
-      'pen:play:torso-uarm': ['H5', .163], 'pen:play:farm-torso': ['H5', .1939], 'pen:play:hand-torso': ['H5', .1991], 'pen:play:head-uarm': ['H5', .1446],
-      'pen:play:farm-head': ['H5', .1361], 'pen:play:shin-thigh': ['M8', .1199]},
-    'cordon-catch': {'slip:play': ['B4', .7264], 'vertex:play': ['M5', -.0269], 'pen:play:torso-uarm': ['M1', .119], 'pen:play:farm-torso': ['M1', .1189],
-      'pen:play:hand-torso': ['M1', .0381], 'pen:play:head-uarm': ['M1', .1143], 'pen:play:farm-head': ['M1', .105], 'pen:play:hand-thigh': ['M8', .0565],
-      'pen:play:farm-thigh': ['M8', .0485], 'pen:play:shin-thigh': ['M8', .0517]},
-    throw: {'slip:thrower': ['B4', .6462], 'teleport:thrower': ['B4', .0719], 'vertex:thrower': ['M5', -.0198], 'pen:thrower:hand-torso': ['H1', .1607],
-      'pen:thrower:farm-torso': ['H1', .1527], 'pen:thrower:shin-thigh': ['M8', .0539], 'pen:thrower:thigh-uarm': ['M8', .0217], 'pen:thrower:shin-torso': ['M8', .0409],
-      'pen:thrower:hand-thigh': ['M8', .0341]}};
+    dive: {'slip:play': ['B4', .5094], 'slipTurn:play': ['B4', 1.7929], 'teleport:play': ['H5', .0988], 'teleportHand:play': ['H5', .2772],
+      'pen:play:hand-torso': ['H5', .0913], 'pen:play:farm-torso': ['H5', .0833], 'pen:play:shin-thigh': ['M8', .1175]},
+    'cordon-catch': {'slip:play': ['B4', .7637], 'pen:play:torso-uarm': ['M1', .0348], 'pen:play:shin-thigh': ['M8', .0434]},
+    throw: {'slip:thrower': ['B4', .1025], 'pen:thrower:shin-thigh': ['M8', .0317], 'pen:thrower:thigh-uarm': ['M8', .0205]}};
   const worse = (g, v) => Math.abs(g.value - g.limit) > 1.2 * Math.abs(v - g.limit) + .005;
   const CAMS = rd('cameras.json'), cmScript = 'window.__cm=(()=>{' + readFileSync(new URL('metrics.mjs', LAB), 'utf8').replace(/^export /gm, '') + '\nreturn {V,wrap,segDist,penetration,reduce,pairKey};})();';
   const cp = await browser.newPage({viewport: {width: 390, height: 844}});

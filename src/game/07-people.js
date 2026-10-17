@@ -80,10 +80,10 @@ const SPECIES={
     swt:[['#000','#000',1],['#1c150a','#000',.12],['#fff4cc','#ffcf6a',.3],['#000','#000',1]],
     head:()=>GB.join(NECK(),spP(E([0,.03,0],[.082,.135,.09],14,9)),spP(E([0,-.085,.02],[.05,.04,.05],10,4)),
       ...EYES(.035,.03,.08,[.022,.012,.008],1,.4,.2),spS(E([0,.09,.075],[.01,.01,.007],6,3),2),spS(E([0,-.04,.088],[.02,.004,.008],6,3),1)),
-    // the ring: a small solid flat band (22 cm wide, 2.6 cm across) floating above the crown, tilted like Saturn's (a level wide
-    // ring read as a halo); ring = [height over the head centre in world up, tilt], placed and slowly precessed in 07-render3d.
-    // Its band (radius .094-.126) passes outside the head (.082 x .09 half-width), .14 m up at its lowest when the head is level
-    ex:()=>ringG(.11,.016,.007,40,8),exM:'ring',ring:[.215,.5]},
+    // the ring: a solid flat band (22 cm wide, 2.6 cm across) round the upper skull, part of the head as Saturn's ring is of the
+    // planet (a ring floating over the crown read as a halo); ring = [its centre above the head centre on the head's up axis, tilt
+    // up at the front], placed in 07-render3d. Its band (radius .094-.126) passes outside the head (.082 x .09 half-width)
+    ex:()=>ringG(.11,.016,.007,40,8),exM:'ring',ring:[.06,.42]},
   neptune:{name:'Tidefolk',skin:'#1a6890',rough:.35,st:1.05,jp:.12,
     pat:(g,e,w,h,r)=>{for(let i=0;i<40;i++){g.fillStyle='rgba(10,30,80,.25)';g.beginPath();g.arc(r()*w,r()*h,3+r()*7,0,7);g.fill();}
       for(let i=0;i<26;i++){const x=r()*w,y=r()*h,s=1.2+r()*1.3;g.fillStyle='#8ff4ff';if(e)e.fillStyle='#38d8ff';for(const c of [g,e]){if(!c)continue;c.beginPath();c.arc(x,y,s,0,7);c.fill();}}},

@@ -176,7 +176,7 @@ function labPeople(){
   for(let i=0;i<V.nf;i++){const f=V.f[i],r=G3.fielders[i],n=M.field[i]&&M.field[i].n||'f'+i;
     out.push({i,n,kp:f.kp,bw:f.bwl,on:r.g.visible,act:f.act,ap:+f.ap.toFixed(3),hold:f.hold,run:f.running,x:+f.x.toFixed(3),z:+f.z.toFixed(3),face:+f.face.toFixed(4),
       h:R3([f.hx,f.hy,f.hz]),J:r.g.visible?rigJoints(r):null});}
-  const b=G3.bowler;out.push({i:-1,n:'bowler',on:b.g.visible,arm:V.arm,run:V.brn,x:+V.bx.toFixed(3),z:+V.bz.toFixed(3),face:Math.PI,J:b.g.visible?rigJoints(b):null});
+  const b=G3.bowler;out.push({i:-1,n:'bowler',on:b.g.visible,act:BO.act||0,ap:BO.ap,arm:V.arm,run:V.brn,x:+V.bx.toFixed(3),z:+V.bz.toFixed(3),face:Math.PI,J:b.g.visible?rigJoints(b):null});
   return out;
 }
 // capsules [name, a, b, r] per person for the penetration metric (limb vs torso and limb, bat vs body and pads); adjacent parts share a joint

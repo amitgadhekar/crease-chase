@@ -57,7 +57,7 @@ each starts from the hub and passes alone; `SMOKE_PLANETS=earth,mars` limits the
 (what CI does) is required once before a push. New checks go inside the matching `if(on('section'))` guard in tests/smoke.mjs.
 Its `chars` section plays five Earth sequences through the character lab's runner on a page of its own (stance, cover drive, a
 diving stop, a cordon catch, a stop and throw) and asserts the lab's gates (tests/charlab/metrics.mjs + thresholds.json) for each
-subject; gates still red at the 2026-10-17 wrap-up are listed in its `KNOWN` (with their round-3 finding) and fail only if they get
+subject; gates still red at the 2026-10-17 wrap-up (values re-taken after fix pass 4) are listed in its `KNOWN` (with their round-3 finding) and fail only if they get
 worse (more than 1.2x their excess + 5 mm). Remove an entry when its finding is fixed. `fieldPlay`'s hands-on-the-ball check uses the
 lab's `handsBall` (12 cm). Run `npm run lab` (or `-- --quick`) after any change to a character's model or motion, and read the
 sheets in `tests/charlab/out/<run>/sheets/` against docs/art-style.md; rules, gates and contracts are in docs/characters.md.
@@ -233,7 +233,8 @@ planet preview) + boot.
   parent-first; each bone stores rest `aim`/`ref` vectors (glTF extras -> `bone.userData`); <= 4 influences. `batJoints(p)` turns a
   pose into the joint struct `J` (the one interface for every person). `skinVecs(J)` gives aim/ref from the pose (limb line + IK
   pole for elbows/knees, toe for shins, the elbow taken from the pose's own IK; hands turned so the glove's grip channel lies on the
-  bat axis; twist refs spread the hand's twist along the forearm and the elbow plane along the upper arm; lengths from `J.L`), and
+  bat axis; twist refs spread the hand's twist along the forearm and the elbow plane along the upper arm; an arm raised above the
+  shoulder lifts the clavicle up to ~20 deg; lengths from `J.L`), and
   `skinDrive(rec,J,scale,gw)` writes every bone's **world matrix** (head at the joint, rotation mapping rest aim/ref onto the
   pose's; bones have `matrixAutoUpdate`/`matrixWorldAutoUpdate` off), so a limb the pose stretches still ends at the hand and ankle
   and nothing depends on Blender's bone axes (`__r.skinErr()` 0). The bat stays procedural (`batsman3D`), so contact targeting is
@@ -246,7 +247,7 @@ planet preview) + boot.
   with a face and the cap; keeper gauntlets and pads; one 512² WebP detail atlas in `REGIONS`). At load each mesh is put into bind
   space and merged per species into ONE geometry (body + shoes + head: the GLB Earth head and cap, or the species' head with
   head-bone weights), so a person is one draw call; the keeper's gauntlets + pads one more (`wk`), his helmet up to spin (a clone of
-  the batter GLB's, Earth only) another; Saturn's ring stays a rigid part. Each rig: 23 cloned bones and its own Skeleton,
+  the batter GLB's, Earth only) another; Saturn's ring stays a rigid part (a band round the upper skull on the head's axes, `placeEx`). Each rig: 23 cloned bones and its own Skeleton,
   `skinDrive` from `personJoints`' J, frustum-culled by a bounding sphere at the hip; fielders beyond `SHADOW_D` (28 m) cast no
   shadow and keep a blob. ONE people material (`peopleMat`) over three 512² canvases painted per species and kit (`spPaint`, 07-people:
   colour with the GLB detail atlas multiplied in on the CPU, alpha = tint mask for trim and eye white; emissive; roughness G + rim
@@ -265,14 +266,25 @@ planet preview) + boot.
   bound `jp`). `vis.kit` per planet: shirt, cream trousers, `trim`, `cap` (section 4 contrast). `spApply(key,kit)` swaps heads and
   repaints; in the T20 first innings both batters wear the planet team's kit and the fielders are Earth humans (`setKits`). In the
   win celebration fielders stand dejected (`V.dej`, three variants by index; not recorded, replays end before it).
-- **Bowler** (07-render3d `bowlerState`, persistent `BW`, never a jump): a steady run-up from his mark (`BWP`: pace 31 m, spin
-  25.5 m), then a keyed window around the release (`BKP` pace, `BKS` spin; times in s from the release, `kf` over `bt`): pace = gather
-  with both hands on the ball, bound off the left foot, back-foot contact side-on (hips and shoulders turned, front arm high), front
-  arm pulled down over a braced front leg, hips opening before the shoulders, the bowling hand through the logic's release point at
-  `bt` 0, follow-through across to the off side and decelerating strides; spin = a short approach, the back foot pivoting, the front
-  arm leading, a slower arm. Then a jog back to the mark (still in the result). The ball is drawn in his hand through the run-up. A
-  caught-and-bowled or a throw to him hands his slot over from `BW` without a jump. `V.bt/bv/bh` (recorded) replace the old
-  `arm/brn`.
+- **Bowler** (07-render3d `bowlerState`, persistent `BW`, never a jump): a run-up from his mark (`BWP`: pace 28.5 m, accelerating
+  over .5 s to ~7 m/s; spin 23.3 m, ~4 m/s; a run-up started short of the mark runs from where he is, the shortfall `BW.dz0/dx0`
+  fading over its first 60%, `bwFade`), then a keyed window around the release (`BKP` pace, `BKS` spin; times in s from the release,
+  `kf` over `bt`; the keys come in with `bowlW`'s weight, before the window): pace = gather with both hands on the ball, bound off the
+  left foot, back-foot contact side-on (hips and shoulders turned, front arm high), the front arm pulled down past the chest and the
+  bowling arm rising behind by front-foot contact over a braced front leg, hips opening before the shoulders, the bowling hand
+  through the logic's release point at `bt` 0 (vertical arm), follow-through across to the off side; spin = a short upright
+  approach, the back foot pivoting side-on, hands together at the chin, then a quick rounder circle (down at the side, back at
+  shoulder height, over at about 1 o'clock: his hip sits `bwXO` .36 m from the ball's line, pace .2) with the wrist turning
+  through release, a short follow-through. **His feet are planned** (`bowlPlan`/`bowlFeet`, a pure function of `bt`, rebuilt for
+  replays) from the run-up's start until he stands after the follow-through: run-up footfalls at a cadence for his speed
+  (`bwCad`), each landing ahead of the hip and toeing off .5 m behind it, the delivery stride's plants from the keys' `ft`, the back
+  foot then the front one stepping in where he stops; swings are cubic Hermites in the hip's frame (no speed over the ground at
+  take-off or landing) on a lift bump; the hips follow the keys under a ceiling `Cs` from the planted feet's reach, eroded by a
+  parabola so they ease down before a long stride lands. Body cues (pelvis/shoulder counter-turn, arm swing, lean, bob) come from
+  the plan like the gait's. Then the anchors take the feet, and a jog back to the mark (he turns toward it first; the run-up start
+  turns him round if he has not). The release frame runs on the run-up's clock (`BW.rel`), so it never stalls. The ball is drawn in
+  his hand through the run-up. A caught-and-bowled or a throw to him hands his slot over from `BW` without a jump (a swinging foot
+  lands on the plan first). `V.bt/bv/bh` (recorded) replace the old `arm/brn`.
 - **Audio** (02): recorded MP3 clips in `src/sfx/` (filename = role, e.g. `fw-launch.mp3` -> `SFX_DATA.fwLaunch`), embedded as base64 by
   `build.mjs` (`@include-sfx` in src/index.html) and decoded once on AudioContext creation; sounds requested before decoding are skipped.
   `play(name,{vol,rate,delay,lp})` -> master gain + compressor. Bat kind (mid/edge/top/block) is picked from the result label (`bat`, `edge`, `mishit`, `block`).
@@ -310,15 +322,26 @@ planet preview) + boot.
   the crouch, run amount, idle variant and the head's look are springs per rig (`mkPIk`), so a recorded flag never pops. Positions
   are continuous: fielders walk in over the last second of the run-up, then walk/backpedal home from the result on; the keeper
   sidesteps to the line and walks back; `resetFielders` keeps every man where he is and only starts a man at his spot when it moved
-  more than 12 m (keeper 6 m: a stance change under the over break).
+  more than 12 m (keeper 6 m: a stance change under the over break). `walkTo` accelerates from his speed (10 m/s²) and slows into
+  his place. Plays (`playTick`, `personJoints`): a play begun late in its own blend brings the hands in over at least .2 s; an early
+  arrival before a launch eases into the launch point; a dive or leap takes off with the run's speed (Hermite flight), a diver lands
+  sliding on along his flight (at most .35 m); a dive launches off the foot on the side he dives to (held where it stands while the
+  body starts to roll), reaches with that hand only (the top arm along his side), lands on his side with the head held up off the
+  turf against the roll and the top arm resting; a leap's feet leave where they stood and fly with him, the gait taking them up
+  again where they land; a slide stop sits up and leans to the ball's side (fixed as it starts). Hands aim at the ball as drawn
+  (`hy`+.05) and a held ball is drawn there. A low pick-up drops the hips before the chest folds, knees open outward in a squat, and
+  the ball comes up in front of the knees. The keeper's give rides back to the hip, never above the helmet.
   Throws back (08, show only: no logic, runs or outs; `TR` = `prng`): `planThrow` (end of `doSwing`) takes the last stop, fetch
   (`isFetch`) or fumble of a ball not out and not a boundary, not the keeper's or the bowler's (his throw to the keeper would go
   through the batter); the end by what the camera shows: the bowler in the home batting view (the keeper is hidden there), the
   keeper under the cordon camera and by geometry under the chase camera (the keeper only if his take falls in the result phase,
   else the bowler), bowling by geometry (the bowler if he is nearer than 0.75x the keeper's distance, else the keeper);
   kind by distance (under 14 m standing: underarm 11 m/s; under 42 m: flat 28 m/s; else a one-bounce 32 m/s or a loop 21 m/s,
-  70/30), each segment's vy from its time, so only the arc changes by planet. `S.thr` (times after `S.f0`): `tg` ready (stop +0.3,
-  fetch +0.35, dive/slide +1.15, fumble: a walk to the ball first), wind-up `wu`, release `tr` (waits for the receiver), arrival
+  70/30), each segment's vy from its time, so only the arc changes by planet. Overarm and looping throws (`THW2`): the hand goes
+  out to the side, low and back past the hip, cocked behind the shoulder, then over the top; the feet are planned (`throwFeet`, 07):
+  a crow-hop of the back foot turned across the line and a long stride of the front foot landing just before the release;
+  underarm, one short front-foot step. `S.thr` (times after `S.f0`): `tg` ready (stop and
+  fetch +0.5, the ball up to the chest first, dive/slide +1.15, fumble: a walk to the ball first), wind-up `wu`, release `tr` (waits for the receiver), arrival
   `ta`. The receiver (by role: keeper `kp` at 5.5 m/s from his stance or last play, or bowler `bw` at 4 m/s from 0.6 s) goes to his
   stumps, takes it in front of them, gloves over the bails (`at`); batting, the bowler does so only if he can then walk back to his
   mark before the next run-up, else he takes it on his way back there (no direct hit). Throws run on into the next ball's countdown
@@ -469,13 +492,13 @@ planet preview) + boot.
   a six lands >= 1 m over it, a one-bounce four 0.5 m inside).
 - **View state and replays:** `render3D`/`draw` read the ball, batter pose, bowler, fielders and stumps only from a view object `V`. `liveView()` (07) builds it from
   live state each frame (it also runs `poseTick`/`bowlerState`, which are stateful, once per frame). From `runup` to the end of
-  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (245 floats/frame, max 600 frames, ~575 KB, current
+  `result`, `recFrame` (08b) copies `V` into one preallocated Float32Array (293 floats/frame, max 600 frames, ~700 KB, current
   delivery only). In the `replay` phase `rpView()` rebuilds `V` from the buffer, blending the two nearest frames. **Any new
   per-frame render state must be added to `V` in `liveView`, to the frame layout in `recFrame`/`rpView`, and read from `V` in
   render code**, or replays will show live state instead. Replay is not re-simulation (randomness is unseeded).
   Frame layout (08b header): t, ball xyz, bowler z/arm/run/running, stumps age/bails, bowler `bt`/`bv`/`bh` (`RP0` = 13), the
-  batter's pose[`PN` 29], then per fielder 14 floats (`RFF`): x, z, sin/cos face, run, flags, action, its time `ap`, hands' target,
-  stretch, heading `vx`/`vz`; then crowd cheer, bowler x, non-striker on/x/backing-up distance and his pose[`PN`], last the far
+  batter's pose[`PN` 29], then per fielder 18 floats (`RFF`): x, z, sin/cos face, run, flags, action, its time `ap`, hands' target,
+  stretch, heading `vx`/`vz`, a throw's direction, wind-up and release hip (`ta`/`tw`/`tbx`/`tbz`, `throwFeet`); then crowd cheer, bowler x, non-striker on/x/backing-up distance and his pose[`PN`], last the far
   stumps' hit age (`V.st2`). `V.bk` (ball in the keeper's gloves, hidden with him in the batting view by `render3D`) is not recorded: the
   ball itself always is.
   Director (08b, docs/replays.md): `commit` stores `S.hl = highlightOf(res,b,field,c)` (logic.js, pure: `{kind, ev, t, rel}`, most

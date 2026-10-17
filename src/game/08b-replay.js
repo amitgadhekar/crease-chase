@@ -2,10 +2,10 @@
    buffer and played back after fours and sixes. Frame layout: t, ball xyz (NaN = none), bowler z/arm (NaN = none)/run/running,
    stumps age (NaN = none)/bails, bowler bt/bv/bh (NaN = none), pose[PN], then per fielder x, z, sin/cos face, run, flags (1 on,
    2 running, 4 crouch, 8 action to his right, 16 keeper, 32 bowler's slot, 64 ball in hand), action, its time, hands' target xyz,
-   stretch (fieldTick), heading vx/vz, then crowd cheer, bowler x, non-striker on/x/backing-up distance and his pose[PN], far
+   stretch (fieldTick), heading vx/vz, a throw's direction, wind-up and hip at the release (throwFeet), then crowd cheer, bowler x, non-striker on/x/backing-up distance and his pose[PN], far
    stumps' age after a thrown hit (NaN = none). ---------- */
-const RFF=14,RP0=13,RF0=RP0+PN,RNS=RF0+NFL*RFF+1,RNP=RNS+4,RFL=RNP+PN+1,RMAX=600,REC={buf:new Float32Array(RMAX*RFL),n:0,t0:0,nf:0},RX=new Float32Array(RFL),RV=mkView();
-const RDISC=new Uint8Array(RFL);RDISC[7]=RDISC[9]=RDISC[RNS+1]=1;for(let j=0;j<NFL;j++)RDISC[RF0+j*RFF+5]=RDISC[RF0+j*RFF+6]=1;
+const RFF=18,RP0=13,RF0=RP0+PN,RNS=RF0+NFL*RFF+1,RNP=RNS+4,RFL=RNP+PN+1,RMAX=600,REC={buf:new Float32Array(RMAX*RFL),n:0,t0:0,nf:0},RX=new Float32Array(RFL),RV=mkView();
+const RDISC=new Uint8Array(RFL);RDISC[7]=RDISC[9]=RDISC[RNS+1]=1;for(let j=0;j<NFL;j++)RDISC[RF0+j*RFF+5]=RDISC[RF0+j*RFF+6]=RDISC[RF0+j*RFF+14]=RDISC[RF0+j*RFF+15]=1;
 RV.pose=RX.subarray(RP0,RF0);RV.ns.pose=RX.subarray(RNP,RNP+PN);
 let RP=null;
 function recStart(){REC.n=0;REC.t0=clock;S.thr=null;}
@@ -17,7 +17,7 @@ function recFrame(V,force){
   r[o+10]=V.bt==null?NaN:V.bt;r[o+11]=V.bv==null?NaN:V.bv;r[o+12]=V.bh==null?NaN:V.bh;
   r.set(V.pose,o+RP0);
   for(let j=0;j<V.nf;j++){const f=V.f[j],k=o+RF0+j*RFF;r[k]=f.x;r[k+1]=f.z;r[k+2]=Math.sin(f.face);r[k+3]=Math.cos(f.face);r[k+4]=f.run;
-    r[k+5]=(f.on?1:0)|(f.running?2:0)|(f.crouch?4:0)|(f.sd>0?8:0)|(f.kp?16:0)|(f.bwl?32:0)|(f.hold?64:0);r[k+6]=f.act;r[k+7]=f.ap;r[k+8]=f.hx;r[k+9]=f.hy;r[k+10]=f.hz;r[k+11]=f.e;r[k+12]=f.vx||0;r[k+13]=f.vz||0;}
+    r[k+5]=(f.on?1:0)|(f.running?2:0)|(f.crouch?4:0)|(f.sd>0?8:0)|(f.kp?16:0)|(f.bwl?32:0)|(f.hold?64:0);r[k+6]=f.act;r[k+7]=f.ap;r[k+8]=f.hx;r[k+9]=f.hy;r[k+10]=f.hz;r[k+11]=f.e;r[k+12]=f.vx||0;r[k+13]=f.vz||0;r[k+14]=f.ta;r[k+15]=f.tw;r[k+16]=f.tbx;r[k+17]=f.tbz;}
   const ns=V.ns;r[o+RNS-1]=V.cheer;r[o+RNS]=V.bx;r[o+RNS+1]=ns.on?1:0;r[o+RNS+2]=ns.x;r[o+RNS+3]=ns.u;r.set(ns.pose,o+RNP);r[o+RNP+PN]=V.st2?V.st2.a:NaN;REC.nf=V.nf;REC.n++;
 }
 // contact falls between two frames, so the replay gets a frame at exactly that moment: ball on the blade, impact pose; and one at the
@@ -48,7 +48,7 @@ function rpView(){
   V.nf=REC.nf;
   for(let j=0;j<V.nf;j++){const k=RF0+j*RFF,f=V.f[j],fl=x[k+5];
     f.on=!!(fl&1);f.x=x[k];f.z=x[k+1];f.face=Math.atan2(x[k+2],x[k+3]);f.run=x[k+4];f.running=!!(fl&2);f.crouch=fl&4?1:0;
-    f.sd=fl&8?1:-1;f.kp=!!(fl&16);f.bwl=!!(fl&32);f.hold=!!(fl&64);f.act=x[k+6];f.ap=x[k+7];f.hx=x[k+8];f.hy=x[k+9];f.hz=x[k+10];f.e=x[k+11];f.vx=x[k+12];f.vz=x[k+13];}
+    f.sd=fl&8?1:-1;f.kp=!!(fl&16);f.bwl=!!(fl&32);f.hold=!!(fl&64);f.act=x[k+6];f.ap=x[k+7];f.hx=x[k+8];f.hy=x[k+9];f.hz=x[k+10];f.e=x[k+11];f.vx=x[k+12];f.vz=x[k+13];f.ta=x[k+14];f.tw=x[k+15];f.tbx=x[k+16];f.tbz=x[k+17];}
   V.trail=tr;V.cheer=x[RNS-1];V.bx=x[RNS];
   const ns=V.ns;ns.on=!!x[RNS+1];if(ns.on){ns.x=x[RNS+2];ns.u=x[RNS+3];}
   return V;

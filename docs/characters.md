@@ -1,7 +1,7 @@
 # Characters: production upgrade (models, motion, verification)
 
-Status: stopped after review round 3 of 3 (2026-10-17, the owner's cap); not production ready by the round-3 critic (bowler, throw,
-dive and catch motion open, below). Style rules and the review rubric: docs/art-style.md (read it first).
+Status: stopped after review round 3 of 3 (2026-10-17, the owner's cap); not production ready by the round-3 critic. Fix pass 4
+(2026-10-17, below) closed most round-3 blockers; no critic has reviewed it yet. Open findings: As built, below. Style rules and the review rubric: docs/art-style.md (read it first).
 This page holds the decisions, the technical contracts, the gates and the round log. Update "As built" and the round log as work
 lands; keep it lean.
 
@@ -148,6 +148,20 @@ lands; keep it lean.
   gbat 103, gside 82, gbowl 63, gbowlns 95, gchase 51, gcord 57, gcel 115; triangles without the crowd at most 132,906 (gcel); T20
   bowling view 87 calls / 132,182 triangles. Fixed: mass skating after contact (non-bowler slip reds 800 -> 256), the celebration,
   the lofted finish, Mercury's look, the spin approach's 1 m jump (now 9 cm). Open: below (As built, open findings).
+- Fix pass 4 (2026-10-17, one agent, on the round-3 findings; lab 20261017-1516 against wrapup-20261017): 1650 of 19,446 lab gates red
+  (2326 of 19,879): slip 345 -> 189, teleport 326 -> 263, releaseHand 57 -> 17, teleportHand 38 -> 23, vertex 30 -> 14, handsBall 22 ->
+  12, pen 1416 -> 1053. Bowler: teleport reds 142 -> 42 (worst .60 -> .19 m), slip 89 -> 31 (3.4 -> 1.7 m/s); in bowl-pace/bowl-spin on
+  all planets his teleport, slip, releaseHand and arm-through-torso (farm-torso) reds are gone (17, 9, 10, 12 -> 0). What changed: the
+  bowler's feet are planned from his path (`bowlPlan`), marks 28.5/23.3 m (slower, upright run-ups), keys from his weight, release on
+  the run-up's clock, front arm pulled down by front-foot contact, spin side-on with a rounder arm (`bwXO`), a run-up from where he is
+  and a turn-round at its start; fielders: lift-held gait swings, leaps with flying feet, Hermite take-offs and easing launches, a dive
+  off one foot onto the side with the head up and one reaching hand, sliding on after landing, slide stops that sit up, hands aimed at
+  the drawn ball, a low pick-up that drops the hips first with the knees open, throws with planned crow-hop feet and a cocked arm
+  (`throwFeet`, `THW2`, recorded `ta/tw/tbx/tbz`), the keeper's give to the hip, `walkTo` acceleration, the clavicle lifting with a raised
+  arm, Saturn's ring as a band round the skull. Balance FP 96fcd588 ("All balance checks passed"); smoke chars, planets, field, throw,
+  catch, t20bowl, replay2 green (KNOWN re-taken, fixed entries removed). Build 2,280,790 B; draw calls and triangles as round 3.
+  Not fixed, with the cause: non-bowler teleports 184 -> 221 (the Moon/Mars/Venus split-step pop at the release, now also in the spin
+  sequences, and the generic gait at sprint speeds), bat-late contact 1.32 cm, M2, M4, M7, M8; partly: H5, H6, M1, M5 (below).
 - 2026-10-16, batter motion (07-motion.js, batter/non-striker parts of 07-render3d.js, skinVecs, 08b-replay.js): PN 29 (top-hand offset
   channels), mixPose (slerp bat, hands on an arc round the body, head clearance, feet lift before they travel), C1 swing through a
   bit-exact impact (swingTiming: follow and finish from the downswing's speed), 60 ms settle cross-fade, per-family backlifts with the
@@ -254,13 +268,14 @@ Contracts as implemented
   swings), contact within 1 cm on 17 of 18 swings (bat-late 1.32 cm: open), `BP` feet = `FOOT`, logic untouched (FP 96fcd588).
 - Fielders: one merged skinned geometry per person (body + shoes + head; keeper kit, keeper helmet and Saturn's ring separate), one
   people material over three 512² canvases (CPU paint, not the planned `onBeforeCompile`), `REGIONS` as listed above.
-- Replay frame: 245 floats (header 13 with bowler `bt/bv/bh`, pose 29, 14 per fielder with `vx/vz`, non-striker pose 29).
+- Replay frame: 293 floats (header 13 with bowler `bt/bv/bh`, pose 29, 18 per fielder with `vx/vz` and a throw's `ta/tw/tbx/tbz`,
+  non-striker pose 29).
 - Permanent gate: tests/smoke.mjs `chars` (Earth stance, cover drive, a diving stop, a cordon catch, a stop and throw), the lab's
   runner and gates; gates red at the wrap-up are in its `KNOWN` with their finding and fail if they get worse. `fieldPlay`'s hands
   check is now the lab's `handsBall` (.12 m, was .35).
 
 Budgets measured
-- Build: 2,270,162 B (2216.9 KB; 1.57 MB at the start; cap 2.5 MB, target ~2.0 MB: over target, under cap).
+- Build: 2,270,162 B at the wrap-up, 2,280,790 B after fix pass 4 (2216.9 KB; 1.57 MB at the start; cap 2.5 MB, target ~2.0 MB: over target, under cap).
 - GLBs: batter.glb 313,932 B, 11,206 triangles (body 6,188, helmet 1,522, shoes 2 x 320, gloves 2 x 650, pads 2 x 778), 1024²
   WebP atlas 46 KB; fielder.glb 215,712 B, 7,604 triangles (body 4,312, Earth head 820, cap 348, shoes 2 x 260, keeper gauntlets
   2 x 320, pads 2 x 482), 512² WebP atlas 15 KB. Was: batter.glb 220,228 B, no fielder GLB.
@@ -280,20 +295,25 @@ Deviations from the plan
 - The plan's stop condition (two clean review rounds) was replaced by the owner's 3-round cap; round 3 was a check only.
 - Reviews are markdown only (round-0-art/motion, round-1..3.md); the planned `.json` twins were not written.
 
-Open findings (round 3, tests/charlab/reviews/round-3.md; none fixed after it)
-- Blockers: B1 the bowler's hip and ankles pop 9-20 cm in one frame on every delivery (0.5-0.6 m in the stop-throw sequence) and
-  his planted foot slides ~2 m/s (89 sequences); B2 the spin approach leans ~45 deg with the feet behind the hips; B3 leaping fielders
-  jump 27-29 cm in a frame; B4 residual skating (keeper on edges 5.7 m/s on Saturn, backing-up mid-off, deep catchers, idle turns).
-- High: H1 the throw is a statue (no crow-hop, forearm over the cap); H2 front-foot contact is a T; H3 spin and pace releases look
-  alike from the bowling camera; H4 catches end 15-30 cm short of the ball, slide stops 40-50 cm; H5 no approach run into a dive,
-  face-plant landing, arm through the head; H6 the body caves in at the chest with the arms raised (bowler at release); bat-late
-  contact 1.32 cm (limit 1 cm; a claimed fix is not in the build).
-- Medium: M1 the keeper's give puts the gauntlets on the helmet; M2 batter forearms/wrists through each other and the handle by 2-6
-  cm in the leave and after impact; M3 the bowler's arm through his torso by 11-13 cm at release; M4 elbow/knee pole flips in the
-  delivery and the slide; M5 the keeper sinks 4 cm on dives, mid-on 2 cm in a stop; M6 Saturn's ring reads as a halo; M7 the lab's
-  cordon shot shows ~30 m (check the game's `cordCam`); M8 harness: the batter's torso capsule is round (r .15) and flags arms in
-  front of the chest, and shin-thigh needs a knee-flex rule or is real; M9 gate definitions changed between rounds (baseline re-taken
-  at the wrap-up, below).
+Open findings (round 3, tests/charlab/reviews/round-3.md, after fix pass 4; numbers from lab 20261017-1516)
+- Fixed in fix pass 4: B1 (bowler: no teleport, slip or release-hand red in bowl-pace/bowl-spin on any planet; the stop-throw jumps
+  came from his slot taking over: facing and speed now carry on), B2 (spin approach upright at ~4 m/s, a foot under the hips), B3
+  (leaps: the feet fly with him; the worst leap teleport left is a Moon running gait frame, not the leap), H1 (crow-hop, long stride,
+  hand cocked behind the shoulder and over the top beside the head), H3 (spin release about 25 deg off vertical vs pace vertical), H4
+  (catches and slide stops: 22 -> 12 handsBall reds; ring and leap catches reach the drawn ball), M3 (bowler arm through torso gone
+  in the delivery), M6 (ring round the skull).
+- Partly fixed: B4 residual skating (non-bowler slip reds 256 -> 158; worst left: a Venus dive's get-up 2.1 m/s, the keeper's run into
+  a dive 0.8 m/s); H2 (front-foot contact: the front arm bends and pulls down, the bowling arm rises behind; from the front camera the
+  arms still read wide); H5 (dive: launch off the near foot, side landing with the head up and one reaching hand; the run-up into it is
+  still a short gait run from a crouch, and the get-up slips); H6 (clavicle lifts with a raised arm; the chest still reads rounded at
+  1.6 m: a model/weights fix); M1 (the give rides to the hip; a head-high take still puts the gauntlets in front of the face); M5
+  (keeper vertex -.042 on dives and low takes on Jupiter: the lowest vertex is not a joint the clamp knows, likely the pad's lip).
+- Open: bat-late contact 1.32 cm (limit 1 cm; batter code not touched in this pass); M2 batter forearms/wrists through each other
+  and the handle 2-6 cm; M4 pole flips (13: bowl-pace bowler 2 on six planets at the keys' blend-in, slide fielders 3; not reproduced in
+  isolated runs); M7 the lab's cordon shot; M8 harness (round torso capsule; shin-thigh is now mostly cross-leg contact in run-ups);
+  the Moon/Mars/Venus split-step pop (.06-.12 m on every ring fielder at release + .12 s, pre-existing, now also in spin sequences);
+  the dive at a flying miss still moves the body 15 m/s (a logic show-only event); stop-throw on Mercury: the bowler's hands jump .55 m
+  when his slot takes a throw.
 - 11 low findings (1.6 m sheets only; counted by the critic, not itemised in round-3.md).
 - Smoke flakes seen at the wrap-up (unseeded forced plays; each passed on its rerun, not reproduced in 24 targeted repeats): the
   landscape catch replay once drew the keeper's hands 3.49 m from the ball at the catch (act 2, a take), and the landscape stop for

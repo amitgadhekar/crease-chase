@@ -795,8 +795,8 @@ const kf=(K,t,lin)=>{if(t<=K[0][0])return K[0][1];const n=K.length;if(t>=K[n-1][
 const BKP={w0:-.42,w1:.45,sht:[[-.2,0],[-.04,.1],[0,.16],[.12,.04],[.3,0]],hy:[[-.42,1],[-.3,1.05],[-.22,.92],[-.09,.88],[0,.95],[.15,.92],[.45,.96]],
   gy:[[-.42,.2],[-.3,.6],[-.22,.9],[-.09,.6],[0,0],[.12,-.35],[.3,-.2],[.45,-.05]],sy:[[-.42,.3],[-.3,1],[-.22,1.25],[-.09,1],[0,.05],[.12,-.6],[.3,-.35],[.45,-.1]],
   ln:[[-.42,.1],[-.3,-.05],[-.22,-.1],[-.09,0],[0,.35],[.12,.65],[.3,.4],[.45,.25]],
-  hr:[[-.6,[-.1,-.32,.42]],[-.42,[-.05,-.2,.62]],[-.3,[.1,0,.66]],[-.26,[.36,-.3,.3]],[-.22,[.3,-.62,-.35]],[-.09,[.2,-.72,-.5]],[-.06,[.22,-.15,-.9]],[-.03,[.18,.65,-.6]],[0,'rp'],[.04,[-.05,.5,.55]],[.12,[-.35,-.3,.65]],[.3,[-.7,-.5,.35]],[.45,[-.25,-.7,.35]]],
-  hl:[[-.6,[.1,-.32,.42]],[-.42,[.15,-.35,.55]],[-.3,[0,.3,.6]],[-.22,[-.05,.85,.5]],[-.09,[-.12,.72,.6]],[-.03,[-.3,.25,.6]],[0,[-.35,-.35,.35]],[.12,[-.3,-.65,-.05]],[.3,[-.1,-.72,0]]],
+  hr:[[-.6,[-.1,-.32,.42]],[-.42,[-.05,-.2,.62]],[-.3,[.1,0,.66]],[-.26,[.36,-.3,.3]],[-.22,[.3,-.62,-.35]],[-.1,[.2,-.72,-.5]],[-.07,[.22,-.1,-.9]],[-.04,[.18,.6,-.62]],[0,'rp'],[.04,[-.05,.5,.55]],[.12,[-.35,-.3,.65]],[.3,[-.7,-.5,.35]],[.45,[-.25,-.7,.35]]],
+  hl:[[-.6,[.1,-.32,.42]],[-.42,[.15,-.35,.55]],[-.3,[0,.3,.6]],[-.22,[-.05,.85,.5]],[-.1,[-.1,.75,.55]],[-.05,[-.25,.15,.45]],[-.02,[-.33,-.2,.3]],[0,[-.35,-.38,.25]],[.12,[-.3,-.65,-.05]],[.3,[-.1,-.72,0]]],
   gr:[[-.42,[.3,-.3,-.9]],[-.22,[.3,-.5,-.8]],[-.04,[.2,.4,-.9]],[0,[0,.2,-1]],[.12,[-.7,.5,.4]]],gl:[[-.42,[-.3,-.3,-.9]],[-.22,[-.8,.3,-.4]],[0,[-.6,-.3,-.7]]],
   pr:[[-.42,[1,-.3,-.3]],[-.22,[1,.3,-.4]],[-.04,[1,.1,-.2]],[.04,[.8,-.4,.5]],[.3,[.3,-.5,.8]]],pl:[[-.42,[-1,-.3,-.3]],[-.22,[-1,.4,.1]],[0,[-1,-.3,-.5]]],
   // feet: [from, to, landing point (x his right of his line, z behind the release hip line zh = -z ahead), yaw, lift]; a key with
@@ -807,10 +807,10 @@ const BKP={w0:-.42,w1:.45,sht:[[-.2,0],[-.04,.1],[0,.16],[.12,.04],[.3,0]],hy:[[
 const BKS={w0:-.4,w1:.5,sht:[[-.15,0],[0,.1],[.15,.03],[.4,0]],hy:[[-.4,1],[-.3,1.03],[-.25,.93],[-.1,.92],[0,.98],[.2,.95],[.5,.97]],
   gy:[[-.4,.1],[-.25,.7],[-.1,.5],[0,.1],[.2,-.3],[.5,-.1]],sy:[[-.4,.2],[-.25,1.1],[-.1,.9],[0,.15],[.2,-.45],[.5,-.15]],
   ln:[[-.4,.05],[-.25,-.05],[-.1,.05],[0,.25],[.2,.4],[.5,.25]],
-  hr:[[-.6,[-.1,-.3,.45]],[-.4,[-.05,-.25,.6]],[-.25,[.05,.1,.62]],[-.18,[.36,-.35,.25]],[-.1,[.3,-.72,-.3]],[-.06,[.25,-.1,-.9]],[-.03,[.18,.65,-.6]],[0,'rp'],[.06,[-.1,.35,.55]],[.18,[-.45,-.3,.5]],[.4,[-.3,-.65,.35]]],
+  hr:[[-.6,[-.1,-.3,.45]],[-.4,[-.05,-.15,.55]],[-.27,[-.08,.12,.62]],[-.19,[0,.14,.6]],[-.13,[.42,-.22,.12]],[-.08,[.42,.18,-.45]],[-.04,[.32,.62,-.35]],[0,'rp'],[.07,[-.05,.4,.55]],[.18,[-.42,-.2,.5]],[.4,[-.3,-.6,.3]]],
   hl:[[-.6,[.1,-.3,.45]],[-.4,[.15,-.3,.5]],[-.25,[0,.55,.6]],[-.12,[-.05,.8,.5]],[-.05,[-.15,.55,.7]],[0,[-.35,-.2,.45]],[.2,[-.2,-.62,0]]],
-  gr:[[-.25,[.3,-.4,-.85]],[0,[.5,.1,-.85]],[.15,[-.4,.7,.3]]],gl:[[-.25,[-.8,.3,-.4]],[0,[-.6,-.3,-.7]]],
-  pr:[[-.25,[1,.3,-.4]],[0,[1,0,0]],[.15,[.5,-.4,.6]]],pl:[[-.25,[-1,.4,.1]],[0,[-1,-.3,-.5]]],
+  gr:[[-.25,[.3,-.4,-.85]],[-.08,[.7,.3,-.6]],[0,[.6,.35,-.7]],[.15,[-.4,.7,.3]]],gl:[[-.25,[-.8,.3,-.4]],[0,[-.6,-.3,-.7]]],
+  pr:[[-.25,[1,.3,-.4]],[-.13,[1,-.4,.2]],[-.04,[1,.2,-.3]],[0,[1,0,0]],[.15,[.5,-.4,.6]]],pl:[[-.25,[-1,.4,.1]],[0,[-1,-.3,-.5]]],
   ft:[[[-.4,-.08,[-.05,.15],Math.PI-.2,.2],[.3,.5,[-.2,-.8],Math.PI-.3,.1,-.12]],[[-.4,-.25,[.05,1],Math.PI/2+.3,.15],[-.22,-.1,[.05,1],Math.PI-.6,0],[-.08,.25,[.22,-.45],Math.PI-.4,.1,.18]]]};
 // the bowler's x drift after the release: across to the off side (the release side's), off the pitch
 const bdrift=(bt,pc,bx)=>bt==null||bt<=0?0:(pc?.9:.6)*smooth(clamp(bt/(pc?.8:.6),0,1))*(bx<0?-1:1);
@@ -833,7 +833,7 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
   // run amount (the arms' carriage) from the recorded speed, eased
   // the idle variant (hands on hips) settles in slowly and leaves at once when he moves off
   const ra=ik?MO.spring(ik.ra,clamp((speed-1.4)/1.2,0,1),dt,12):clamp((speed-1.4)/1.2,0,1),
-    idlT=speed<.15&&!act&&!(o.crouch||0)&&bt==null&&!dj?1:0,idl=ik?MO.spring(ik.idl,idlT,dt,idlT>ik.idl.x?5:18):0;
+    idlT=speed<.15&&!act&&!(o.crouch||0)&&bt==null&&!dj&&!o.bwl?1:0,idl=ik?MO.spring(ik.idl,idlT,dt,idlT>ik.idl.x?5:18):0;
   // the ready crouch (a recorded flag) eases in and out
   let cr=ik?MO.spring(ik.cr,o.crouch||0,dt,8):o.crouch||0,st=0,sq=0,rl=0,pt=0,hip=null,jh=0,wh=0,sl5=0,sp=0,db=0,dvh=null;if(ik&&jump){ik.cr.x=o.crouch||0;ik.cr.v=0;cr=ik.cr.x;}
   const rel=(a,b,u)=>ap<0?smooth(clamp((ap-a)/(b-a),0,1)):o.hold?1:1-smooth(clamp((ap-u)/.45,0,1));
@@ -842,39 +842,53 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
     if(ap<-T)wh=.5*smooth(clamp((ap+T+.25)/.25,0,1));
     else if(ap<=0){const g=smooth((ap+T)/T);rl=th*g;dvh=[0,g,hc,lo];wh=.5+.5*smooth(clamp(g*3,0,1));sp=1;db=g;}
     else{const g=ap<.5?0:smooth(clamp((ap-.5)/.6,0,1));rl=th*(1-g);dvh=[1,g,hc,lo];wh=o.hold?1:1-g;sp=1-g;db=1-g;}}
-  else if(act===4){const jm=1.2*FS[M?physD():'medium'].jp*Math.min(9,9.8/G);jh=clamp(o.hy-(hy0+P.tor*.926+AL)+.06,0,jm+.06)*(ap>-.35&&ap<.35?Math.sin(Math.PI*(ap+.35)/.7):0);   // (+.06: the wrist sits below a fingertip catch)
+  else if(act===4){const jm=1.2*FS[M?physD():'medium'].jp*Math.min(9,9.8/G);jh=clamp(o.hy+.05-(hy0+P.tor*.926+AL*.96)+.12,0,jm+.3)*(ap>-.35&&ap<.35?Math.sin(Math.PI*(ap+.35)/.7):0);   // (+.06: the wrist sits below a fingertip catch)
     st=ap<-.35?.45*smooth(clamp((ap+.6)/.25,0,1)):ap>.35?.4*(1-smooth(clamp((ap-.35)/.3,0,1))):0;wh=rel(-.55,-.2,.4);}
-  else if(act===5){const g=ap<0?smooth(clamp((ap+.45)/.45,0,1)):ap<.6?1:1-smooth(clamp((ap-.6)/.5,0,1));sl5=g;pt=.85*g;hip=lerp(hy0,.34,g);wh=rel(-.35,-.1,.6);}
+  else if(act===5){const g=ap<0?smooth(clamp((ap+.45)/.45,0,1)):ap<.6?1:1-smooth(clamp((ap-.6)/.5,0,1));sl5=g;wh=rel(-.35,-.1,.6);if(ik&&ik.s5==null)ik.s5=((o.hx-x)*c-(o.hz-z)*s)<0?-1:1;pt=.85*g*(1-1.5*wh);rl=(ik?ik.s5:1)*.35*g*wh;hip=lerp(hy0,.34,g);}   // (stopping it, he sits up and leans over to the ball side, s5, fixed as the slide starts)
   else if(act===6){wh=1;st=.9*(1-o.e)*clamp((1.05-o.hy)/.85,0,1);sq=Math.max(o.e,clamp((.75-o.hy)/.5,0,1));}
   else if(act===7)st=Math.max(Math.floor(o.e+1e-6)===1?.3:.1,clamp((1.05-o.hy)/.85,0,1));
+  // a play that begins late in its own blend (a short reaction, the result phase starting after its t0) brings the hands, the
+  // stoop and the dive's launch in over at least .2 s rather than in one frame
+  if(ik){if(jump||ik.whp==null)ik.whp=wh;else{const rt=Math.max(5,ap<0?(wh-ik.whp)/Math.max(dt,-ap):1e9);if(wh>ik.whp+dt*rt){const r=(ik.whp+dt*rt)/Math.max(1e-6,wh);st*=r;sq*=r;wh=ik.whp+dt*rt;}}ik.whp=wh;}   // (but always there by the play's own moment, ap 0)
+  if(ik&&act!==5)ik.s5=null;
   // feet: planted by the gait/anchors (world), lifted together in a leap or a split-step; the bowling keys place them in the window
   const hw=.1*tw;if(ik)ik.ws=act===7&&Math.floor(o.e+1e-6)!==1?.15*smooth(clamp((ap+.6)/.3,0,1))*(1-smooth(clamp((ap-.4)/.4,0,1))):0;   // a throw's wide stance: side-on, his width lies along the throw
-  const F=ik?feetStep(ik,x,z,face,vx,vz,dt,P,jump):null,GT=F&&F.g,tk=.14*k*smooth(clamp(jh/.08,0,1));   // up on the toes, then a hop, for a ball above the reach
+  // the bowler's feet are planned from the run-up's start until he stands after the follow-through (bowlFeet); then the anchors
+  // take them where the plan left them
+  let F=null,planned=false;
+  // (a play taking him over mid-stride, a caught-and-bowled or a throw to him, lets the swinging foot land on the plan first)
+  // a throw's footwork is planned from the throw (throwFeet); the anchors take the feet where it leaves them
+  const thrF=!!ik&&act===7&&o.tw>0&&ap<.55&&!jump;
+  // (also when something else moves him off his path: his slot's walk to take a throw)
+  let off=false;if(ik&&o.bwl&&bt!=null&&M&&ik.pl&&ik.bpl&&ik.bpk===bwKey(o,P))off=Math.hypot(x-ik.bpl.H.x(bt),z-ik.bpl.H.z(bt))>.02;
+  if(ik){if(o.bwl&&bt!=null&&M&&(!act&&!off&&bt>=-bowlGeo().T-1e-6||ik.pl&&!jump&&act<3&&(!BFT.st[0]||!BFT.st[1]))){F=bowlFeet(ik,o,x,z,face,P,jump);planned=!!F;}
+    if(!F&&thrF){F=throwFeet(ik,o,ap,Math.floor(o.e+1e-6),face);}
+    else if(!F){if(ik.tk!=null&&!jump){const a=ik.a;ik.gm=0;for(let i=0;i<2;i++){MO.cp(a.foot[i],TFT.f[i]);a.foot[i][1]=0;a.yaw[i]=TFT.yaw[i];a.st[i]=1;a.u[i]=0;}a.hold=.15;a.split=-1;a.wx=0;a.air=0;ik.ax=null;}
+      // (a plan left behind elsewhere, a restart or a cut, is not handed on: the anchors start beside him)
+      ik.tk=null;if(ik.pl&&!jump){const a=ik.a;ik.gm=0;if(Math.max(Math.hypot(BFT.f[0][0]-x,BFT.f[0][2]-z),Math.hypot(BFT.f[1][0]-x,BFT.f[1][2]-z))>1.3)MO.anchorsReset(a,x,z,face,.1*P.tw);
+        else for(let i=0;i<2;i++){MO.cp(a.foot[i],BFT.f[i]);a.foot[i][1]=0;a.yaw[i]=BFT.yaw[i];a.st[i]=1;a.u[i]=0;}a.hold=.12;a.split=-1;a.wx=0;a.air=0;ik.ax=null;}
+      ik.pl=false;F=feetStep(ik,x,z,face,vx,vz,dt,P,jump);}}
+  const GT=F&&F.g,tk=.14*k*smooth(clamp(jh/.08,0,1));   // up on the toes, then a hop, for a ball above the reach
   const Wi0=w=>{const dx=w[0]-x,dz=w[2]-z;return [dx*c-dz*s,w[1],dx*s+dz*c];};
   let fL,fR,fyL=face,fyR=face;const fpl=[1,1];   // fpl: planted (on the ground, not a swing or an arc)
   if(F){fL=Wi0(F.f[0]);fR=Wi0(F.f[1]);fyL=F.yaw[0];fyR=F.yaw[1];fL[1]+=tk;fR[1]+=tk;fpl[0]=F.st[0];fpl[1]=F.st[1];}
+  // a leap off the ground: the feet leave where they stood (relative to him) and fly with him, tucked under the rising hips; the
+  // gait and anchors take them up again where they come down
+  if(ik){const air=act===4&&jh>.005&&!jump;
+    if(air){if(!ik.lp){ik.lp=[fL.slice(),fR.slice(),fyL-face,fyR-face];}
+      const up=Math.max(tk,jh*.85);fL=[ik.lp[0][0],ik.lp[0][1]+up,ik.lp[0][2]];fR=[ik.lp[1][0],ik.lp[1][1]+up,ik.lp[1][2]];fyL=face+ik.lp[2];fyR=face+ik.lp[3];fpl[0]=fpl[1]=0;}
+    else if(ik.lp){const L2=[ik.lp[0],ik.lp[1]].map(l=>[x+l[0]*c+l[2]*s,0,z-l[0]*s+l[2]*c]);
+      if(ik.gm){const g=ik.g;MO.gaitReset(g,x,z,face,hw,0);for(let i=0;i<2;i++){MO.cp(g.foot[i],L2[i]);MO.cp(g.lock[i],L2[i]);MO.cp(g.tgt[i],L2[i]);}}
+      else{const a=ik.a;for(let i=0;i<2;i++){MO.cp(a.foot[i],L2[i]);a.st[i]=1;a.u[i]=0;a.yaw[i]=face+ik.lp[2+i];}a.split=-1;a.hold=.1;}
+      fL=[ik.lp[0][0],tk,ik.lp[0][2]];fR=[ik.lp[1][0],tk,ik.lp[1][2]];fyL=face+ik.lp[2];fyR=face+ik.lp[3];fpl[0]=fpl[1]=1;ik.lp=null;}}
   else{fL=[-hw,tk,0];fR=[hw,tk,0];}
   let kb=0;
-  if(bw&&bt>=BKK.w0-.001&&bt<=BKK.w1+.001&&ik){const zh=BZR[o.pc?'pace':'spin'],sx=o.bx<0?-1:1;
-    // the window's feet: from where the gait left them (each captured as its own first key starts) on arcs to their landing
-    // points, then planted
-    if(!ik.bw){ik.bw=1;ik.bfc[0]=ik.bfc[1]=0;}
-    const fw=[fL,fR];for(let i=0;i<2;i++){const KF=BKK.ft[i];let pos=null,yaw=face;
-      if(!ik.bfc[i]){if(bt<KF[0][0])continue;ik.bfc[i]=1;MO.cp(ik.bf[i],F.f[i]);}
-      // (facing down the pitch his right is -x: points and yaws are mirrored into game x; plus his drift to the off side)
-      for(const [t0,t1,pt,yw0,lf,bg] of KF){const land=[o.bx+bdrift(t1,o.pc,o.bx)-pt[0]*sx,0,zh+pt[1]],yw=sx>0?2*Math.PI-yw0:yw0;
-        if(bt<t0)break;if(bt<t1){const u=(bt-t0)/(t1-t0),from=pos||ik.bf[i];pos=[lerp(from[0],land[0],MO.trav(u))-(bg||0)*sx*Math.sin(Math.PI*u),lerp(from[1],0,smooth(u))+Math.sin(Math.PI*u)*lf,lerp(from[2],land[2],MO.trav(u))];   /* (bg: a swing leg passing the planted one bows out round it) */yaw=lerp(yaw,yw,smooth(u));}
-        else{pos=land;yaw=yw;}}
-      if(pos){const l=Wi0(pos);fw[i][0]=l[0];fw[i][1]=l[1];fw[i][2]=l[2];if(i)fyR=yaw;else fyL=yaw;fpl[i]=pos[1]===0?1:0;}}
-    kb=1;
-    // the gait takes the feet back where the keys left them, planted
-    if(bt>BKK.w1-.02){const g=ik.g;ik.gm=1;MO.gaitReset(g,x,z,face,hw,0);for(let i=0;i<2;i++){const w=[x+fw[i][0]*c+fw[i][2]*s,0,z-fw[i][0]*s+fw[i][2]*c];MO.cp(g.foot[i],w);MO.cp(g.lock[i],w);MO.cp(g.tgt[i],w);}
-      if(speed>.3)gaitPhase(g,x,z,vx,vz,speed,MO.gaitParams(GPP,speed<1.9?1:speed<4.2?2:3,speed),GSP2);}}
-  else if(ik)ik.bw=0;
+  if(bww>0&&ik)kb=1;   // (the keys come in with his weight on them, bowlW, before the window opens)
   // a dive's launch: the legs trail and bend (the feet lifted toward the hip bend the knees); a slide places them along the ground
   // (the feet lift before they tuck, and come down after they return, so a foot on the ground never slides)
-  if(db>0){const dL=[-hw,.22,-.05],dR=[hw,.12,-.2],dy=Math.min(1,db*3),dxz=smooth(clamp((db-.2)/.8,0,1));
-    [[fL,dL],[fR,dR]].forEach(([f,d])=>{f[0]=lerp(f[0],d[0],dxz);f[2]=lerp(f[2],d[2],dxz);f[1]=lerp(f[1],d[1],dy);});}
+  // the launch is off the foot on the side he dives to: it pushes until halfway, the other leg drives up and across first
+  let dvP=-1,dvQ=0;if(db>0){const dL=[-hw,.22,-.05],dR=[hw,.12,-.2],pu=os>0?1:0;
+    [[fL,dL],[fR,dR]].forEach(([f,d],i)=>{const q=i===pu&&ap<=0?clamp((db-.45)/.55,0,1):db,dy=Math.min(1,q*3),dxz=smooth(clamp((q-.2)/.8,0,1));f[0]=lerp(f[0],d[0],dxz);f[2]=lerp(f[2],d[2],dxz);f[1]=Math.max(lerp(f[1],d[1],dy),.07*Math.min(1,q*12));if(i===pu&&ap<=0&&F){if(q===0)fpl[i]=1;dvP=i;dvQ=smooth(q);}});}   // (a foot leaves the turf before the roll carries it)
   // a throw: the feet stay with the gait/anchors, which step him through the crow-hop (his body travels toward the target over the
   // wind-up) and pivot them as he turns side-on; nothing places them, so a planted foot never slides
   const ty7=act===7?Math.floor(o.e+1e-6):0,gth=act===7?(o.e-ty7)*4:0;   // the throw's kind and its gather blend (both hands still on the ball)
@@ -895,20 +909,24 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
       ceil=f=>Math.max(hy0*.78,f[1]+(f[1]<.1&&f[2]-jz<-.05&&db===0?.18:0)+P.an+HJD+Math.sqrt(Math.max(0,(L*.985)**2-(f[0]-jx)**2-(f[2]-jz)**2)));
     const f=i?fR:fL,cy=ceil(f),up=Math.max(0,f[1]-tk);hyS=Math.min(hyS,cy+up*2.5);if(up<.012)hyR=Math.min(hyR,cy);
     if(GT&&!kb&&!GT.st[i]&&GT.u[i]>0){const t=Wi0(GT.tgt[i]);t[1]=tk;hyS=Math.min(hyS,ceil(t)+(1-GT.u[i])*.35);}}
-  if(sl5)hy=hy0;else hy=Math.min(hy,hyS);
+  if(sl5)hy=hy0;else if(!planned)hy=Math.min(hy,hyS);
   // the standing height eases (the reach floor releasing at toe-off would pop the hips up otherwise), never above the ceiling
-  if(ik){if(jump){ik.hy.x=hy;ik.hy.v=0;}hy=MO.spring(ik.hy,hy,dt,30);if(!sl5&&hy>Math.min(hyR,hyS)){hy=Math.min(hyR,hyS);ik.hy.x=hy;ik.hy.v=Math.min(ik.hy.v,0);}}
+  // (planned feet: the plan's hip is followed exactly, under the ceilings, so the keys' drops are not late)
+  if(ik){if(jump){ik.hy.x=hy;ik.hy.v=0;}
+    // (rising, the hips ease up: entering the plan from a crouch never pops them up)
+    if(planned){let h=Math.min(hy,F.hc,off?hyR:9);if(h>ik.hy.x+1e-4&&dt>0&&bt<-bowlGeo().T+.45){const h0=ik.hy.x;h=Math.min(h,MO.spring(ik.hy,h,dt,24));ik.hy.x=h;ik.hy.v=(h-h0)/dt;}else{ik.hy.v=dt>0?(h-ik.hy.x)/dt:0;ik.hy.x=h;}hy=h;}
+    else{hy=MO.spring(ik.hy,hy,dt,30);if(!sl5&&hy>Math.min(hyR,hyS)){hy=Math.min(hyR,hyS);ik.hy.x=hy;ik.hy.v=Math.min(ik.hy.v,0);}}}
   // a dive's hip: launch from the current height up to the flight height, down to the ground, then back up
-  if(dvh){const [ph2,g,hc,lo]=dvh;hip=ph2===0?lerp(hy,hc,g)+.12*Math.sin(Math.PI*g):ap<.3?lerp(hc,lo,(ap/.3)**2):lerp(lo,hy,g);}
+  if(dvh){const [ph2,g,hc,lo]=dvh;hip=ph2===0?lerp(hy,hc,smooth(g))+.12*Math.sin(Math.PI*g)**2:ap<.3?lerp(hc,lo,(ap/.3)**2):lerp(lo,hy,g);}   // (no vertical speed where the flight meets the landing)
   // torso lean ln forward about the hips (the gait's lean with speed and acceleration); for a two-handed take the lean grows (then
   // the hips drop) until the ball is within the arms' reach of the shoulder centre, so the hands get there instead of stopping short
-  let ln=P.hu+ra*.1+(GT?GT.lean:0)+cr*.3+dj*dl[0]+st*1.05+sq*.4;if(kb)ln=lerp(ln,kf(BKK.ln,bt),bww);
+  let ln=P.hu+ra*.1+(GT?GT.lean:0)+cr*.3+dj*dl[0]+st*(1.05-.5*sq)+sq*.3;if(kb)ln=lerp(ln,kf(BKK.ln,bt),bww);   // (deep in a squat the back stays up: the chest never folds onto the knees)
   // a throw: a little back at the top of the wind-up, the weight forward onto the front foot through the release
   if(act===7&&ty7!==1)ln+=ap<0?-.12*smooth(clamp((ap+.45)/.3,0,1))*smooth(clamp(-ap/.15,0,1)):.3*smooth(clamp(ap/.22,0,1))*(1-smooth(clamp((ap-.5)/.4,0,1)));
   const shy=P.tor*.926-dj*.04,two=wh>0&&act!==7;
-  if(two&&(act===2||act===6)){const dx=o.hx-x,dz=o.hz-z,bl=[dx*c-dz*s,o.hy-jh,dx*s+dz*c],r=AL*.88,low=bl[1]<hy+shy*Math.cos(ln)-.05;
+  if(two&&(act===2||act===6)){const dx=o.hx-x,dz=o.hz-z,bl=[dx*c-dz*s,o.hy+.05-jh,dx*s+dz*c],r=AL*.82,low=bl[1]<hy+shy*Math.cos(ln)-.05;
     // the extra lean and hip drop come in with wh (the hands' blend), never in one frame
-    if(low){let l2=ln,h2=hy;for(let k=0;k<12;k++){const sc=[0,h2+shy*Math.cos(l2),shy*Math.sin(l2)];if(V3.dist(bl,sc)<=r)break;if(l2<1.25)l2+=.1;else if(h2>.45)h2-=.04;else break;}
+    if(low){let l2=ln,h2=hy;for(let k=0;k<12;k++){const sc=[0,h2+shy*Math.cos(l2),shy*Math.sin(l2)];if(V3.dist(bl,sc)<=r)break;if(l2<.95)l2+=.1;else if(h2>.5)h2-=.04;else if(l2<1.25)l2+=.1;else break;}   // (the hips drop before the chest goes past ~55 deg)
       ln+=(l2-ln)*wh;hy+=(h2-hy)*wh;}
     else{const sc=[0,hy+shy*Math.cos(ln),shy*Math.sin(ln)];jh+=clamp(V3.dist(bl,sc)-r,0,.3)*wh;}}
   // the bowling hand must reach the release point at bt 0: the body rises onto the toes for what the arm lacks
@@ -927,7 +945,7 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
   if(sl5){const uy=Math.min(1,sl5*4),uxz=smooth(clamp((sl5-.25)/.75,0,1));   // off the ground first, then along it (and back the same way)
     [[fL,[-.16,P.an+.03,.28*k]],[fR,[.1,P.an+.03,.95*k]]].forEach(([f,a])=>{const l=Qi(a);for(let j=0;j<3;j++)f[j]=lerp(f[j],l[j]-(j===1?P.an:0),j===1?uy:uxz);if(f[1]<.03*uy)f[1]=.03*uy;});}
   [fL,fR].forEach((f,i)=>{const sd=i?1:-1,hj=W([sd*hw*cgy+swy,hy-HJD,-sd*hw*sgy]),fy=i?fyR:fyL,ff=[Math.sin(fy-face),0,Math.cos(fy-face)],
-      kp=Wd(sl5||db>0||kb?[sd*.12+sd*.3*sq,0,1]:V3.lerp([sd*.1,0,1],[ff[0],-.15+.6*Math.max(st,sq),ff[2]],.7)),ft=W([f[0],f[1]+P.an,f[2]]),fy0=P.an+(sl5?.035*Math.min(1,sl5*4):db>0?.035*Math.min(1,db*5):0);if(ft[1]<fy0)ft[1]=fy0;   // (a sliding or diving foot leaves the turf first: it never skids on it)
+      kp=Wd(sl5||db>0||kb?[sd*.12+sd*.3*sq,0,1]:V3.lerp([sd*(.1+.8*sq),0,1],[ff[0]+sd*.75*sq,-.15+.6*Math.max(st,sq),ff[2]],.7)),   /* (squatting, the knees open outward, clear of each other) */ft=i===dvP?V3.lerp([F.f[i][0],P.an+F.f[i][1],F.f[i][2]],W([f[0],f[1]+P.an,f[2]]),dvQ):W([f[0],f[1]+P.an,f[2]]),fy0=P.an+(sl5?.035*Math.min(1,sl5*4):db>0?.035*Math.min(1,db*5):0);if(ft[1]<fy0)ft[1]=fy0;   // (a sliding or diving foot leaves the turf first: it never skids on it; a dive's push foot stays where it stands while the body starts to roll)
     // a planted foot the leg can no longer reach flat (the trailing foot before toe-off) pivots on its toes: the heel and ankle
     // rise toward the hip and the foot pitches down, so the toe stays where it is instead of the foot sliding
     // (also a foot just off the ground at toe-off, still beyond the leg: the swing lifts it before it travels)
@@ -939,7 +957,8 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
       // swing carries on from it, never drops); a foot too far for any pivot is drawn in along the ground instead of being hoisted
       // up the leg's line by the IK clamp
       let y=Math.max(ft[1]+gR,y0+(back>.2?.24*smooth(clamp((back-.2)/.45,0,1)):0));
-      if(back>0&&hd+(hj[1]-y)**2>Lr*Lr)y=clamp(hj[1]-Math.sqrt(Math.max(0,Lr*Lr-hd)),y,Math.max(y,y0+.2));
+      // (any planted foot, not only a trailing one: backpedalling, the foot in front is the one the hips leave behind)
+      if(hd+(hj[1]-y)**2>Lr*Lr)y=clamp(hj[1]-Math.sqrt(Math.max(0,Lr*Lr-hd)),y,Math.max(y,y0+.2));
       const r=y-ft[1];if(r>0){ft[1]=y;tilt=gpt<0&&gR>=r-1e-6?-gpt:Math.asin(Math.min(1,r/.27));dh[1]=ft[1]-hj[1];}
       const mh=Math.sqrt(Math.max(0,Lr*Lr-dh[1]*dh[1]));if(hd>mh*mh&&hd>1e-9){const q=mh/Math.sqrt(hd);ft[0]=hj[0]+dh[0]*q;ft[2]=hj[2]+dh[2]*q;}}
     if(gpt>0)ft[1]+=Math.sin(gpt)*.07;   // about the heel
@@ -960,10 +979,12 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
   if(ik&&!two){const eye=[x,hy+shy+P.nk,z],tg=PS.look;MO.lookAt(ik.lk,LKO,eye,tg,face,jump?undefined:dt,14);
     hyw=clamp(ik.lk.yaw.x,-1.1,1.1)*(1-bww)+(bww?clamp(MO.wrap(Math.atan2(tg[0]-x,tg[2]-z)-face),-1.1,1.1)*bww:0);hpit=ik.lk.pitch.x;
     if(!PS.ball&&speed<.2&&!dj&&act===0)hyw+=.18*Math.sin(clock*.29+id*2.1)*(1-bww);}
-  const hq=P.nod+ln*.35+dj*dl[1]-st*.5-hpit*.7,Uh0=[0,Math.cos(hq),Math.sin(hq)],Fh0=[Math.sin(hyw),-Math.cos(hyw)*Math.sin(hq),Math.cos(hyw)*Math.cos(hq)],
+  // (rolled onto his side in a dive, he holds his head up off the turf: the neck tilts back against the roll)
+  const hq=P.nod+ln*.35+dj*dl[1]-st*.5-hpit*.7,ht=-.5*rl,cht=Math.cos(ht),sht2=Math.sin(ht),Uh0=[-Math.cos(hq)*sht2,Math.cos(hq)*cht,Math.sin(hq)],
+    Fh0=[Math.sin(hyw)*cht+Math.cos(hyw)*Math.sin(hq)*sht2,Math.sin(hyw)*sht2-Math.cos(hyw)*Math.sin(hq)*cht,Math.cos(hyw)*Math.cos(hq)],
     Yn=V3.norm(V3.lerp(Yl,Uh0,.5)),T=W(V3.add(SC,V3.sc(Yn,P.nk))),Uh=Wd(Uh0),Fh=Wd(Fh0);
   J.nt=T;J.hv=Uh;J.face=Fh;J.hc=V3.add(T,V3.sc(Uh,.06));
-  let H2=null,HG=null;if(two){MO.hands2(H2O,[o.hx,o.hy,o.hz],null,J.sh,J.hip,J.n,V3.sc(J.s,-1),shp,AL*.96,o.kp?.13:.105,.05,.16);H2=H2O;
+  let H2=null,HG=null;if(two){MO.hands2(H2O,[o.hx,o.hy+.05,o.hz],null,J.sh,J.hip,J.n,V3.sc(J.s,-1),shp,AL*.96,o.kp?.13:.105,.05,.16);H2=H2O;
     // the bones' heads from the cupped palms (back along the fingers, off the palm); kept as far apart as the palms, since
     // fingers splayed inward would bring the wrists together
     HG=[0,1].map(i=>V3.sub(V3.sub(H2.hd[i],V3.sc(H2.fd[i],.035)),V3.sc(H2.pn[i],.02)));
@@ -985,15 +1006,19 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
       if(ri>=0&&bt>K[ri-1][0]&&bt<K[ri+1][0]){const rp=V3.sub(rpB,S),a=K[ri-1],b=K[ri+1];kt=bt<0?V3.lerp(V3.sc(a[1],AL),rp,(bt-a[0])/-a[0]):V3.lerp(rp,V3.sc(b[1],AL),bt/b[0]);}
       else{kt=kf(K,bt);kt=kt==='rp'?V3.sub(rpB,S):V3.sc(kt,AL);}
       t=V3.lerp(t,kt,bww);p=V3.lerp(p,kf(i?BKK.pr:BKK.pl,bt),bww);gb=V3.lerp(gb,kf(i?BKK.gr:BKK.gl,bt),bww);}
-    if(H2){const g=HG[i],hi=smooth(clamp((o.hy-J.sh[1]+.2)/.5,0,1));
+    // a dive reaches with the hand on the side he dives to; the other arm stays clear of the chest, along his top side
+    if(H2&&act===3&&sd!==os){t=V3.lerp(t,[sd*.2,-AL*.6,AL*.35],wh);p=V3.lerp(p,[sd,0,-1],wh);gb=V3.lerp(gb,[sd*.9,0,-.4],wh);}
+    else if(H2){const g=HG[i],hi=smooth(clamp((o.hy-J.sh[1]+.2)/.5,0,1));
       t=V3.lerp(t,V3.sub(Wi(g),S),wh);t[0]+=sd*bulge;p=V3.lerp(p,V3.lerp([sd,-.3,-.3],[sd,.3,.1],hi),wh);gw=V3.sc(H2.pn[i],-1);wa=H2.fd[i];}
     // sliding, the far hand goes back to the ground for support
-    if(sl5&&sd!==os){const a=Wi([x-s*.35+c*sd*.3,.07,z-c*.35-s*sd*.3]);t=V3.lerp(t,V3.sub(a,S),wh);p=[sd,-.3,-.3];gb=[sd*.3,-1,0];gw=null;wa=null;}
+    // lying after a dive: the arm underneath keeps the ball on the turf, the top one comes back to rest along his side
+    if(act===3&&ap>.1&&sd!==os){const r=smooth(clamp((ap-.12)/.25,0,1))*wh;t=V3.lerp(t,[sd*.07,-AL*.85,.1],r);p=V3.lerp(p,[sd,0,-1],r);gb=V3.lerp(gb,[sd*.9,0,-.4],r);if(r>.5){gw=null;wa=null;}}
+    if(sl5&&sd!==(ik?ik.s5:1)){const a=Wi([x-s*.35+c*sd*.3,.07,z-c*.35-s*sd*.3]);t=V3.lerp(t,V3.sub(a,S),wh);p=[sd,-.3,-.3];gb=[sd*.3,-1,0];gw=null;wa=null;}
     if(act===7){const hb=V3.sub(Wi([o.hx,o.hy,o.hz]),S);
       if(i){t=hb;p=ty7===1?[1,-.5,-.3]:[1,.3,-.5];gb=ap<0?[.3,-.6,-.7]:[0,.6,-.8];}
       else{if(ty7!==1){const l=smooth(clamp((ap+.6)/.3,0,1))*(1-smooth(clamp((ap+.18)/.22,0,1)));t=V3.lerp(t,[-.45*AL,.3*AL,.68*AL],l);p=V3.lerp(p,[-1,-.3,.2],l);gb=V3.lerp(gb,[-.5,0,-.8],l);}
         // the gather: the free hand stays on the ball beside the throwing hand, then lets go
-        if(gth>0){t=V3.lerp(t,[hb[0]-.12,hb[1],hb[2]],gth);p=V3.lerp(p,[-1,-.3,-.3],gth);gb=V3.lerp(gb,[-.8,.2,-.5],gth);}}}
+        if(gth>0){t=V3.lerp(t,[Math.min(hb[0]-.12,.1),hb[1],hb[2]],gth);p=V3.lerp(p,[-1,-.3,-.3],gth);gb=V3.lerp(gb,[-.8,.2,-.5],gth);}}}
     const shw=W(S),pl=Wd(p);let [e,wr]=reach(shw,W(V3.add(S,t)),P.ua,P.fa,pl,ik&&ik.e[i],dt);
     // a bowling or throwing arm swinging across the body keeps its elbow clear of the chest and head (armClear, as the batter's)
     if((bww>0||act===7)&&ik)e=armClear(J,shw,wr,e,ik.e[i],-sd,dt);
@@ -1003,7 +1028,7 @@ function personJoints(x,z,face,o,id=0,dj=0,ik=null){
   // nothing below the turf: a lying or diving body is lifted as a whole by what its lowest part (hip and shoulders on their side,
   // knees, elbows, hands, head, with the skinned body's width around each joint) would sink; standing, the hips rise and the
   // legs are re-solved so a deep squat's knees stay above the ground
-  const lyb=smooth(clamp((Math.max(Math.abs(rl),pt)-.15)/.4,0,1)),lying=lyb>0||!!dvh,hm=J.hr+(o.kp?.06:.03),lowOf=()=>{let m=9;for(let i=0;i<2;i++)m=Math.min(m,J.kn[i][1]-.09,J.e[i][1]-.06,J.hd[i][1]-hm,J.sp[i][1]-.1);
+  const lyb=smooth(clamp((Math.max(Math.abs(rl),pt)-.15)/.4,0,1)),lying=lyb>0||!!dvh,hm=J.hr+(o.kp?.06:.03),lowOf=()=>{let m=9;for(let i=0;i<2;i++)m=Math.min(m,J.kn[i][1]-(o.kp?.13:.09),J.e[i][1]-.06,J.hd[i][1]-hm,J.sp[i][1]-.1,lyb>0?J.an[i][1]-(o.kp?.12:.07)*lyb:9);   // (the keeper's pads are thick: knees and shins on the turf)
     return Math.min(m,J.hc[1]-.12,J.hip[1]-lerp(.1,o.kp?.21:.17,lyb));};
   const low=lowOf();
   if(low<-.003){const d=-low+.003;
@@ -1022,13 +1047,12 @@ function placeParts(r,J,id=0){
   mB(r.head,J.hc,R,J.hv,J.face);
   placeEx(r,J,id);
 }
-// the species' extra part: Saturn's ring floating over the head (skinned too), or the fallback's cap. The ring keeps to world
-// up, above the head centre whatever the head does (on the head's own axes it stood up like a hoop in a dive)
+// the species' extra part: Saturn's ring, or the fallback's cap. The ring is part of the head, as Saturn's is of the planet: a
+// band round the upper skull on the head's own axes, tilted up at the front (clear of the eyes) and a little to one side
 function placeEx(r,J,id){
   if(!r.ex.visible)return;const P=J.L,R=J.hx,Uh=J.hv,Fh=J.face;
-  if(P.ring){const a=P.ring[1],ph=clock*.7+id,sa=Math.sin(a),n=[Math.cos(ph)*sa,Math.cos(a),Math.sin(ph)*sa],
-      e1=V3.norm(V3.cross(n,[0,0,1])),e2=V3.cross(e1,n),ps=clock*1.6,X=V3.add(V3.sc(e1,Math.cos(ps)),V3.sc(e2,Math.sin(ps)));
-    mB(r.ex,[J.hc[0],J.hc[1]+P.ring[0]+.012*Math.sin(clock*2.3+id),J.hc[2]],X,n,V3.cross(X,n));}
+  if(P.ring){const a=P.ring[1],n=V3.norm(V3.add(V3.add(V3.sc(Uh,Math.cos(a)),V3.sc(Fh,-Math.sin(a))),V3.sc(R,.18))),X=V3.norm(V3.cross(n,Fh));
+    mB(r.ex,V3.add(J.hc,V3.sc(Uh,P.ring[0])),X,n,V3.cross(X,n));}
   else mB(r.ex,J.hc,R,Uh,Fh);
 }
 // a person drawn from his view state: skinned (fielder.glb) when loaded, else the fallback parts; kp: the keeper (his kit)
@@ -1166,32 +1190,147 @@ function stumps3D(s,z,hit){
 // the bowler's hip z at the release (the ball leaves the hand .2 m ahead of it: makeDelivery/bowlDelivery zr 19.0 pace, 19.3 spin)
 const BZR={pace:19.22,spin:19.52};
 // the bowler's mark: start of his run-up
-const BWP={pace:{mk:31,ta:.35,tb:.25,v1:4.5,tf:1},spin:{mk:25.5,ta:.4,tb:.3,v1:2.5,tf:.7}};
+const BWP={pace:{mk:28.5,ta:.5,tb:.25,v1:4.5,tf:1},spin:{mk:23.3,ta:.45,tb:.3,v1:2.2,tf:.7}};
 const bowlMark=()=>BWP[M.bowlerType].mk;
+// his hip's x from the ball's line at release: the hand .2 to his right over the shoulder for pace; a spinner's rounder arm (about
+// 20 deg off vertical) puts the hand further out
+const bwXO=()=>(M&&M.bowlerType==='spin'?.36:.2)*(SPX?SPX.tw:1);
 /* the bowler's persistent state (BW: never a jump): the run-up at a steady pace from the mark to the release, a decelerating
    follow-through (v0 into a stop over .75 s pace / .55 s spin) across to the off side, a turn to watch the ball, then (still in
    the result phase) a jog back to his mark along the pitch's edge, facing the way he goes, turning at the mark. bt = s from the
    release (null once he stands at his mark), v his speed, f his facing: V.bt/bv/bh, recorded with bz; his x is a function of bt
    and bz (bowlX), so replays draw him where he was without another slot. */
-const BW={x:.5,z:31,f:Math.PI,t:-1,v:0,ff:MO.springState(Math.PI),rel:-9};
+const BW={x:.5,z:31,f:Math.PI,t:-1,v:0,ff:MO.springState(Math.PI),rel:-9,dx0:0,dz0:0,rid:null};
 // the follow-through's geometry for the current bowler: v0 approach speed, a deceleration, zs where it ends
 // the run-up: from a standing start (accelerating over ta), steady at vm, slowing into the delivery stride (over tb) to v1 at the
 // release, then the follow-through slowing from v1 to a stop over tf; vm from the distance and the run-up's time
 const bowlGeo=()=>{const pace=M.bowlerType==='pace',T=S.runupDur,B=BWP[M.bowlerType],mk=B.mk,zr=BZR[M.bowlerType],D=mk-zr-.25,
-  vm=(D-B.v1*B.tb/2)/Math.max(.3,T-B.ta/2-B.tb/2);return {pace,T,mk,zr,D,vm,ta:B.ta,tb:B.tb,v1:B.v1,tf:B.tf,v0:vm,a:B.v1/B.tf,zs:zr+.25-B.v1*B.tf/2};};
+  vm=(D-B.v1*B.tb/2)/Math.max(.3,T-B.ta/2-B.tb/2);return {pace,T,mk,zr,D,vm,ta:B.ta,tb:B.tb,v1:B.v1,tf:B.tf,v0:vm,a:B.v1/B.tf,zs:zr+.25-B.v1*B.tf/2,dx0:BW.dx0,dz0:BW.dz0};};
+// a run-up started short of his mark (the walk back not quite done) runs from where he is: the shortfall fades over its first 60%
+const bwFade=(g,bt)=>bt==null||bt>=0?0:1-smooth(clamp((bt+g.T)/(.6*g.T),0,1));
 // distance still to run to the release line and the speed, u s before the release
 function bowlRun(g,u){const {T,D,vm,ta,tb,v1}=g;if(u<=tb)return [v1*u+(vm-v1)*u*u/(2*tb),v1+(vm-v1)*u/tb];
   if(u<=T-ta)return [v1*tb+(vm-v1)*tb/2+vm*(u-tb),vm];const t=Math.max(0,T-u);return [D-vm*t*t/(2*ta),vm*t/ta];}
 // his x: the release side's, drifting to the off side through the follow-through and back as he walks to his mark (by his z)
 const bowlX=(bx,bt,bz)=>{if(bt==null||!M)return bx;const g=bowlGeo();return bx+bdrift(bt,g.pace,bx)*clamp((bz-g.mk)/(g.zs-g.mk),0,1);};
+// his hip z and speed at bt (s from the release): standing at the mark, the run-up (bowlRun), the follow-through slowing to a stop
+function bowlPath(g,bt){if(bt<=-g.T)return [g.mk+g.dz0,0];if(bt<=0){const r=bowlRun(g,-bt);return [g.zr+.25+r[0]+g.dz0*bwFade(g,bt),r[1]];}
+  const tb=Math.min(bt,g.tf);return [g.zr+.25-(g.v1*tb-.5*g.a*tb*tb),Math.max(0,g.v1-g.a*bt)];}
+/* --- the bowler's planned feet, from the run-up's start until he stands after the follow-through: every footfall is planned
+   from his path (a function of bt), so a planted foot never moves and nothing depends on the frame rate. Run-up steps at a
+   cadence for his speed, each foot planted where the hip passes over it a third of the way through its stance (within the
+   leg's reach); the delivery stride's plants from the keys (BKP/BKS ft); the back foot, then the front one, stepping in beside
+   each other where he stops. A swing is minimum-jerk between its plants (no velocity jump at take-off or landing), lifted on a
+   bump with zero vertical speed at both ends. Replays rebuild the plan from the recorded bt. --- */
+// a swing's lift: up off the turf at once (the toe's push), coming down onto it rather than skimming it
+const bump=u=>4*u*(1-u);
+const bwCad=v=>1.9+.3*v,bwTc=v=>Math.min(.85/Math.max(v,.1),1.24/bwCad(v),.7),bwBeta=v=>lerp(.5,.35,clamp(v/4,0,1));
+function bowlPlan(g,K,bx,sx,hw,st0,B){
+  const zAt=t=>bowlPath(g,t)[0],vAt=t=>bowlPath(g,t)[1],xAt=t=>bowlX(bx,t,zAt(t))+g.dx0*bwFade(g,t),PI2=2*Math.PI;
+  const P=[[],[]],pl=(i,tl,to,x,z,yw,lf,bg)=>{const p={tl,to,x,z,yw,yw2:yw,lf,bg,pv:null};P[i].push(p);return p;};
+  // run-up plants, backward from the left foot's take-off into the bound (its first key), one step period apart: each foot lands
+  // a little ahead of the hip (more at speed) and toes off once the hip is BH past it, at least .2 s before it lands again
+  const tAtZ=zq=>{let a=-g.T,b=g.tf;if(zq>=zAt(a))return a;if(zq<=zAt(b))return b;for(let n=0;n<40;n++){const m=(a+b)/2;if(zAt(m)>zq)a=m;else b=m;}return (a+b)/2;},
+    ahead=v=>Math.min(.32,.08+.035*v),BH=.5,run=[];
+  {const t0=K.ft[0][0][0],z0=zAt(t0)+BH;let tl=tAtZ(z0+ahead(vAt(t0))),f=0;run.push([0,tl,t0,z0]);
+    for(let n=0;n<40;n++){const tp=tl-1/bwCad(vAt(tl));if(tp<-g.T+.12)break;f=1-f;const zp=zAt(tp)-ahead(vAt(tp)),nx=run.length>=2?run[run.length-2][1]:K.ft[1][0][1];
+      run.push([f,tp,Math.min(tAtZ(zp-BH),nx-.2,tp+1.24/bwCad(vAt(tp))),zp]);tl=tp;}}
+  // standing at the mark: the foot that lands first leaves as he starts, the other as that one lands (before the hip leaves it behind)
+  const A=run[run.length-1];
+  for(let i=0;i<2;i++){const nx=run.slice().reverse().find(r=>r[0]===i),t1=nx?nx[1]:K.ft[i][0][1];
+    pl(i,-Infinity,i===A[0]?-g.T+.02:Math.min(A[1]+.03,t1-.22,tAtZ(st0[i][1]-BH)),st0[i][0],st0[i][1],st0[i][2],0,0);}
+  for(let k=run.length-1;k>=0;k--){const [i,tl,to,zf]=run[k];pl(i,tl,to,xAt(tl)+(i?-hw:hw)*sx,zf,Math.PI,.1+.016*vAt(to),0);}
+  const land=P[0].concat(P[1]).filter(p=>p.tl>-9).map(p=>[p.tl,p.to]).sort((a,b)=>a[0]-b[0]);
+  // the delivery stride from the keys (a key without lift turns the planted foot on its ball)
+  for(let i=0;i<2;i++){let cur=P[i][P[i].length-1];
+    K.ft[i].forEach(([t0,t1,pt,yw0,lf,bg],j)=>{const yw=sx>0?PI2-yw0:yw0;
+      if(!lf){cur.pv=[t0,t1,cur.yw2,yw];cur.yw2=yw;return;}
+      if(j>0)cur.to=t0;
+      cur=pl(i,t1,Infinity,xAt(t1)-pt[0]*sx,g.zr+pt[1],yw,Math.max(.13,lf),bg||0);});}
+  land.push([Math.min(P[0][P[0].length-1].tl,P[1][P[1].length-1].tl,K.ft[1][0][1]),0]);
+  // the follow-through: the back foot steps in beside the front one where he stops (or where the front foot is, if it is further)
+  const zS=zAt(g.tf),xS=xAt(g.tf),lt=[P[0][P[0].length-1],P[1][P[1].length-1]],fr=lt[0].z<lt[1].z?0:1,zF=Math.min(zS,lt[fr].z);
+  let t=Math.max(lt[0].tl,lt[1].tl);
+  for(const i of [1-fr,fr]){const q=lt[i],x=xS+(i?-hw:hw)*sx,d=Math.hypot(q.x-x,q.z-zF);if(d<.12&&i===fr)continue;
+    const off=Math.max(t+.03,q.tl+.12);q.to=off;t=off+clamp(d/3.2,.26,.42);pl(i,t,Infinity,x,zF,Math.PI,.13,0);}
+  // each swing travels in the hip's frame (cubic Hermite: from where the foot left the ground to where it lands relative to the hip,
+  // the end tangents cancelling the hip's velocity), so the foot leaves and lands with no speed over the ground, passes under the
+  // hip mid-swing and is never left behind it or thrown out ahead of it
+  const hv=t=>[(xAt(t+.005)-xAt(t-.005))/.01,(zAt(t+.005)-zAt(t-.005))/.01];
+  for(let i=0;i<2;i++)for(let k=1;k<P[i].length;k++){const p=P[i][k-1],q=P[i][k],T=q.tl-p.to,v0=hv(p.to),v1=hv(q.tl);
+    q.sw=[p.x-xAt(p.to),p.z-zAt(p.to),q.x-xAt(q.tl),q.z-zAt(q.tl),-v0[0]*T,-v0[1]*T,-v1[0]*T,-v1[1]*T];}
+  const H={x:xAt,z:zAt};
+  // the hips' ceiling over the plan: no higher than the planted feet's legs reach (a foot behind the hip may rise onto its toes:
+  // .18 more), eroded by a parabola (min over s of C(s) + KC (t-s)^2) so the hips ease down before a long stride lands and never
+  // drop or rise faster than 2 KC m/s^2
+  const t0=-g.T,DT=1/240,n=Math.ceil((t+.3-t0)/DT)+1,C=new Float32Array(n),Cs=new Float32Array(n),L=(B.th+B.sh)*.975,hy0=B.an+HJD+(B.th+B.sh)*B.kn,ft=[0,0,0];
+  for(let k=0;k<n;k++){const tk=t0+k*DT,z=zAt(tk),x=xAt(tk);let c=2;
+    // (a swinging foot ahead of the hip, coming down to land, limits them as it is; behind, its knee folds)
+    for(let i=0;i<2;i++){const st=bowlFootAt(P[i],tk,sx,ft,H).st,jx=x+(i?-hw:hw)*sx,dx=ft[0]-jx,dz=ft[2]-z;if(!st&&dz>-.05)continue;
+      c=Math.min(c,ft[1]+B.an+HJD+Math.sqrt(Math.max(0,L*L-dx*dx-dz*dz))+(st&&dz>.05?.18:0));}
+    C[k]=Math.max(hy0*.78,c);}
+  const KC=60,W=Math.ceil(.12/DT);for(let k=0;k<n;k++){let m=9;for(let j=Math.max(0,k-W);j<=Math.min(n-1,k+W);j++){const d=(k-j)*DT;m=Math.min(m,C[j]+KC*d*d);}Cs[k]=m;}
+  return {P,land,end:t+.05,t0,DT,Cs,H};
+}
+// one foot of the plan at t: out = its point on the ground (y its lift); st 1 planted, u the swing's progress, q the plant it swings to
+const BFA={st:1,u:0,q:null,yaw:0};
+function bowlFootAt(Pi,t,sx,out,H){let k=0;while(k<Pi.length-1&&Pi[k+1].tl<=t)k++;const p=Pi[k],q=Pi[k+1];
+  if(t<=p.to||!q){out[0]=p.x;out[1]=0;out[2]=p.z;BFA.yaw=p.pv&&t<p.pv[1]?lerp(p.pv[2],p.pv[2]+MO.wrap(p.pv[3]-p.pv[2]),smooth(clamp((t-p.pv[0])/(p.pv[1]-p.pv[0]),0,1))):p.yw2;
+    BFA.st=1;BFA.u=0;BFA.q=null;BFA.vs=p.tl>-9&&p.to<9?(t-p.tl)/(p.to-p.tl):0;return BFA;}
+  const u=clamp((t-p.to)/(q.tl-p.to),0,1),u2=u*u,u3=u2*u,h00=2*u3-3*u2+1,h10=u3-2*u2+u,h01=3*u2-2*u3,h11=u3-u2,w=q.sw,bw=q.bg*sx*16*u2*(1-u)*(1-u);
+  out[0]=H.x(t)+h00*w[0]+h10*w[4]+h01*w[2]+h11*w[6]-bw;out[1]=q.lf*bump(u);out[2]=H.z(t)+h00*w[1]+h10*w[5]+h01*w[3]+h11*w[7];BFA.yaw=p.yw2+MO.wrap(q.yw-p.yw2)*smooth(u);
+  BFA.st=0;BFA.u=Math.max(1e-6,u);BFA.q=q;return BFA;}
+// a person's feet from the plan at bt (the same shape feetStep returns), with gait-like cues for the body; BFT.hc the hips' ceiling
+const BGT={pelvis:[0,0,0],sh:0,arm:[0,0],elbow:0,lean:0,st:[1,1],u:[0,0],tgt:[[0,0,0],[0,0,0]],pitch:[0,0]},BFT={f:[[0,0,0],[0,0,0]],yaw:[0,0],st:[1,1],g:BGT,sp:0,hc:9},BFR=[[0,0,0],[0,0,0]];
+/* --- a throw's footwork (o.ta the throw's direction, o.tw the wind-up in s, o.tbx/tbz his hip at the release): overarm, a
+   crow-hop (the back foot hops up behind the front one, turned across the line) and a long stride of the front foot toward the
+   target landing just before the release (the hips stay between the feet through the follow-through); underarm, one short step
+   of the front foot. Each foot swings minimum-jerk from where it stood, lifted on a bump. --- */
+const TGT={pelvis:[0,0,0],sh:0,arm:[0,0],elbow:0,lean:0,st:[1,1],u:[0,0],tgt:[[0,0,0],[0,0,0]],pitch:[0,0]},TFT={f:[[0,0,0],[0,0,0]],yaw:[0,0],st:[1,1],g:TGT,sp:0},s5j=u=>u*u*u*(u*(u*6-15)+10);
+function throwFeet(ik,o,ap,ty,face){
+  if(ik.tk!==o.ta){ik.tk=o.ta;const src=ik.gm?ik.g.foot:ik.a.foot;ik.tf0=[[src[0][0],src[0][2]],[src[1][0],src[1][2]]];ik.ty0=[ik.gm?face:ik.a.yaw[0],ik.gm?face:ik.a.yaw[1]];}
+  const a=o.ta,w=o.tw,ux=Math.sin(a),uz=Math.cos(a),rx=Math.cos(a),rz=-Math.sin(a),Pt=(f,r)=>[o.tbx+ux*f+rx*r,o.tbz+uz*f+rz*r],
+    K=ty===1?[[],[[-w,-.02,Pt(.32,-.1),a+.3,.08]]]:[[[-w,-w*.45,Pt(-.4,.08),a+1.25,.13]],[[-w*.42,-.03,Pt(.42,-.06),a+.45,.1]]];
+  // (TGT: gait-like cues, so the hips ease down for a foot coming down to land, as for a gait's swing)
+  for(let i=0;i<2;i++){const out=TFT.f[i];let p=ik.tf0[i],yw=ik.ty0[i],st=1,y=0,uu=0,tq=null;
+    for(const [t0,t1,q,qy,lf] of K[1-i]){if(ap<t0)break;if(ap<t1){const u=(ap-t0)/(t1-t0),e=s5j(u);p=[lerp(p[0],q[0],e),lerp(p[1],q[1],e)];yw=yw+MO.wrap(qy-yw)*smooth(u);y=lf*4*u*(1-u);st=0;uu=Math.max(1e-6,u);tq=q;break;}p=q;yw=qy;}
+    out[0]=p[0];out[1]=y;out[2]=p[1];TFT.yaw[i]=yw;TFT.st[i]=TGT.st[i]=st;TGT.u[i]=uu;const tg=tq||p;TGT.tgt[i][0]=tg[0];TGT.tgt[i][1]=0;TGT.tgt[i][2]=tg[1];}
+  return TFT;
+}
+const bwKey=(o,P)=>S.runupDur+':'+o.pc+':'+o.bx.toFixed(4)+':'+P.tw+':'+BW.dx0.toFixed(3)+':'+BW.dz0.toFixed(3);
+function bowlFeet(ik,o,x,z,face,P,jump){
+  const g=bowlGeo(),K=o.pc?BKP:BKS,bt=o.bt,sx=o.bx<0?-1:1,hw=.1*P.tw,key=bwKey(o,P);
+  if(!ik.pl||ik.bpk!==key){
+    // where his feet stand as the run-up starts (planted where they are; after a reset or entering late, beside his mark)
+    // (a foot more than 1.2 m from its place beside the mark, a broken state, is put there)
+    const live=!jump&&bt<-g.T+.05&&ik.t>=0,st0=[0,1].map(i=>{const c=[o.bx+(i?-hw:hw)*sx,g.mk,Math.PI],f=ik.gm?ik.g.foot[i]:ik.a.foot[i];
+      return live&&Math.hypot(f[0]-c[0],f[2]-c[1])<1.2?[f[0],f[2],ik.gm?face:ik.a.yaw[i]]:c;});
+    ik.bpl=bowlPlan(g,K,o.bx,sx,hw,st0,P);ik.bpk=key;}
+  const B=ik.bpl;if(bt>B.end)return null;
+  ik.pl=true;
+  const fw=[Math.sin(face),0,Math.cos(face)],[,v]=bowlPath(g,bt),acc=(bowlPath(g,bt+.02)[1]-bowlPath(g,bt-.02)[1])/.04;
+  for(let i=0;i<2;i++){const out=BFT.f[i],a=bowlFootAt(B.P[i],bt,sx,out,B.H);BFT.yaw[i]=a.yaw;BFT.st[i]=BGT.st[i]=a.st;BGT.u[i]=a.u;
+    BGT.pitch[i]=a.st?(a.vs>.8?-.34*(a.vs-.8)/.2:0):-.4*(1-a.u)*(1-a.u)+.12*a.u*a.u;MO.cp(BGT.tgt[i],a.q?[a.q.x,0,a.q.z]:out);BFR[i][0]=out[0];BFR[i][2]=out[2];}
+  const kc=clamp((bt-B.t0)/B.DT,0,B.Cs.length-1.001),k0=Math.floor(kc);BFT.hc=lerp(B.Cs[k0],B.Cs[k0+1],kc-k0);
+  // body cues as the gait gives them: pelvis and shoulders counter-turning with the stride, arms swinging, the run's lean and bob
+  const p=MO.gaitParams(GPP,v<1.9?1:v<4.2?2:3,v),mv=clamp(v/.6,0,1),span=Math.max(.3,v/bwCad(v)),fr=BFR.map(f=>(f[0]-x)*fw[0]+(f[2]-z)*fw[2]),fm=(fr[0]+fr[1])/2,fL=clamp((fr[0]-fr[1])/span,-1,1);
+  BGT.pelvis[2]=p[5]*fL*mv;BGT.sh=-p[6]*fL*mv;for(let i=0;i<2;i++)BGT.arm[i]=-p[7]*clamp((fr[i]-fm)/(span*.5),-1,1)*mv;
+  BGT.elbow=p[8]*mv;BGT.lean=p[9]*mv+clamp(acc*.01,-.1,.12);BGT.pelvis[0]=0;
+  // the run's bob: lowest at mid-stance, highest between footfalls
+  let bob=0;const L=B.land;for(let k=0;k<L.length-1;k++)if(bt>=L[k][0]&&bt<L[k+1][0]){const d=L[k+1][0]-L[k][0],ph=(bt-L[k][0])/d,pm=(L[k][1]>L[k][0]?bwBeta(v)*(L[k][1]-L[k][0]):0)/d;
+    bob=-p[4]*clamp((v-1.5)/2,0,1)*smooth(clamp((bt+g.T)/.5,0,1))*Math.cos(2*Math.PI*(ph-pm));break;}
+  BGT.pelvis[1]=bob;
+  return BFT;
+}
 function bowlerState(){
   const g=bowlGeo(),{pace,T,mk,zr,v0,a,zs}=g,ph=S.phase,dt=clamp(clock-BW.t,0,.1);BW.t=clock;
-  const bb=S.ball||S.pending,bx=(bb?bb.xr:pace?.3:.22)+.2*(SPX?SPX.tw:1),slot=S.fpos&&S.fpos.find(p=>p.bw);
+  const bb=S.ball||S.pending,bx=(bb?bb.xr:pace?.3:.22)+bwXO(),slot=S.fpos&&S.fpos.find(p=>p.bw);
   let z=BW.z,bt=null,v=0,f=BW.f;
   let xx=null;
-  if(ph==='runup'){bt=S.t-T;const r=bowlRun(g,Math.max(0,T-S.t));z=zr+.25+r[0];v=r[1];f=Math.PI;BW.ff.x=f;BW.ff.v=0;BW.rel=clock-S.t+T;xx=bx;}
+  if(ph==='runup'){if(BW.rid!==bb){BW.rid=bb;const ok=Math.hypot(BW.x-bx,BW.z-mk)<3;BW.dz0=ok?BW.z-mk:0;BW.dx0=ok?BW.x-bx:0;g.dz0=BW.dz0;g.dx0=BW.dx0;}
+    bt=S.t-T;const r=bowlRun(g,Math.max(0,T-S.t)),fd=bwFade(g,bt);z=zr+.25+r[0]+g.dz0*fd;v=r[1];f=MO.springA(BW.ff,Math.PI,dt,16);BW.rel=clock-S.t+T;xx=bx+g.dx0*fd;}   // (not yet turned round from his walk back: he turns as he sets off)
   else if(slot&&slot.act){z=slot.z;xx=slot.x;f=slot.face;BW.ff.x=f;BW.ff.v=0;v=slot.mv||0;bt=BW.rel>-9?clock-BW.rel:null;}   // his slot's play drives him (c&b, a throw)
-  else if((ph==='flight'||ph==='result')&&S.ball){bt=clock-S.ball.start;const ts=v0/a;
+  else if((ph==='flight'||ph==='result')&&S.ball){bt=BW.rel>-9?clock-BW.rel:clock-S.ball.start;const ts=v0/a;   // (bt from the run-up's own clock: the frame that releases the ball is not a stall)
     if(bt<=g.tf+.45){const tb=Math.min(bt,g.tf);z=zr+.25-(g.v1*tb-.5*a*tb*tb);v=Math.max(0,g.v1-a*bt);
       // through the follow-through he faces down the pitch, then turns to the ball (or the batter)
       const tg=S.hit?hitPos(S.hit,Math.max(0,clock-S.f0)):null,x=bowlX(bx,bt,z),want=bt<.4?Math.PI:tg?Math.atan2(tg.x-x,tg.z-z):Math.atan2(-x,BATS_Z-z);
@@ -1202,9 +1341,9 @@ function bowlerState(){
   // the jog back to the mark (the next ball's side): 3.2 m/s, or what the time left needs (up to 7), facing the way he goes
   function back(left){const x0=BW.x,d=Math.hypot(bx-x0,mk-BW.z);
     if(d<.03)return {z:mk,x:bx,v:0,f:MO.springA(BW.ff,Math.PI,dt,4)};
-    const want=Math.atan2(bx-x0,mk-BW.z),f=d>.8?MO.springA(BW.ff,want,dt,6):MO.springA(BW.ff,Math.PI,dt,4),
+    const want=Math.atan2(bx-x0,mk-BW.z),f=d>.8?MO.springA(BW.ff,want,dt,8):MO.springA(BW.ff,Math.PI,dt,4),
       // he runs only as fast as he faces the way he goes (turning first, never sprinting backwards) and slows into his mark
-      al=Math.cos(MO.wrap(f-want)),sp=Math.min(7.5,Math.max(3.2,d/Math.max(.4,left-.3)),Math.sqrt(12*d))*clamp(.25+.75*al,.25,1),
+      al=Math.cos(MO.wrap(f-want)),sp=Math.min(7.5,Math.max(3.2,d/Math.max(.4,left-.3)),Math.sqrt(12*d))*(d>.8?smooth(clamp((al-.2)/.7,0,1)):1),
       s=Math.min(d,sp*dt),zz=BW.z+(mk-BW.z)/d*s;
     return {z:zz,x:x0+(bx-x0)/d*s,v:Math.min(sp,d/.1),f};}
   BW.z=z;BW.f=f;BW.v=v;BW.x=xx==null?BW.x:xx;S.bowlerZ=z;return {z,bt,v,f};
@@ -1215,7 +1354,7 @@ const NFL=12,SHADOW_D=28,wideCam=()=>!!S.cel||S.phase==='replay'||MENU.on;
 // the home batting camera: the keeper is hidden there (standing up he would block the batter; standing back he is behind it)
 function batView(){return !!M&&!M.bowl&&!S.cel&&S.phase!=='replay'&&!(S.chase&&clock>=S.chase.t0)&&!(S.cord&&clock>=S.cord.t0)&&!MENU.on;}
 const mkView=()=>({pose:null,ball:null,bk:false,bo:{x:0,y:0,z:0},st:null,so:{a:0,bails:false},st2:null,so2:{a:0,bails:true},mk:null,bz:0,bx:0,bt:null,bv:0,bh:Math.PI,ns:{on:false,x:0,u:0,ph:0,mv:0,pose:new Float32Array(PN)},
-  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0,act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,kp:false,bwl:false,hold:false,vx:0,vz:0})),hideBat:false,trail:null,cheer:0,dej:0});
+  nf:0,f:Array.from({length:NFL},()=>({on:false,x:0,z:0,face:0,run:0,running:false,crouch:0,act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,kp:false,bwl:false,hold:false,vx:0,vz:0,ta:0,tw:0,tbx:0,tbz:0})),hideBat:false,trail:null,cheer:0,dej:0});
 const LV=mkView(),CH={on:false,t0:-9},BO={};
 function liveView(){
   const V=LV,ph=S.phase;
@@ -1224,13 +1363,13 @@ function liveView(){
   V.mk=!settings.assist||M&&M.bowl?null:ph==='runup'&&S.t/S.runupDur>0.4?S.pending:ph==='flight'&&clock-S.ball.start<S.ball.t1?S.ball:null;
   V.nf=0;
   if(M){
-    const bs=bowlerState(),bb=S.ball||S.pending;V.bz=bs.z;V.bt=bs.bt;V.bv=bs.v;V.bh=bs.f;V.bx=(bb?bb.xr:M.bowlerType==='pace'?.3:.22)+.2*(SPX?SPX.tw:1);
+    const bs=bowlerState(),bb=S.ball||S.pending;V.bz=bs.z;V.bt=bs.bt;V.bv=bs.v;V.bh=bs.f;V.bx=(bb?bb.xr:M.bowlerType==='pace'?.3:.22)+bwXO();
     // fielders from fieldTick; the bowler's slot only carries a caught-and-bowled attempt (he is drawn from bowlerState)
     S.fpos.forEach(p=>{if(V.nf>=NFL)return;const o=V.f[V.nf++];
-      Object.assign(o,{on:!p.bw,kp:p.kp,bwl:p.bw,x:p.x,z:p.z,face:p.face,running:p.mv>.8,run:p.run,crouch:!p.kp&&(ph==='flight'||ph==='runup')?1:0,
-        act:p.act,ap:p.ap,hx:p.hx,hy:p.hy,hz:p.hz,e:p.e,sd:p.sd,hold:p.hold,vx:p.vx||0,vz:p.vz||0});
+      Object.assign(o,{on:!p.bw,kp:p.kp,bwl:p.bw,x:p.x,z:p.z,face:p.face,running:p.mv>.8,run:p.run,crouch:!p.kp&&(ph==='flight'||ph==='runup'||ph==='result'&&p.act&&p.ap<-.45&&!p.hold)?1:0,
+        act:p.act,ap:p.ap,hx:p.hx,hy:p.hy,hz:p.hz,e:p.e,sd:p.sd,hold:p.hold,vx:p.vx||0,vz:p.vz||0,ta:p.ta||0,tw:p.tw||0,tbx:p.tbx||0,tbz:p.tbz||0});
       // a caught or gathered ball stays in the hands (bk: the keeper's, hidden with him in the batting view by render3D)
-      if(p.hold&&p.ap>0){V.ball=(V.bo.x=p.hx,V.bo.y=p.hy-.05,V.bo.z=p.hz,V.bo);V.bk=p.kp;}});
+      if(p.hold&&p.ap>0){V.ball=(V.bo.x=p.hx,V.bo.y=p.hy,V.bo.z=p.hz,V.bo);V.bk=p.kp;}});
     thrView(V);
   }
   nsTick(V.ns,V.bx);
@@ -1293,10 +1432,10 @@ function render3D(V){
     if(i<V.nf&&p.bwl&&p.act)cb=p;
     if(on){mT(G.fsh[i],[p.x,0,p.z],.5,1,.5);person3D(r,p.x,p.z,p.face,p,i,V.dej,p.kp);}}
   G.bowler.g.visible=!!M;let JB=null;
-  if(M){const tw=SPX?SPX.tw:1,bx=S.phase==='replay'?bowlX(V.bx,V.bt,V.bz):BW.x;
+  if(M){const tw=SPX?SPX.tw:1,bx=S.phase==='replay'?bowlX(V.bx,V.bt,V.bz)+BW.dx0*bwFade(bowlGeo(),V.bt):BW.x;
     // the bowler from his state (bt/bv/bh); a caught-and-bowled attempt (his field slot's play) takes over, the bowling pose fading
     Object.assign(BO,{act:0,ap:0,hx:0,hy:0,hz:0,e:0,sd:1,hold:false,kp:false,bwl:true,crouch:0,bt:V.bt,pc,bx:V.bx,rp:BO.rp||[0,0,0],vx:V.bv*Math.sin(V.bh),vz:V.bv*Math.cos(V.bh)});
-    BO.rp[0]=V.bx-.2*tw;BO.rp[1]=pc?2.15:1.95;BO.rp[2]=pc?19.0:19.3;
+    BO.rp[0]=V.bx-bwXO();BO.rp[1]=pc?2.15:1.95;BO.rp[2]=pc?19.0:19.3;
     if(cb)Object.assign(BO,{act:cb.act,ap:cb.ap,hx:cb.hx,hy:cb.hy,hz:cb.hz,e:cb.e,sd:cb.sd,hold:cb.hold,vx:cb.vx,vz:cb.vz});
     JB=cb?person3D(G.bowler,cb.x,cb.z,cb.face,BO,1,V.dej):person3D(G.bowler,bx,V.bz,V.bh,BO,1,V.dej);}
   // the ball: in the bowler's hand through his run-up (V.bt < 0), else where the view puts it

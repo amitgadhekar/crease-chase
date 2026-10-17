@@ -16,6 +16,7 @@ owner marks it; decisions get dated below.
 - 2026-10-16: **Achievements with a login**, so a database is needed: **Cloudflare D1** at that time -> R2.4, R2.7.
 - 2026-10-16: **Community: a Discord server** (feedback, bug reports, reviews) plus short clips on Instagram Reels / YouTube Shorts /
   TikTok and Reddit; Facebook page as a name placeholder only -> R0.8, R1.5.
+- 2026-10-17: **New name: Galactic Cricket** (over Crease Chase, which is one letter from an existing web cricket game "Crease Clash" and uses a generic word; and over "Galaxy Cricket", whose .com has been taken since 2014 and which leans on Samsung's "Galaxy" mark). `galacticcricket.com` and `.game` were unregistered on 2026-10-17: the owner bought `galacticcricket.com` on 2026-10-17 (R0.7) and runs a trademark check (R0.4). The rename in the game and docs follows the current character fixes.
 - 2026-10-16: **Core gameplay first**, then the release steps -> section "G" below (the owner picks its items).
 - 2026-10-16: **Loading screen** on first open (done): paints at once, a progress bar through sounds, players and stadium.
 
@@ -77,6 +78,19 @@ docs/replays.md), the `SMOKE_ONLY` smoke filter. In flight: production-ready cha
 ## 4. Roadmap
 
 Order (owner, 2026-10-16): **G (core gameplay) first**, then R0 -> R1 (static launch), R2, R3, R4.
+
+### P: character polish follow-ups (owner, 2026-10-17: later)
+
+Left open after the character upgrade and fix pass 4 (details, frames and numbers: docs/characters.md, tests/charlab/reviews/round-3.md).
+
+| ID | Item | Size |
+|---|---|---|
+| P1 | Batter: late-shot bat contact 1.32 cm vs the 1 cm gate; forearms passing through each other and the handle (M2) | S-M |
+| P2 | Fielder skating left: Venus dive get-up (~2 m/s) and the keeper's run into a dive; non-bowler teleport reds (the Moon/Mars/Venus split-step pop at release + 0.12 s, the generic gait at sprint speed) | M |
+| P3 | Front-foot contact still reads wide from the front camera (H2); dive run-in short and get-up slips (H5) | S-M |
+| P4 | Fielder chest rounded with the arms raised (H6, model or weights); keeper's head-high take puts the gloves in front of the face (M1); keeper sinks ~4 cm on dives (M5, likely the pad lip) | M |
+| P5 | Elbow/knee pole flips seen only in full-lab order (M4); lab issues M7 (cordon framing ~30 m) and M8 (batter torso capsule too round) | S |
+| P6 | A critic review of fix pass 4 (none was run) and a fresh round-4 check before calling the characters production ready | S |
 
 ### G: core gameplay (first; proposed items, the owner picks)
 
@@ -249,7 +263,7 @@ Answered 2026-10-16 (see "Owner decisions"): analytics (at the end, R4.1), error
 (yes, R1.1), Easy as the default (yes, R0.2), URL (Cloudflare Pages + a custom domain, R0.7), launch places (our URL only; portals
 later), community (Discord + clips). Still open:
 
-1. **Domain name:** which name to buy (check that it's free of trademarks first, R0.4).
+1. ~~Domain name~~ answered 2026-10-17: Galactic Cricket, `galacticcricket.com` (owner buys it; trademark check first, R0.4).
 2. **Analytics provider** (when R4.1 starts): cookieless Cloudflare Web Analytics (recommended) or GoatCounter [21]?
 3. **Error reports** (when R4.2 starts): local only (recommended), or also a hosted service with IP collection off [22]?
 4. **Licence and repository visibility:** all rights reserved (default with no licence file; others can read but not reuse), MIT,

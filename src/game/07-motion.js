@@ -78,7 +78,7 @@ const MO=(()=>{
   // bob up, yaw (+ turns the right hip back: left leg forward)], sh shoulder yaw (counter), arm[i] swing (+ forward, opposite
   // to its leg), elbow extra bend, lean (rad forward), mode, speed, stride, travel (unit), fw/rt the facing's forward and right
   function gaitState(){return {ph:0,mode:0,speed:0,vf:F(2),p:F(GN),foot:[F(3),F(3)],u:F(2),st:new Uint8Array([1,1]),ls:F(2),lock:[F(3),F(3)],tgt:[F(3),F(3)],
-    pitch:F(2),pelvis:F(3),sh:0,arm:F(2),elbow:0,lean:0,fly:0,travel:F(3),fw:F(3),rt:F(3),vprev:F(2),acc:springState(),hy:springState(),sway:springState(),stride:1};}
+    pitch:F(2),lfh:F(2),pelvis:F(3),sh:0,arm:F(2),elbow:0,lean:0,fly:0,travel:F(3),fw:F(3),rt:F(3),vprev:F(2),acc:springState(),hy:springState(),sway:springState(),stride:1};}
   // put both feet on the ground in the stance for pos (x,z) and facing f (w: half width, ahead: left foot forward by this)
   function gaitReset(g,x,z,f,w=.1,ahead=0){fwdOf(g.fw,f);rightOf(g.rt,f);
     for(let i=0;i<2;i++){const sd=i?1:-1;set(g.foot[i],x+g.rt[0]*sd*w+g.fw[0]*(i?-ahead:ahead)*.5,0,z+g.rt[2]*sd*w+g.fw[2]*(i?-ahead:ahead)*.5);cp(g.lock[i],g.foot[i]);cp(g.tgt[i],g.foot[i]);
@@ -123,7 +123,9 @@ const MO=(()=>{
       // the landing target follows the prediction at a capped rate, and is fixed for the last 30% so the foot lands on a point
       if(u<.7){set(T3,x+(g.vf[0]*tl+g.travel[0]*ahead)+g.rt[0]*sd*w,0,z+(g.vf[1]*tl+g.travel[2]*ahead)+g.rt[2]*sd*w);
         if(fresh)cp(tg,T3);else{sub(T3,T3,tg);const l=len(T3),mx=3*dt;if(l>mx)sc(T3,T3,mx/l);add(tg,tg,T3);}}
-      const e=trav(u),lift=Math.max(.045,p[3]*sp.lf*Math.min(1,speed));
+      // (running, the heel comes up higher behind; the height is the one the swing started with, so a change of mode mid-swing
+      // never moves the foot up or down at once)
+      if(fresh)g.lfh[i]=Math.max(.045,p[3]*(1+.8*p[12])*sp.lf*Math.min(1,speed));const e=trav(u),lift=g.lfh[i]||.045;
       set(foot,lerp(g.lock[i][0],tg[0],e),Math.sin(Math.PI*u)*lift,lerp(g.lock[i][2],tg[2],e));
       g.pitch[i]=-.5*(1-u)*(1-u)*(1-p[12]*.5)+p[13]*u*u;
       if(u>=1){ // landing: lock, and nudge the next stance toward antiphase with the other foot

@@ -95,7 +95,7 @@ function skinVecs(J){
     R=[J.ha,V3.add(V3.norm(prp(J.ha,J.Y)),J.s),J.s,V3.add(J.n,J.face),J.face],P=[J.hip,J.hip,V3.add(J.hip,V3.sc(J.Y,L.sp)),J.sh,J.nt],
     D=V3.add(V3.sc(J.n,SKT.D[0]),V3.sc(J.Y,SKT.D[1])),TW=[];
   for(let i=0;i<2;i++){const lat=V3.sc(J.s,i?-1:1),c=V3.add(J.sh,V3.sc(lat,L.sw-L.cl)),u0=V3.add(V3.sc(J.Y,-Math.SQRT1_2),V3.sc(lat,Math.SQRT1_2)),
-      ca=V3.norm(V3.add(lat,V3.sc(V3.sub(V3.norm(V3.sub(J.e[i],J.sp[i])),u0),.15))),sp=V3.add(c,V3.sc(ca,L.cl)),
+      ad=V3.norm(V3.sub(J.e[i],J.sp[i])),ca=V3.norm(V3.add(V3.add(lat,V3.sc(V3.sub(ad,u0),.15)),V3.sc(J.Y,.25*Math.max(0,V3.dot(ad,J.Y))))),sp=V3.add(c,V3.sc(ca,L.cl)),   // (an arm raised above the shoulder lifts the clavicle too, up to ~20 deg: the shoulder and chest are not dragged up by the arm)
       bd=bendDir(J.sp[i],J.e[i],J.hd[i])||J.ap[i],e=J.e[i],sd=prp(bd,V3.sub(J.hd[i],sp)),ua=V3.sub(e,sp),f=V3.sub(J.hd[i],e),hr=V3.cross(J.gn[i],J.wa[i]),
       un=V3.norm(ua),fn=V3.norm(f),usd=V3.norm(prp(sd,un)),fsd=V3.norm(prp(sd,fn));
     A.push(ca,ua,f,J.wa[i]);R.push(J.Y,twistTo(usd,D,un,SKT.uf,SKT.uc),fsd,hr);P.push(c,sp,e,J.hd[i]);

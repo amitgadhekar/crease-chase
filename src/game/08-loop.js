@@ -63,9 +63,9 @@ function fieldTick(dt){
   if(!M||!S.fpos.length)return;
   const ph=S.phase,b=S.ball,t=clock-S.f0,ev=ph==='result'&&S.fev,bl=S.hit?hitPos(S.hit,Math.max(0,t)):b&&(ph==='flight'||ph==='result')?ballPos(b,clock-b.start):null;
   S.fpos.forEach((p,i)=>{
-    const x0=p.x,z0=p.z,es=ev&&ev[i];let face=p.face;p.act=0;p.hold=false;const tf=S.thr?throwTick(p,i,t,dt):null;
+    const x0=p.x,z0=p.z,es=ev&&ev[i];let face=p.face;p.act=0;p.hold=false;p.tw=0;const tf=S.thr?throwTick(p,i,t,dt):null;
     if(tf!=null)face=tf;
-    else if(es)face=playTick(p,es,t,bl);
+    else if(es&&!(p.bw&&es.every(e=>e.o==='miss')))face=playTick(p,es,t,bl);   // (the bowler, in his follow-through, makes no show-only dive at a ball he cannot reach)
     else if(p.kp)face=keepTick(p,ph,b);
     else if(!p.bw){
       // ring and deep fielders walk in 1.5 m over the last second of the run-up and hold through the flight; from the result on
@@ -75,34 +75,45 @@ function fieldTick(dt){
         tx=w>0?p.bx-p.bx/d*w:p.bx,tz=w>0?p.bz-(p.bz-BATS_Z)/d*w:p.bz,far=Math.hypot(tx-p.x,tz-p.z),wf=walkTo(p,tx,tz,w>0?1.8:1.3,dt);
       face=wf!=null&&far>2.5&&w<0?wf:ph==='result'&&bl?toward(p,bl.x,bl.z):toward(p,0,BATS_Z);
     }
-    const m=Math.hypot(p.x-x0,p.z-z0);p.run+=m*2.3;p.mv=dt>0?m/dt:0;p.vx=dt>0?(p.x-x0)/dt:0;p.vz=dt>0?(p.z-z0)/dt:0;
+    // (the bowler's slot taking over from where BW has him is not a step: no speed from it)
+    if(p.snap){p.snap=0;p.mv=p.vx=p.vz=0;}else{const m=Math.hypot(p.x-x0,p.z-z0);p.run+=m*2.3;p.mv=dt>0?m/dt:0;p.vx=dt>0?(p.x-x0)/dt:0;p.vz=dt>0?(p.z-z0)/dt:0;}
     // the facing eases round at up to 18 rad/s (a quick pivot, never a snap: 0.15 rad per 120 Hz frame)
-    const df=wrapA(face-p.face);p.face+=clamp(p.act>=3?df:df*Math.min(1,dt*14),-18*dt,18*dt);
+    const df=wrapA(face-p.face),rv=p.bw&&tf!=null;p.face+=clamp(p.act>=3?df:df*Math.min(1,dt*(rv?30:14)),-(rv?26:18)*dt,(rv?26:18)*dt);   // (the bowler taking a throw turns from where he was facing quicker)
   });
   const o=S.thr;if(o&&o.td&&o.rd){S.thr=null;if(M.bowl)bowlUI();}
 }
 // a fielder's events (sorted by t1): the last one begun, or the first one still to come; returns the facing wanted
 function playTick(p,es,t,bl){
   let e=es[0];for(const x of es)if(x.t0<=t)e=x;
-  if(p.ev!==e){if(p.bw){p.x=BW.x;p.z=BW.z;p.face=BW.f;}p.ev=e;playGeo(p,e);}
+  if(p.ev!==e){if(p.bw){p.x=BW.x;p.z=BW.z;p.face=BW.f;p.snap=1;}p.ev=e;playGeo(p,e);}
   const g=p.g,k=e.k;
   if(t<e.t0){p.x=g.ax;p.z=g.az;}
   else if(t<g.tL){const D=Math.hypot(g.lx-g.ax,g.lz-g.az),u=t-e.t0;
     // a take or stop arrives at the launch point as his hands meet the ball; a dive, leap or slide launches from wherever the
     // logic's run profile has carried him by then (never a snap to the launch point), the flight covering the rest
-    if(g.lead){const r=Math.min(runP(u),g.D);p.x=g.ax+g.rx*r;p.z=g.az+g.rz*r;g.px=p.x;g.pz=p.z;}
+    // (arriving early, he eases into the point over its last .4 m instead of stopping dead from a sprint)
+    if(g.lead){const s0=runP(u),Lb=Math.min(.4,g.D*.5),r=s0<g.D-Lb?s0:g.D-Lb*Math.exp(-(s0-g.D+Lb)/Math.max(1e-3,Lb));p.x=g.ax+g.rx*r;p.z=g.az+g.rz*r;g.px=p.x;g.pz=p.z;}
     else{const f=D>1e-3?Math.max(Math.min(1,runP(u)/D),runP(u)/Math.max(1e-6,runP(g.tL-e.t0))):1;p.x=lerp(g.ax,g.lx,Math.min(1,f));p.z=lerp(g.az,g.lz,Math.min(1,f));g.px=p.x;g.pz=p.z;}}
   else if(t<e.t1){const T=Math.max(1e-3,e.t1-g.tL);let u=(t-g.tL)/T;if(g.px==null){g.px=g.ax;g.pz=g.az;}
     // a slide carries on from the run's speed and slows along the ground (start slope a: v0 = a.Rm/T, end speed (2-a).Rm/T)
     if(k==='slide'){const Rm=Math.hypot(g.bx-g.px,g.bz-g.pz),a=g.sa!=null?g.sa:(g.sa=clamp(FS[physD()].v*ENV.run*T/Math.max(1e-3,Rm),0,2));g.sv=(2-a)*Rm/T;u=a*u+(1-a)*u*u;}
+    // (a leap or dive takes off with the run's speed along the flight: a Hermite from that speed into the flight's own)
+    if(k!=='slide'&&g.lead){if(g.v0==null){const D=Math.hypot(g.bx-g.px,g.bz-g.pz),w=Math.max(0,t-e.t0-.012),s0=runP(t-e.t0),s1=runP(w),Lb=Math.min(.4,g.D*.5),
+        rr=q=>q<g.D-Lb?q:g.D-Lb*Math.exp(-(q-g.D+Lb)/Math.max(1e-3,Lb)),v=(rr(s0)-rr(s1))/Math.max(1e-3,t-e.t0-w),dir=D>1e-3?((g.bx-g.px)*g.rx+(g.bz-g.pz)*g.rz)/D:0;
+        g.v0=D>1e-3?clamp(v*T*Math.max(0,dir)/D,0,3):0;}
+      const m=g.v0,u2=u*u,u3=u2*u;u=(u3-2*u2+u)*m+(3*u2-2*u3)+(u3-u2);}
     p.x=lerp(g.px,g.bx,u);p.z=lerp(g.pz,g.bz,u);}   // no run time: he launches from where he stands
+  else if(k==='dive'){   // a diver lands still moving: he slides on along his flight, slowing to a stop over at most .35 m
+    if(!g.dv){const T=Math.max(1e-3,e.t1-g.tL),px=g.px==null?g.ax:g.px,pz=g.pz==null?g.az:g.pz,D=Math.hypot(g.bx-px,g.bz-pz),v=D/T;g.dv=[D>1e-3?(g.bx-px)/D:0,D>1e-3?(g.bz-pz)/D:0,v,Math.min(.35,2*.35/Math.max(v,1e-3))];}
+    const [dx,dz,v,Ts]=g.dv,tt=clamp(t-e.t1,0,Ts),u=v*(tt-tt*tt/(2*Ts));p.x=g.bx+dx*u;p.z=g.bz+dz*u;}
   else{const tt=clamp(t-e.t1,0,.5),u=k==='slide'?(g.sv||0)*(tt-tt*tt):0;p.x=g.bx+g.ux*u;p.z=g.bz+g.uz*u;}
   p.act=k==='dive'?3:k==='jump'?4:k==='slide'?5:k==='run'&&!g.hands?1:2;
   p.ap=t-e.t1;p.e=e.e;p.sd=g.sd;p.hold=g.hold&&p.ap>0;p.hx=e.x;p.hy=e.y;p.hz=e.z;
   // a diver's hands come down with him; a held ball comes up to the chest once he is on his feet
   if(p.act===3&&p.ap>0)p.hy=lerp(e.y,Math.min(e.y,.1),smooth(clamp(p.ap/.3,0,1)));
   // a held ball comes to the chest: at once from a catch above the head (the hands come down with him), after a beat otherwise
-  if(p.hold){const hi=e.y>1.8,u=smooth(clamp((p.ap-(p.act>=3?.6:hi?0:.25))/(hi?.4:.6),0,1));p.hx=lerp(e.x,p.x+Math.sin(g.af)*.3,u);p.hy=lerp(p.hy,1.05,u);p.hz=lerp(e.z,p.z+Math.cos(g.af)*.3,u);}
+  if(p.hold){const hi=e.y>1.8,u=smooth(clamp((p.ap-(p.act>=3?.6:hi?0:.25))/(hi?.4:.6),0,1)),fo=hi?0:.3*Math.sin(Math.PI*u);   // (from low down the hands come up in front of the knees, not through them)
+    p.hx=lerp(e.x,p.x+Math.sin(g.af)*.3,u)+Math.sin(g.af)*fo;p.hy=lerp(p.hy,1.05,u);p.hz=lerp(e.z,p.z+Math.cos(g.af)*.3,u)+Math.cos(g.af)*fo;}
   const D=Math.hypot(g.lx-g.ax,g.lz-g.az);
   if(t<e.t0)return bl?toward(p,bl.x,bl.z):p.face;
   if(D>1.2&&t<g.tL-.25)return g.rf;
@@ -123,7 +134,7 @@ function playGeo(p,e){
   else if(k==='jump'){rB=rL=.45;lead=.35;}
   // the ball is scooped beside the hip as he slides past it (the body as near as his run and a slowing slide get him, the
   // lying arm's reach for the rest)
-  else if(k==='slide'){lead=.45;const v=FS[physD()].v*ENV.run,sl=v*lead*.6;rB=Math.max(.2,d-runP(Math.max(0,e.t1-lead-e.t0))-sl);if(e.o!=='miss')rB=Math.min(rB,.5);rL=rB+sl;}   // (a miss: he slides short of it)
+  else if(k==='slide'){lead=.45;const v=FS[physD()].v*ENV.run,sl=v*lead*.6;rB=Math.max(.2,d-runP(Math.max(0,e.t1-lead-e.t0))-sl);if(e.o!=='miss')rB=Math.min(rB,.35);rL=rB+sl;}   // (a miss: he slides short of it)
   if(wl>.3)rB=rL=Math.max(.35,Math.min(d,rB));else{rB=Math.min(d,rB);rL=Math.min(d,rL);}
   const g={ax:p.x,az:p.z,lx:e.x-ux*rL,lz:e.z-uz*rL,bx:e.x-ux*rB,bz:e.z-uz*rB,ux,uz,tL:clamp(e.t1-lead,e.t0,e.t1),hands,sd:1,lead,px:null,pz:null,
     hold:e.o==='catch'||e.o==='stop'||fetch};
@@ -160,8 +171,9 @@ function keepTick(p,ph,b){
   if(!tk||G.y>2.45||Math.abs(G.x-p.bx)>2.3){walkTo(p,p.bx,p.bz,1.2,dt);p.hx=p.x;p.hy=.4+.35*(1-p.e);p.hz=p.z+.35;return G&&fl?toward(p,G.x,G.z+2):0;}
   const gx=p.bx+clamp(G.x-p.bx,-1.7,1.7)*smooth(clamp(bt/tk,0,1));p.x+=clamp(gx-p.x,-3*dt,3*dt);p.z+=clamp(p.bz-p.z,-2*dt,2*dt);p.ap=bt-tk;p.hold=p.ap>0;
   // the gloves go up to the line of the ball over the last .4 s before it arrives (until then they wait in front of him)
-  const u=smooth(clamp((bt-(tk-.4))/.4,0,1));p.hx=lerp(p.x,G.x,u);p.hy=lerp(.4+.35*(1-p.e),G.y+.05,u);p.hz=lerp(p.z+.35,G.z,u);
-  if(p.hold){const u=smooth(clamp(p.ap/(S.stumps&&p.bz>-3?.15:.4),0,1)),T=S.stumps&&p.bz>-3?[0,.62,.1]:[p.x,.95,p.z+.3];p.hx=lerp(G.x,T[0],u);p.hy=lerp(G.y+.05,T[1],u);p.hz=lerp(G.z,T[2],u);}
+  const u=smooth(clamp((bt-(tk-.4))/.4,0,1));p.hx=lerp(p.x,G.x,u);p.hy=lerp(.35+.35*(1-p.e)+.05*p.e,G.y,u);p.hz=lerp(p.z+.35,G.z,u);   // (hy: the ball's centre as drawn is .05 above it, as for every fielder)
+  // the give: the gloves ride back into him and down to the hip (over the bails at the stumps), never up past the helmet
+  if(p.hold){const st=S.stumps&&p.bz>-3,u=smooth(clamp(p.ap/(st?.15:.5),0,1)),T=st?[0,.57,.1]:[p.x,.85,p.z+.28],dn=Math.min(1,u*1.6);p.hx=lerp(G.x,T[0],u);p.hy=lerp(Math.min(G.y,1.75),T[1],dn);p.hz=lerp(G.z,T[2],u);}
   return 0;
 }
 /* throws back, show only (no runs, outs or logic; decorative randomness from TR): after a stop, a fetch or a fumble the fielder
@@ -177,7 +189,11 @@ const TR=prng(29),THW={under:.15,flat:.35,bounce:.55,loop:.55},
   // throwing hand from the right shoulder (toward the target, his right, up; x arm length/.61): chest, back at that fraction of the
   // wind-up, release, follow-through. Overarm: side-on, the hand back behind the head at about head height with the elbow up and
   // bent, then through high in front at the release, then down across the body; underarm: low back, low through; looping: higher
-  THK=[[-.4,[.25,-.2,-.25],[-.34,.12,.1],[.38,-.05,.28],[.3,-.45,-.4],[.05,-.15,-.55]],[-.6,[.3,-.2,-.35],[-.3,.05,-.5],[.4,-.05,-.3],[.45,-.05,-.1],[.07,.07,-.57]],[-.4,[.25,-.2,-.25],[-.45,.1,.25],[.3,-.05,.42],[.3,-.4,-.3],[.05,-.15,-.55]]];
+  THK=[[-.4,[.3,-.05,-.22],[-.34,.12,.1],[.38,.1,.28],[.34,-.28,-.36],[.1,.18,-.55]],[-.6,[.3,-.2,-.35],[-.3,.05,-.5],[.4,-.05,-.3],[.45,-.05,-.1],[.07,.07,-.57]],[-.4,[.25,-.2,-.25],[-.45,.1,.25],[.3,-.05,.42],[.3,-.4,-.3],[.05,-.15,-.55]]];
+// overarm and looping wind-ups (fractions of the wind-up before the release): from the chest the hand goes out to his side and drops
+// low and back past the hip, comes up cocked behind the shoulder (elbow at shoulder height, hand above it and out to the side, clear of the head), then
+// accelerates over the top, beside the head (never over the cap), to the release in front
+const THW2=[[[-1,[.3,-.05,-.22]],[-.82,[.08,.36,-.3]],[-.62,[-.28,.42,-.32]],[-.28,[-.22,.32,.3]],[0,[.38,.1,.3]]],null,[[-1,[.3,-.05,-.22]],[-.82,[.08,.3,-.28]],[-.62,[-.33,.36,-.28]],[-.28,[-.3,.32,.36]],[0,[.3,-.05,.45]]]];
 const isFetch=(e,h,res)=>e.k==='run'&&!e.o&&!!h&&!res.boundary&&(q=>Math.hypot(q.x-e.x,q.z-e.z)<1.5)(hitPos(h,e.t1));
 // in doSwing: the throw after this ball, if any (S.thr)
 function planThrow(res,D0){
@@ -188,7 +204,7 @@ function planThrow(res,D0){
   // where he throws from: behind the ball (the body is captured when the throw takes over, see throwTick); after a fumble he walks to it
   if(R){const dx=R.x-e.x,dz=R.z-e.z,d=Math.hypot(dx,dz)||1;B={x:R.x-dx/d*.45,z:R.z-dz/d*.45};}
   else{const dx=e.x-p.x,dz=e.z-p.z,d=Math.hypot(dx,dz),r=Math.min(d,dv?.9:.6);B=d>1e-3?{x:e.x-dx/d*r,z:e.z-dz/d*r}:{x:p.x,z:p.z};}
-  const tg=R?e.t1+.75+Math.hypot(B.x-e.x,B.z-e.z)/3.5:dv?e.t1+1.15:e.k==='run'?e.t1+.35:e.t1+.3;
+  const tg=R?e.t1+.75+Math.hypot(B.x-e.x,B.z-e.z)/3.5:dv?e.t1+1.15:e.k==='run'?e.t1+.5:e.t1+.5;   // (a stop or fetch: the ball comes up to the chest first)
   const Dk=Math.hypot(B.x,B.z),Db=Math.hypot(B.x,B.z-20.12),geo=Db<.75*Dk?['bw','kp']:['kp'],
     ends=M.bowl?geo:S.cord?['kp','bw']:S.chase?[...geo,'bw']:['bw'];
   for(const rv of new Set(ends)){const o=thrPlan(p,e,rv,B,tg,R,clock-S.f0+D0);if(o){S.thr=o;return;}}
@@ -232,7 +248,9 @@ function thrFlight(o){
 // the throwing (right) hand: keys from the shoulder through the wind-up (ap<0), accelerating into the release, easing after it
 function thrHand(o,x,z,f,ap){
   const P=SPX,s=P?(P.ua+P.fa)/.61:1,sy=P?P.an+(P.th+P.sh)*P.kn+P.tor*.926:1.4,sx=P?.2*P.tw:.2,K=THK[o.ty],w=o.wu,tb=K[0]*w;
-  const k=ap<=-w?K[1]:ap<=tb?V3.lerp(K[1],K[2],smooth((ap+w)/(tb+w))):ap<=0?V3.lerp(K[2],K[3],((ap-tb)/-tb)**2):ap<=.4?V3.lerp(K[3],K[4],1-(1-ap/.4)**2):V3.lerp(K[4],K[5],smooth((ap-.4)/.5));
+  const W2=THW2[o.ty];let k;
+  if(W2&&ap<=0){const q=Math.max(-1,ap/w);let j=1;while(j<W2.length-1&&W2[j][0]<q)j++;const A=W2[j-1],B=W2[j],u=clamp((q-A[0])/(B[0]-A[0]),0,1);k=V3.lerp(A[1],B[1],j===W2.length-1?u*u:smooth(u));}
+  else k=ap<=-w?K[1]:ap<=tb?V3.lerp(K[1],K[2],smooth((ap+w)/(tb+w))):ap<=0?V3.lerp(K[2],K[3],((ap-tb)/-tb)**2):ap<=.4?V3.lerp(K[3],K[4],1-(1-ap/.4)**2):V3.lerp(K[4],K[5],smooth((ap-.4)/.5));
   const fw=k[0]*s,r=k[1]*s,sn=Math.sin(f),cs=Math.cos(f),sa=Math.sin(o.a),ca=Math.cos(o.a);   // the shoulder turns with him (f), the keys go with the throw (o.a)
   return {x:x+sx*cs+fw*sa+r*ca,y:sy+k[2]*s,z:z-sx*sn+fw*ca-r*sa};
 }
@@ -261,12 +279,14 @@ function throwTick(p,i,t,dt){
     const s0=R?{x:o.B.x,z:o.B.z,hx:R.x,hy:.06,hz:R.z,f:Math.atan2(R.x-o.B.x,R.z-o.B.z)}:c,k=smooth(clamp((t-o.tg)/Math.min(.25,o.tr-o.tg),0,1)),
       g=clamp((ap+w)/w,0,1),bx=lerp(o.B.x,o.Br.x,smooth(g)),bz=lerp(o.B.z,o.Br.z,smooth(g)),
       f=o.a+(ap<0?(o.ty===1?.15:.85)*Math.sin(Math.PI*g):-.25*smooth(clamp(ap/.3,0,1))),H=thrHand(o,bx,bz,f,ap);
-    p.x=lerp(s0.x,bx,k);p.z=lerp(s0.z,bz,k);p.hx=lerp(s0.hx,H.x,k);p.hy=lerp(s0.hy,H.y,k);p.hz=lerp(s0.hz,H.z,k);
-    p.act=7;p.ap=ap;p.e=o.ty+.25*clamp(1-(t-o.tg)/.3,0,1);p.hold=ap<0;
+    // (the ball coming up from low down comes up in front of his knees, not through them)
+    const fo=s0.hy<.75?.3*Math.sin(Math.PI*k):0,fa=s0.f+wrapA(f-s0.f)*k;
+    p.x=lerp(s0.x,bx,k);p.z=lerp(s0.z,bz,k);p.hx=lerp(s0.hx,H.x,k)+Math.sin(fa)*fo;p.hy=lerp(s0.hy,H.y,k);p.hz=lerp(s0.hz,H.z,k)+Math.cos(fa)*fo;
+    p.act=7;p.ap=ap;p.e=o.ty+.25*clamp(1-(t-o.tg)/.3,0,1);p.hold=ap<0;p.ta=o.a;p.tw=o.wu;p.tbx=o.Br.x;p.tbz=o.Br.z;
     return s0.f+wrapA(f-s0.f)*k;
   }
   if(o.rd||!(o.rv==='kp'?p.kp:p.bw)||t<o.ks)return null;
-  if(!o.k0){o.k0=p.bw&&!p.ev?{x:BW.x,z:BW.z}:{x:p.x,z:p.z};if(p.bw&&!p.ev)p.face=BW.f;}
+  if(!o.k0){o.k0=p.bw&&!p.ev?{x:BW.x,z:BW.z}:{x:p.x,z:p.z};if(p.bw){p.face=BW.f;p.snap=1;}}   // (the bowler is drawn from BW until now: his facing goes on from there)
   const r=thrRecv(o),ap=t-r.tk,u=smooth(clamp((t-o.ks)/Math.max(.05,o.tR-.15-o.ks),0,1)),w0=o.at?.6:.3;
   let x=lerp(o.k0.x,r.bx,u),z=lerp(o.k0.z,r.bz,u),hx=r.hx,hy=r.hy,hz=r.hz,face=Math.atan2(o.Br.x-x,o.Br.z-z);
   // on his way back he faces where he is going until he turns for the throw
@@ -288,7 +308,8 @@ function walkTo(p,x,z,v,dt){
   // the planet's run multiplier scales the walk, not the hurry: whoever must be back for the next ball runs at up to 7 m/s
   // (a man still far from his place as the bowler runs in sprints the rest: he must be there at the release)
   const left=ph==='ready'?BALL_GAP-S.t:ph==='break'?S.breakDur-S.t+BALL_GAP:ph==='result'?S.resultDur-S.t+BALL_GAP:ph==='runup'&&d>2.5?S.runupDur-S.t:9,need=d/Math.max(.2,left-.2);
-  const s=Math.min(d,Math.max(v*ENV.run,Math.min(need,7))*dt);p.x+=dx/d*s;p.z+=dz/d*s;return Math.atan2(dx,dz);
+  // (setting off he accelerates from the speed he has, at most 10 m/s^2, and he slows into his place)
+  const s=Math.min(d,Math.min(Math.max(v*ENV.run,Math.min(need,7)),(p.mv||0)+10*dt,Math.sqrt(12*d)+.3)*dt);p.x+=dx/d*s;p.z+=dz/d*s;return Math.atan2(dx,dz);
 }
 // the ball while a throw drives it: in the thrower's hand, in flight, on to the stumps for a direct hit, then in the receiver's hands;
 // kp: held by the keeper (hidden with him in the batting view)
